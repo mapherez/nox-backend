@@ -59,6 +59,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/sync/upload/", s.handleUploadSync)
 	mux.HandleFunc("/v1/sync/commit", s.handleCommitSync)
 	mux.HandleFunc("/v1/sync/abort", s.handleAbortSync)
+	mux.HandleFunc("/v1/files", s.handleListFiles)
 	mux.HandleFunc("/v1/files/download", s.handleDownloadFile)
 	return mux
 }

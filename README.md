@@ -243,6 +243,7 @@ The release tag should match the version in `plugin/manifest.json`.
 
 - [User setup guide](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
+- [Read API for Codex integration](docs/read-api.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Security policy](SECURITY.md)
 

@@ -156,8 +156,21 @@ type AbortRequest struct {
 
 // DownloadResult points at a finalized backend blob.
 type DownloadResult struct {
-	Path     string
-	Hash     string
-	Size     int64
-	Revision int64
+	Path     string `json:"path"`
+	Hash     string `json:"hash"`
+	Size     int64  `json:"size"`
+	Revision int64  `json:"revision"`
+}
+
+// FileList is a consistent view of the vault's last committed state.
+type FileList struct {
+	VaultID        string           `json:"vaultId"`
+	ServerRevision int64            `json:"serverRevision"`
+	Files          []DownloadResult `json:"files"`
+}
+
+// DownloadConditions optionally require the selected file version to be current.
+type DownloadConditions struct {
+	ExpectedHash     *string
+	ExpectedRevision *int64
 }

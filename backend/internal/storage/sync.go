@@ -487,17 +487,41 @@ func (s *Store) AbortSync(ctx context.Context, userID string, req AbortRequest) 
 
 // DownloadFile returns metadata for a finalized remote file.
 func (s *Store) DownloadFile(ctx context.Context, userID string, vaultID string, vaultPath string) (DownloadResult, error) {
-	if _, err := s.VaultByID(ctx, userID, vaultID); err != nil {
-		return DownloadResult{}, err
+	return s.DownloadFileConditional(ctx, userID, vaultID, vaultPath, DownloadConditions{})
+}
+
+// DownloadFileConditional checks conditions against the metadata selecting the
+// blob. Callers must serve that hash, without looking up the current file again.
+func (s *Store) DownloadFileConditional(ctx context.Context, userID string, vaultID string, vaultPath string, conditions DownloadConditions) (DownloadResult, error) {
+	userID = strings.TrimSpace(userID)
+	vaultID = strings.TrimSpace(vaultID)
+	if userID == "" || vaultID == "" {
+		return DownloadResult{}, fmt.Errorf("%w: userId and vaultId are required", ErrBadRequest)
+	}
+	if conditions.ExpectedHash != nil {
+		if err := validateSHA256(*conditions.ExpectedHash); err != nil {
+			return DownloadResult{}, err
+		}
+	}
+	if conditions.ExpectedRevision != nil && *conditions.ExpectedRevision < 0 {
+		return DownloadResult{}, fmt.Errorf("%w: expectedRevision cannot be negative", ErrBadRequest)
 	}
 
 	normalizedPath, err := NormalizeVaultPath(vaultPath)
 	if err != nil {
 		return DownloadResult{}, err
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return DownloadResult{}, fmt.Errorf("begin download transaction: %w", err)
+	}
+	defer rollback(tx)
+	if _, err := ensureActiveVaultTx(ctx, tx, userID, vaultID); err != nil {
+		return DownloadResult{}, err
+	}
 
 	var result DownloadResult
-	if err := s.db.QueryRowContext(ctx, `
+	if err := tx.QueryRowContext(ctx, `
 		SELECT path, current_hash, size, revision
 		FROM files
 		WHERE vault_id = ? AND path = ? AND deleted = 0
@@ -506,6 +530,13 @@ func (s *Store) DownloadFile(ctx context.Context, userID string, vaultID string,
 			return DownloadResult{}, ErrNotFound
 		}
 		return DownloadResult{}, fmt.Errorf("load file metadata: %w", err)
+	}
+	if conditions.ExpectedHash != nil && *conditions.ExpectedHash != result.Hash ||
+		conditions.ExpectedRevision != nil && *conditions.ExpectedRevision != result.Revision {
+		return DownloadResult{}, ErrFileChanged
+	}
+	if err := tx.Commit(); err != nil {
+		return DownloadResult{}, fmt.Errorf("commit download transaction: %w", err)
 	}
 
 	return result, nil

@@ -278,11 +278,40 @@ func (s *Store) PurgeDeletedVault(ctx context.Context, userID string, vaultID st
 
 // CurrentVaultFiles returns all current non-deleted file metadata for zip export.
 func (s *Store) CurrentVaultFiles(ctx context.Context, userID string, vaultID string) ([]DownloadResult, error) {
-	if _, err := s.VaultByID(ctx, userID, vaultID); err != nil {
-		return nil, err
+	result, err := s.ListFiles(ctx, userID, vaultID)
+	return result.Files, err
+}
+
+// ListFiles reads ownership, vault revision and current files in one transaction.
+// All queries use tx because the store has only one database connection.
+func (s *Store) ListFiles(ctx context.Context, userID string, vaultID string) (FileList, error) {
+	userID = strings.TrimSpace(userID)
+	vaultID = strings.TrimSpace(vaultID)
+	if userID == "" || vaultID == "" {
+		return FileList{}, fmt.Errorf("%w: userId and vaultId are required", ErrBadRequest)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return FileList{}, fmt.Errorf("begin list files transaction: %w", err)
+	}
+	defer rollback(tx)
+	revision, err := ensureActiveVaultTx(ctx, tx, userID, vaultID)
+	if err != nil {
+		return FileList{}, err
 	}
 
-	rows, err := s.db.QueryContext(ctx, `
+	files, err := currentVaultFilesTx(ctx, tx, vaultID)
+	if err != nil {
+		return FileList{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return FileList{}, fmt.Errorf("commit list files transaction: %w", err)
+	}
+	return FileList{VaultID: vaultID, ServerRevision: revision, Files: files}, nil
+}
+
+func currentVaultFilesTx(ctx context.Context, tx *sql.Tx, vaultID string) ([]DownloadResult, error) {
+	rows, err := tx.QueryContext(ctx, `
 		SELECT path, current_hash, size, revision
 		FROM files
 		WHERE vault_id = ? AND deleted = 0

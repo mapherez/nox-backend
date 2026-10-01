@@ -9,6 +9,7 @@ var (
 	ErrSyncSessionStale    = errors.New("sync session stale")
 	ErrHashMismatch        = errors.New("hash mismatch")
 	ErrNotFound            = errors.New("not found")
+	ErrFileChanged         = errors.New("file changed")
 	ErrConflictDetected    = errors.New("conflict detected")
 	ErrForbidden           = errors.New("forbidden")
 )

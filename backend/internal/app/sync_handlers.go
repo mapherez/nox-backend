@@ -175,6 +175,7 @@ func (s *Server) handleAbortSync(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	if !s.requireMethod(w, r, http.MethodGet) {
 		return
 	}
@@ -188,7 +189,12 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := s.store.DownloadFile(r.Context(), user.ID, vaultID, vaultPath)
+	conditions, err := downloadConditions(r)
+	if err != nil {
+		writeStorageError(w, err)
+		return
+	}
+	result, err := s.store.DownloadFileConditional(r.Context(), user.ID, vaultID, vaultPath, conditions)
 	if err != nil {
 		writeStorageError(w, err)
 		return
@@ -252,6 +258,8 @@ func writeStorageError(w http.ResponseWriter, err error) {
 		writeJSONError(w, http.StatusBadRequest, "HASH_MISMATCH", err.Error())
 	case errors.Is(err, storage.ErrConflictDetected):
 		writeJSONError(w, http.StatusConflict, "CONFLICT_DETECTED", "Unresolved conflicts must be handled before commit.")
+	case errors.Is(err, storage.ErrFileChanged):
+		writeJSONError(w, http.StatusConflict, "FILE_CHANGED", "File changed since selection. Refresh the file list and select again.")
 	case errors.Is(err, storage.ErrNotFound):
 		writeJSONError(w, http.StatusNotFound, "NOT_FOUND", "Requested file was not found.")
 	case errors.Is(err, storage.ErrForbidden):
