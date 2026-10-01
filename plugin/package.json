@@ -6,6 +6,7 @@
   "license": "GPL-3.0-only",
   "main": "dist/main.js",
   "scripts": {
+    "version:set": "node scripts/set-version.mjs",
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
     "test": "node esbuild.test.mjs && node --test .test-dist/sync-core.test.cjs",

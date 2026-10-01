@@ -239,6 +239,21 @@ styles.css
 
 The release tag should match the version in `plugin/manifest.json`.
 
+To update the plugin version everywhere, run from `plugin/`:
+
+```bash
+npm run version:set
+```
+
+The script shows the current version and asks for the new `MAJOR.MINOR.PATCH`
+version. Press Enter to cancel, or pass a version directly with
+`npm run version:set -- 1.0.2`. It updates `plugin/package.json`, both root version
+entries in `plugin/package-lock.json`, the root and plugin `manifest.json` files,
+and both `versions.json` files. Previous compatibility entries and
+`minAppVersion` are preserved. Run `npm run build` afterwards to regenerate the
+release files in `plugin/dist/`. The backend version remains configured through
+`NOX_SYNC_VERSION`.
+
 ## Documentation
 
 - [User setup guide](docs/user-setup.md)
