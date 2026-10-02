@@ -1,82 +1,40 @@
-# NoX Sync - an [Obsidian](https://obsidian.md/) plugin
+# NoX Backend
 
-[![CI](https://github.com/mapherez/nox-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/mapherez/nox-sync/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/mapherez/nox-sync/actions/workflows/codeql.yml/badge.svg)](https://github.com/mapherez/nox-sync/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mapherez/nox-sync/badge)](https://securityscorecards.dev/viewer/?uri=github.com/mapherez/nox-sync)
-[![Docker](https://github.com/mapherez/nox-sync/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/mapherez/nox-sync/actions/workflows/docker-publish.yml)
+[![CI](https://github.com/mapherez/nox-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/mapherez/nox-backend/actions/workflows/codeql.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mapherez/nox-backend/badge)](https://securityscorecards.dev/viewer/?uri=github.com/mapherez/nox-backend)
+[![Docker](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-Made with ❤️ by [Mapherez](https://github.com/mapherez) - If you enjoy NoX Sync, please consider [buying me a beer 🍺](https://buymeacoffee.com/mapherez)
+Made with ❤️ by [Mapherez](https://github.com/mapherez). If you enjoy the project, please consider [buying me a beer 🍺](https://buymeacoffee.com/mapherez).
 
-## What is NoX Sync?
+## What is NoX Backend?
 
-NoX Sync is a private, self-hosted synchronization system for Obsidian vaults. It consists of an Obsidian plugin and a backend service that together manage remote vault storage, synchronization state, conflict handling, and access control.
+NoX Backend is the self-hosted backend for [NoX Sync](https://github.com/mapherez/nox-sync), the Obsidian vault synchronization plugin. This repository contains the Go HTTP service, SQLite metadata, filesystem blob storage, web dashboard, and Docker configuration. The plugin source and releases belong to the separate NoX Sync repository.
 
-The project has two parts:
-
-- `backend/` - Go HTTP service with SQLite metadata, local filesystem blob storage, a web dashboard, and Docker support.
-- `plugin/` - Obsidian plugin written in TypeScript using the Obsidian API, HTML, and CSS.
-
-Synchronization is explicitly triggered by the user rather than running continuously in the background.
-NoX Sync does not depend on external databases, external sync providers, vault sharing, or realtime collaboration services.
-
-## Who is NoX Sync for?
-
-NoX Sync is intended for users who are comfortable managing their own infrastructure and want their Obsidian synchronization stack to remain under their control.
-
-It is particularly suited for users who:
-
-- already run, or are comfortable running, services on a NAS, homelab, VPS, or Docker host;
-- want to synchronize vaults between multiple devices without relying on a managed sync provider;
-- prefer explicit synchronization over always-on background synchronization;
-- are comfortable configuring services such as Docker, domains, reverse proxies, and OAuth where required.
-
-NoX Sync is not intended to hide the underlying infrastructure or operate as a managed cloud service.
+The plugin communicates with the backend through its configured Server URL and API key. Neither repository needs the other's source code to build or run. Synchronization remains manually triggered by the plugin user.
 
 ## Features
 
-- Manual sync from the Obsidian ribbon button or `NoX Sync: Sync vault` command.
-- Self-hosted backend with persistent `/data` storage.
-- Google-authenticated `/vault-dashboard` with admin allowlist management.
-- One reusable `noxsync_` API key per active user.
-- Multiple remote vaults per user, selected from the Obsidian plugin settings.
-- Dashboard vault list with revision, updated time, cloud size, download, soft delete, restore, and permanent delete.
-- Plugin settings vault manager with create, select, delete, restore, permanent delete, and cloud size display.
-- Admin dashboard controls for adding, enabling, disabling, deleting, and promoting users.
-- HTTP + JSON API under `/v1`.
-- Server-sent events for backend status updates.
-- Backend-enforced per-vault sync lock with heartbeat and stale-lock recovery.
-- Manifest-based planning for uploads, downloads, deletes, conflicts, and no-op actions.
-- SHA-256 validation for uploads and downloads.
-- Staged upload and commit flow so interrupted syncs do not change current remote state.
-- Content-addressed local blob storage.
-- Current and previous backend file versions plus tombstones for deletes.
-- Explicit Markdown and binary conflict handling.
-- Safe local replacement/delete behavior through `.nox-sync-trash/`.
-- Settings shortcut from the ribbon when no backend vault is selected.
-- Local `.nox-sync-trash/` size display and clear-trash action.
-- Settings-page support link for donations.
-- Plugin-local settings, credentials, sync state, and trash excluded from sync.
+- Google-authenticated `/vault-dashboard` with admin allowlist and user management.
+- One reusable `noxsync_` API key per active user and multiple vaults per user.
+- Vault download, soft delete, restore, permanent delete, and cloud storage size.
+- HTTP + JSON API under `/v1`, with server-sent events for sync status.
+- Per-vault sync locks, heartbeats, and stale-lock recovery.
+- Manifest-based upload, download, delete, and conflict planning.
+- SHA-256 validation, staged uploads, and atomic remote commits.
+- Content-addressed blobs, current and previous file versions, and deletion tombstones.
+- Read API for external integrations, including conditional downloads.
 
-## Install From Release
+## Run the backend
 
-This is the recommended path for normal use.
-
-### 1. Run The Backend
-
-The backend is published as a Docker image:
-
-```text
-ghcr.io/mapherez/nox-sync:latest
-```
-
-Download `docker-compose.yml` from this repository into an empty folder on your server, homelab, or Docker Desktop machine:
+For a **new installation**, download the production Compose file:
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-sync/master/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
 ```
 
-Create a `.env` file in the same folder:
+Create a `.env` beside it:
 
 ```bash
 NOX_SYNC_PUBLIC_URL=https://sync.example.com
@@ -85,111 +43,49 @@ NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
 NOX_SYNC_ADMIN_EMAILS=you@example.com
 ```
 
-For local-only testing, `NOX_SYNC_PUBLIC_URL` can be:
-
-```bash
-NOX_SYNC_PUBLIC_URL=http://localhost:5710
-```
-
-Start the backend:
-
-```bash
-docker compose up -d
-```
-
-The Compose file maps host port `5710` to container port `8080`. Open the dashboard at:
-
-```text
-http://localhost:5710/vault-dashboard
-```
-
-For a public domain, open:
-
-```text
-https://sync.example.com/vault-dashboard
-```
-
-### 2. Install The Obsidian Plugin
-
-Download the plugin release assets from:
-
-```text
-https://github.com/mapherez/nox-sync/releases
-```
-
-You need these three files from the plugin release:
-
-```text
-main.js
-manifest.json
-styles.css
-```
-
-Create this folder inside each Obsidian vault where you want to use NoX Sync:
-
-```text
-<vault>/.obsidian/plugins/nox-sync/
-```
-
-Put the three release files in that folder, then enable NoX Sync from Obsidian's Community Plugins settings.
-
-### 3. Connect The Plugin
-
-In the backend dashboard:
-
-- Sign in with your allowlisted Google account.
-- Copy the Server URL.
-- Copy your API key.
-
-In Obsidian:
-
-- Open NoX Sync settings.
-- Paste the Server URL and API key.
-- Set a readable Client name, such as `Laptop` or `Desktop`.
-- Click **Test connection**.
-- Create or select a backend vault.
-- Use the ribbon button to manually sync.
-
-You can assign your own shortcut to the `NoX Sync: Sync vault` command from Obsidian's Hotkeys settings.
-
-For the full first-run flow, see [User setup guide](docs/user-setup.md).
-
-## Google OAuth
-
-The dashboard uses Google login. Create a Google OAuth web client and add this authorized redirect URI:
+Set the Google OAuth authorized redirect URI to:
 
 ```text
 https://sync.example.com/auth/google/callback
 ```
 
-For local testing with the default Compose port, use:
+The production Compose file targets `ghcr.io/mapherez/nox-backend:latest`. It can be used after that image is published from this repository:
 
-```text
-http://localhost:5710/auth/google/callback
+```bash
+docker compose up -d
 ```
 
-`NOX_SYNC_PUBLIC_URL` must match the public origin you use in the browser. Do not include a trailing slash.
+It maps host port `5710` to container port `8080`. Open `/vault-dashboard` at your public URL. For local testing, use `NOX_SYNC_PUBLIC_URL=http://localhost:5710` and the matching OAuth callback.
 
-## Backend Data
+**Existing installations:** follow the [repository separation and update guide](docs/backend-separation.md). Update the image in your existing deployment; preserve its Compose project, volume, mounts, and configuration.
 
-The backend stores all persistent state under `/data`:
+## Connect NoX Sync
+
+Install the plugin using the instructions and releases in [mapherez/nox-sync](https://github.com/mapherez/nox-sync).
+
+1. Sign in to this backend's dashboard with an allowlisted Google account.
+2. Copy the Server URL and your API key.
+3. Enter both in NoX Sync settings and use **Test connection**.
+4. Select or create a backend vault, then manually sync.
+
+An existing plugin can keep the same Server URL, API key, and selected vault after the repository separation. The backend routes, authentication, JSON responses, errors, and SSE behavior are unchanged.
+
+## Persistent data and compatibility
+
+All persistent state stays under `/data`:
 
 - `/data/nox-sync.db`
 - `/data/blobs`
 - `/data/staging`
 - `/data/logs`
 
-Back up the whole `/data` directory as one unit. Restoring only the database or only the blobs can leave metadata and file content out of sync.
+Back up the complete directory as one consistent unit. Database metadata and blobs must stay together.
 
-Soft-deleted vaults can be restored from the dashboard or plugin. Permanently deleting a vault removes its metadata and cleans up unreferenced finalized blobs where safe.
+The separation does not change the database schema or add migrations. Existing migration files and startup behavior are retained. Before updating an existing installation, verify that its database has already applied the migrations included in this checkout; see the [update guide](docs/backend-separation.md).
 
-See [Backend configuration](docs/backend-configuration.md) for environment variables and Docker details.
+For compatibility, runtime identifiers retain their existing names: `NOX_SYNC_*` variables, `noxsync_` keys, the `nox-sync` executable, Compose services and containers, and the `nox-sync-data` volume key. The Go module remains `github.com/mapherez/nox-sync/backend`; it is the local module identity, not a runtime dependency on the plugin repository.
 
-## Build From Source
-
-Use this path if you want to modify the code or build everything locally.
-
-Backend:
+## Build from source
 
 ```bash
 cd backend
@@ -197,93 +93,33 @@ go test ./...
 go run ./cmd/nox-sync
 ```
 
-Plugin:
+Configure environment variables before starting the backend. Use a separate data directory for development.
+
+To build with Docker:
 
 ```bash
-cd plugin
-npm install
-npm run typecheck
-npm run test
-npm run build
+docker build -t nox-backend:dev ./backend
 ```
 
-The installable plugin files are written to `plugin/dist/`:
-
-```text
-main.js
-manifest.json
-styles.css
-```
-
-Local development backend with Docker:
+For local development with a `./data:/data` bind mount:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-## Release Notes
-
-Backend releases are Docker images. The production Compose example uses:
-
-```text
-ghcr.io/mapherez/nox-sync:latest
-```
-
-Plugin releases should attach these files as GitHub release assets:
-
-```text
-main.js
-manifest.json
-styles.css
-```
-
-The release tag should match the version in `plugin/manifest.json`.
-
-To update the plugin version everywhere, run from `plugin/`:
-
-```bash
-npm run version:set
-```
-
-The script shows the current version and asks for the new `MAJOR.MINOR.PATCH`
-version. Press Enter to cancel, or pass a version directly with
-`npm run version:set -- 1.0.2`. It updates `plugin/package.json`, both root version
-entries in `plugin/package-lock.json`, the root and plugin `manifest.json` files,
-and both `versions.json` files. Previous compatibility entries and
-`minAppVersion` are preserved. Run `npm run build` afterwards to regenerate the
-release files in `plugin/dist/`. The backend version remains configured through
-`NOX_SYNC_VERSION`.
+The production image is published manually through the **Publish Docker image** GitHub Actions workflow. Publishing an image and updating a running server are separate operations. Backend version reporting continues to use `NOX_SYNC_VERSION` independently of plugin releases.
 
 ## Documentation
 
-- [User setup guide](docs/user-setup.md)
+- [Backend setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
+- [Repository separation, validation, update, and rollback](docs/backend-separation.md)
 - [Read API for Codex integration](docs/read-api.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Security policy](SECURITY.md)
 
-## Security And Quality
-
-NoX Sync uses GitHub Actions for backend tests, plugin type checks, plugin tests, plugin builds, and Docker image builds. CodeQL and OpenSSF Scorecard workflows are included for automated security scanning and repository health checks.
-
-Security issues should be reported privately. See [Security Policy](SECURITY.md).
+CI runs Go formatting checks, backend tests, and Docker builds. CodeQL, Go vulnerability checks, fuzzing, and OpenSSF Scorecard workflows remain available.
 
 ## License
 
-NoX Sync is released under the [GNU General Public License v3.0](LICENSE). You can use, copy, modify, self-host, and redistribute it, but distributed modified versions must remain open-source under the GPL. The software is provided without warranty.
-
-## Safety Model
-
-NoX Sync treats the backend as the authority for users, vault ownership, sync locks, sessions, remote state, and commits. Files are not considered synced until content hashes are verified and the backend commit succeeds. Users cannot access each other's vaults, conflicts are explicit, and normal sync does not silently overwrite local or remote changes.
-
-## Obsidian Policy Disclosures
-
-NoX Sync is intended to be clear about the behaviors Obsidian asks plugin authors to disclose:
-
-- Account requirement: Full sync access requires an allowlisted Google account on the self-hosted backend. The plugin itself authenticates with the user's backend API key.
-- Network use: The plugin sends vault manifests, file content, sync status requests, and vault management requests only to the Server URL configured by the user. The backend dashboard uses Google OAuth for login. The optional support link opens Buy Me a Coffee only when clicked.
-- Payment: No payment is required for full access. The Buy Me a Coffee link is optional.
-- Telemetry: The plugin does not include client-side telemetry or analytics.
-- Ads: The plugin does not load dynamic ads. The settings page includes an optional static support link.
-- File access: The plugin uses Obsidian's vault APIs for files inside the currently opened vault, including `.nox-sync-trash/`. It does not access files outside the vault.
-- Updates: The plugin does not include a self-update mechanism. Updates are installed through Obsidian/GitHub release files.
+NoX Backend retains the original [GNU General Public License v3.0](LICENSE).

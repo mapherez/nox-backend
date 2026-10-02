@@ -1,30 +1,10 @@
 # Troubleshooting
 
-NoX Sync surfaces explicit states instead of silently continuing when sync is unsafe.
+NoX Backend surfaces explicit states instead of silently continuing when sync is unsafe.
 
-## Plugin Does Not Appear In Obsidian
+## Plugin installation and local behavior
 
-Check that the plugin files are in exactly this folder inside your vault:
-
-```text
-<vault>/.obsidian/plugins/nox-sync/
-```
-
-The folder must contain:
-
-```text
-main.js
-manifest.json
-styles.css
-```
-
-If you downloaded the GitHub source code zip, that is not the plugin install package. Download the three release assets from:
-
-```text
-https://github.com/mapherez/nox-sync/releases
-```
-
-Restart Obsidian if the plugin still does not appear.
+Plugin installation, local builds, conflict resolution UI, and local trash are documented in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). This repository maintains the backend and the API used by that plugin.
 
 ## Dashboard Says Google OAuth Is Not Configured
 
@@ -191,7 +171,7 @@ Different backend vaults can sync at the same time.
 
 Both local and remote versions changed since the last common synced revision.
 
-Open the conflict resolver from the NoX Sync ribbon state. Markdown conflicts can be kept local, kept remote, kept both, or manually merged. Binary conflicts preserve copies and allow keep local, keep remote, or keep both.
+The backend reports conflicting changes in the sync plan. Resolve them through the NoX Sync plugin; see its [instructions](https://github.com/mapherez/nox-sync).
 
 NoX Sync does not silently overwrite conflicting changes.
 
@@ -204,12 +184,6 @@ Common causes include interrupted uploads, stale sessions, hash mismatches, or m
 ## Stale Locks
 
 During sync, the plugin sends regular heartbeats. If Obsidian closes, the network drops, or a sync hangs, heartbeats stop. The backend marks the lock stale after expiry, removes abandoned staging content, and broadcasts the stale state to connected clients.
-
-## Local NoX Sync Trash
-
-NoX Sync moves replaced or deleted local files into `.nox-sync-trash/` before applying remote changes. This is local safety storage only; it is excluded from sync and is not uploaded to the backend.
-
-If it grows large, open NoX Sync settings and use the local trash size and clear-trash controls. Clearing the trash permanently removes `.nox-sync-trash/` from the currently opened vault.
 
 ## Deleted Vaults Still Use Space
 
@@ -227,8 +201,10 @@ Permanent delete removes the vault metadata and then removes finalized blobs tha
 
 Back up the complete backend `/data` directory, not just the SQLite database. The database and `/data/blobs` directory must stay together.
 
-If you use the production Compose file, `/data` is stored in the Docker volume named:
+If you use the production Compose file, the named volume key for `/data` is:
 
 ```text
 nox-sync-data
 ```
+
+The actual Docker volume name normally includes the Compose project prefix. If vaults disappear after the image switch, stop and verify that the container mounts the original data volume. Do not create replacement vaults, rename the project, reset the database, rotate keys, or run `docker compose down -v` to fix it. See the [repository separation and rollback guide](backend-separation.md).

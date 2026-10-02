@@ -1,6 +1,6 @@
 services:
   nox-sync:
-    image: ghcr.io/mapherez/nox-sync:latest
+    image: ghcr.io/mapherez/nox-backend:latest
     container_name: nox-sync
     restart: unless-stopped
     ports:

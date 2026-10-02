@@ -1,10 +1,12 @@
 # Backend Configuration
 
-NoX Sync backend is configured with environment variables and stores all persistent state under `/data` inside the container.
+NoX Backend is configured with environment variables and stores all persistent state under `/data` inside the container.
+
+For an existing deployment, follow the [repository separation and update guide](backend-separation.md) before changing the image. Preserve the original deployment folder, Compose project, configuration, and data mount.
 
 ## Quick Docker Compose Setup
 
-For most users, the easiest backend setup is:
+For a new installation, the easiest backend setup is (after the new image has been published):
 
 1. Download `docker-compose.yml` from the repository.
 2. Create a `.env` file next to it.
@@ -13,13 +15,13 @@ For most users, the easiest backend setup is:
 Windows PowerShell:
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-sync/master/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
 ```
 
 macOS or Linux:
 
 ```bash
-curl -L https://raw.githubusercontent.com/mapherez/nox-sync/master/docker-compose.yml -o docker-compose.yml
+curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -o docker-compose.yml
 ```
 
 Example `.env` file for a domain deployment:
@@ -120,10 +122,10 @@ The root `docker-compose.yml` is the minimal production-oriented example:
 docker compose up -d
 ```
 
-It uses the published image:
+It targets the image published by this repository:
 
 ```text
-ghcr.io/mapherez/nox-sync:latest
+ghcr.io/mapherez/nox-backend:latest
 ```
 
 It exposes container port `8080` on host port `5710`:
@@ -133,11 +135,13 @@ ports:
   - "5710:8080"
 ```
 
-It stores backend data in a named Docker volume:
+It retains the existing named Docker volume key:
 
 ```text
 nox-sync-data
 ```
+
+The actual volume name is normally prefixed with the Compose project name. Keep the existing project name when updating; the volume key alone does not identify the deployed volume. See the [update guide](backend-separation.md).
 
 Add the Google OAuth and admin email variables before exposing the dashboard publicly.
 
@@ -201,7 +205,9 @@ Because blobs are content-addressed by SHA-256 hash, a blob shared by another re
 
 ## Updating The Backend
 
-To update a Compose deployment that uses `ghcr.io/mapherez/nox-sync:latest`:
+For the initial switch from the old image, including validation and rollback, follow the [separation guide](backend-separation.md). Do not replace an existing Compose deployment with a fresh one or run `docker compose down -v`.
+
+For subsequent updates to a Compose deployment that already uses `ghcr.io/mapherez/nox-backend:latest`:
 
 ```bash
 docker compose pull
@@ -214,7 +220,7 @@ Check that the container restarted:
 docker compose ps
 ```
 
-The Docker volume keeps `/data` between container updates.
+The same Docker volume keeps `/data` between container updates. Preserve the deployment directory, Compose project name, mounts, environment, and credentials.
 
 ## Development Compose
 
@@ -231,13 +237,13 @@ This builds `./backend` locally and mounts `./data` to `/data` for easy inspecti
 To build the backend image from a source checkout:
 
 ```bash
-docker build -t nox-sync:dev ./backend
+docker build -t nox-backend:dev ./backend
 ```
 
 You can then run that local image with:
 
 ```bash
-docker run --rm --name nox-sync-dev -p 5710:8080 -v nox-sync-dev-data:/data nox-sync:dev
+docker run --rm --name nox-sync-dev -p 5710:8080 -v nox-sync-dev-data:/data nox-backend:dev
 ```
 
-The `ghcr.io/mapherez/nox-sync:latest` tag is the published image used by the production Compose example. Building a local image does not publish anything to GitHub Container Registry. Running NoX Sync does not require external databases or external sync providers.
+The `ghcr.io/mapherez/nox-backend:latest` tag is the image reference used by the production Compose example; it must be published before the example can pull it. Building a local image does not publish anything to GitHub Container Registry. Running NoX Sync does not require external databases or external sync providers.

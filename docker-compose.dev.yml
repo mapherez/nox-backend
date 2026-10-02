@@ -2,7 +2,7 @@ services:
   nox-sync:
     build:
       context: ./backend
-    image: nox-sync:dev
+    image: nox-backend:dev
     container_name: nox-sync-dev
     restart: unless-stopped
     ports:

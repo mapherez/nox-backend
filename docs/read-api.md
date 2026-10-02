@@ -1,5 +1,7 @@
 # API de leitura — integração com o Codex
 
+Este contrato pertence ao NoX Backend (`mapherez/nox-backend`). A separação do repositório preserva as rotas, formatos, autenticação e comportamento existentes. O plugin Obsidian continua em [mapherez/nox-sync](https://github.com/mapherez/nox-sync).
+
 Este contrato permite ao servidor Admin do Codex usar o **Server URL** e a
 **API key** já existentes no NoX Sync:
 

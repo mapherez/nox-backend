@@ -1,62 +1,49 @@
-# User Setup Guide
+# Backend setup and client connection
 
-This guide covers the normal first-run path for NoX Sync: start the backend with Docker, sign in to the dashboard, install the Obsidian plugin, and sync your first vault.
+This guide covers a new NoX Backend installation and connecting the [NoX Sync Obsidian plugin](https://github.com/mapherez/nox-sync). To update an existing backend with real data, use the [separation and update guide](backend-separation.md).
 
-## What You Need
+## What you need
 
-- Docker Desktop, Docker Engine, or a server that can run Docker Compose.
-- An Obsidian desktop install.
-- A Google account for dashboard login.
-- A Google OAuth web client for the dashboard.
-- A domain or local URL for the backend.
+- Docker Engine or Docker Desktop with Docker Compose.
+- A Google account and Google OAuth web client for dashboard login.
+- A local or public URL for the backend.
+- NoX Sync installed in Obsidian using the [plugin repository's instructions](https://github.com/mapherez/nox-sync).
 
-For local testing, the default URL is:
+The dashboard uses Google login. The plugin authenticates using the backend API key.
 
-```text
-http://localhost:5710
-```
+## Prepare Google login
 
-For a real deployment, use your own HTTPS domain, for example:
-
-```text
-https://sync.example.com
-```
-
-## 1. Prepare Google Login
-
-NoX Sync uses Google login only for the web dashboard. The Obsidian plugin uses the API key shown in the dashboard.
-
-Create a Google OAuth web client and add the redirect URI that matches your backend URL:
+Create a Google OAuth web client and register the redirect URI for your backend:
 
 ```text
 https://sync.example.com/auth/google/callback
 ```
 
-For local testing with the default Docker Compose port:
+For local testing:
 
 ```text
 http://localhost:5710/auth/google/callback
 ```
 
-Keep the Google Client ID and Client Secret. They are used in the backend `.env` file.
+Keep the client ID and client secret for the backend configuration.
 
-## 2. Start The Backend With Docker Compose
+## Start a new backend with Docker Compose
 
-Create an empty folder for NoX Sync on the machine that will run the backend.
+In a dedicated deployment folder, download this repository's Compose file.
 
-Download `docker-compose.yml` from the repository into that folder. On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-sync/master/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
 ```
 
-On macOS or Linux:
+macOS or Linux:
 
 ```bash
-curl -L https://raw.githubusercontent.com/mapherez/nox-sync/master/docker-compose.yml -o docker-compose.yml
+curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -o docker-compose.yml
 ```
 
-Create a file named `.env` next to `docker-compose.yml`:
+Create `.env` beside it:
 
 ```bash
 NOX_SYNC_PUBLIC_URL=https://sync.example.com
@@ -65,183 +52,48 @@ NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
 NOX_SYNC_ADMIN_EMAILS=you@example.com
 ```
 
-For local testing:
+For local testing, set `NOX_SYNC_PUBLIC_URL=http://localhost:5710`.
 
-```bash
-NOX_SYNC_PUBLIC_URL=http://localhost:5710
-NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_SYNC_ADMIN_EMAILS=you@example.com
-```
-
-Start the backend:
+After `ghcr.io/mapherez/nox-backend:latest` has been published, start the service:
 
 ```bash
 docker compose up -d
 ```
 
-Docker will pull the published image automatically:
+The service retains the name `nox-sync`. Host port `5710` maps to container port `8080`. The named volume key remains `nox-sync-data`; its actual Docker name depends on the Compose project.
 
-```text
-ghcr.io/mapherez/nox-sync:latest
-```
+## Open the dashboard
 
-The provided Compose file exposes the backend on host port `5710` and stores persistent data in the Docker volume `nox-sync-data`.
+Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault-dashboard` for local testing. Sign in with an admin email listed in `NOX_SYNC_ADMIN_EMAILS`.
 
-## 3. Open The Dashboard
+The dashboard provides your Server URL and API key, vault management and downloads, and admin user management. Each user owns their own vaults and API key.
 
-Open:
+## Connect the plugin
 
-```text
-http://localhost:5710/vault-dashboard
-```
+Plugin installation, releases, local builds, settings, conflict handling, and local trash instructions are maintained in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). Plugin assets are available from its [releases](https://github.com/mapherez/nox-sync/releases).
 
-For a domain deployment:
+In NoX Sync settings:
 
-```text
-https://sync.example.com/vault-dashboard
-```
+1. Paste the Server URL and API key from the backend dashboard.
+2. Set a readable Client name, such as `Laptop`.
+3. Use **Test connection**.
+4. Select or create a backend vault.
+5. Trigger manual sync.
 
-Sign in with the admin email listed in `NOX_SYNC_ADMIN_EMAILS`.
+Use the same public origin for `NOX_SYNC_PUBLIC_URL`, the OAuth callback, and the plugin Server URL. Do not append `/v1` to the Server URL.
 
-The dashboard shows:
+A second device can connect with the same user's API key, select the same vault, and manually sync to receive its files. Admin users can allowlist additional users from the dashboard; each user gets their own key and vaults.
 
-- Server URL.
-- Your reusable API key.
-- Your backend vaults.
-- Vault revision, updated time, and cloud size.
-- Vault download, delete, restore, and permanent delete controls.
-- Admin user management, if your account is an admin.
+Rotating an API key invalidates the previous one. Repository separation does not require rotation or any changes to an existing plugin configuration.
 
-Each user has their own API key. Generating a new key invalidates only that user's previous key, so that user's existing Obsidian devices must be updated manually.
-
-## 4. Install The Plugin From Release Files
-
-Download the plugin release files from:
-
-```text
-https://github.com/mapherez/nox-sync/releases
-```
-
-Download these three files:
-
-```text
-main.js
-manifest.json
-styles.css
-```
-
-Do not use the GitHub source code zip as the Obsidian plugin install package. The source zip contains the repository source, not just the built plugin files.
-
-In your Obsidian vault, create this folder:
-
-```text
-.obsidian/plugins/nox-sync/
-```
-
-Copy the three downloaded files into it:
-
-```text
-.obsidian/plugins/nox-sync/main.js
-.obsidian/plugins/nox-sync/manifest.json
-.obsidian/plugins/nox-sync/styles.css
-```
-
-Restart Obsidian if needed, then enable NoX Sync from:
-
-```text
-Settings > Community plugins > Installed plugins
-```
-
-## 5. Configure The Plugin
-
-In Obsidian, open NoX Sync settings and set:
-
-- Server URL from the backend dashboard.
-- API key from the backend dashboard.
-- Client name, such as `Laptop` or `Desktop`.
-
-Use **Test connection** to verify the backend and API key.
-
-Then use the **Backend vault** section to:
-
-- Refresh the vault list.
-- Create a backend vault from the current Obsidian vault name.
-- Select the backend vault you want this local vault to sync with.
-- See the cloud size used by each backend vault.
-- Delete, restore, or permanently delete backend vaults.
-
-The selected backend vault is the remote sync target for this local Obsidian vault. Switching the selected backend vault also switches the plugin's local sync state, including known hashes, known revisions, pending deletes, and pending conflicts.
-
-If the ribbon button shows that no backend vault is selected, clicking it opens the NoX Sync settings tab directly.
-
-The client name is display metadata only. It is shown when this device owns a sync lock and is used in conflict-copy filenames. Changing it does not break existing backend vaults, API keys, or sync identity.
-
-The settings page also shows the local `.nox-sync-trash/` size and includes a clear-trash action for files NoX Sync preserved during local replacement or delete operations.
-
-## 6. Manually Sync
-
-Use the NoX Sync ribbon button or the `NoX Sync: Sync vault` command.
-
-The plugin does not automatically upload, download, delete, or overwrite vault files on startup. Sync is manual by design.
-
-For a new backend vault, the first manual sync uploads the current vault. A second device receives those files only after it selects the same backend vault and performs its own manual sync.
-
-## 7. Add Another User
-
-Admin users can add more allowlisted users from the dashboard.
-
-After the second user signs in with Google:
-
-- They get their own API key.
-- They see only their own vaults.
-- They cannot access another user's vaults.
-- Admins can enable, disable, promote, or delete non-admin users.
-
-Admin users are protected from being disabled, demoted, or deleted from the dashboard.
-
-## Build The Plugin Locally Instead
-
-If you prefer to build the plugin from source:
+## Build the backend locally
 
 ```bash
-git clone https://github.com/mapherez/nox-sync.git
-cd nox-sync/plugin
-npm install
-npm run build
-```
-
-The built plugin files will be in:
-
-```text
-plugin/dist/
-```
-
-Copy `main.js`, `manifest.json`, and `styles.css` from `plugin/dist/` into:
-
-```text
-<vault>/.obsidian/plugins/nox-sync/
-```
-
-## Build The Backend Locally Instead
-
-If you prefer to build the backend image from source:
-
-```bash
-git clone https://github.com/mapherez/nox-sync.git
-cd nox-sync
+git clone https://github.com/mapherez/nox-backend.git
+cd nox-backend
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The development Compose file builds `./backend` locally and exposes the backend on:
+The development configuration builds `./backend` and mounts `./data` to `/data`. Use separate test data rather than a production data directory.
 
-```text
-http://localhost:5710
-```
-
-For a standalone local image:
-
-```bash
-docker build -t nox-sync:dev ./backend
-docker run --rm --name nox-sync-dev -p 5710:8080 -v nox-sync-dev-data:/data nox-sync:dev
-```
+For Go development and all environment variables, see the [README](../README.md) and [backend configuration](backend-configuration.md).
