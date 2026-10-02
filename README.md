@@ -6,135 +6,345 @@
 [![Docker](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-Made with ❤️ by [Mapherez](https://github.com/mapherez). If you enjoy the project, please consider [buying me a beer 🍺](https://buymeacoffee.com/mapherez).
+A self-hosted backend service providing storage, authentication, vault management and synchronization APIs for NoX applications and external integrations.
 
-## What is NoX Backend?
+## Overview
 
-NoX Backend is an independent, self-hosted backend service for the NoX ecosystem. It provides its own HTTP API, authentication, persistent storage, web dashboard, and Docker infrastructure, which multiple projects can reuse without depending on each other's source code or release cycle.
+NoX Backend is an independent Go service designed to be shared by multiple clients.
 
-The service is written in Go and currently organizes data around users, vaults, files, and revisions. A vault is a user-owned collection of files, with access control, synchronization state, and content stored as filesystem blobs alongside SQLite metadata.
+It provides a common backend for applications that need:
 
-Clients integrate through the backend's existing vault, file, and synchronization APIs. These capabilities can serve projects such as `nox-wiki` and `nox-map-engine`; each client implements its own application workflows. [NoX Sync](https://github.com/mapherez/nox-sync) is one current client, using the API to synchronize Obsidian vaults.
+- authenticated users and API access;
+- logical vaults containing files and revisions;
+- persistent metadata and blob storage;
+- file upload and download APIs;
+- synchronization primitives;
+- conflict-aware change planning;
+- administrative tooling;
+- self-hosted deployment through Docker.
+
+Clients interact with NoX Backend exclusively through its HTTP API and do not depend on its source code or release cycle.
+
+[NoX Sync](https://github.com/mapherez/nox-sync) is one client of NoX Backend, using it to synchronize Obsidian vaults.
+
+## Architecture
+
+NoX Backend uses:
+
+- **Go** for the HTTP service;
+- **SQLite** for metadata;
+- **filesystem blob storage** for file contents;
+- **Google OAuth** for dashboard authentication;
+- **API keys** for client authentication;
+- **Docker** for deployment.
+
+Persistent data is stored under:
+
+```text
+/data/
+├── nox-sync.db
+├── blobs/
+├── staging/
+└── logs/
+```
+
+The SQLite database and blob storage form a single logical data store and should be backed up together.
 
 ## Features
 
-- Google-authenticated `/vault-dashboard` with admin allowlist and user management.
-- One reusable `noxsync_` API key per active user and multiple vaults per user.
-- Vault download, soft delete, restore, permanent delete, and cloud storage size.
-- HTTP + JSON API under `/v1`, with server-sent events for sync status.
-- Per-vault sync locks, heartbeats, and stale-lock recovery.
-- Manifest-based upload, download, delete, and conflict planning.
-- SHA-256 validation, staged uploads, and atomic remote commits.
-- Content-addressed blobs, current and previous file versions, and deletion tombstones.
-- Read API for external integrations, including conditional downloads.
+- HTTP + JSON API under `/v1`.
+- Per-user API keys.
+- Multiple vaults per user.
+- Google-authenticated administration dashboard.
+- User and admin management.
+- Vault creation, listing, download, soft deletion, restoration and permanent deletion.
+- File listing and downloads.
+- Content-addressed blob storage.
+- Current and previous file revisions.
+- Deletion tombstones.
+- SHA-256 content validation.
+- Staged uploads and atomic commits.
+- Manifest-based synchronization planning.
+- Upload, download, delete and conflict operations.
+- Per-vault synchronization locks.
+- Heartbeats and stale-lock recovery.
+- Server-sent events for synchronization status.
+- Read APIs for external integrations.
 
-## Run the backend
+## Docker
 
-For a **new installation**, download the production Compose file:
+The production image is published to:
+
+```text
+ghcr.io/mapherez/nox-backend:latest
+```
+
+The repository includes a production `docker-compose.yml`.
+
+For a new installation:
 
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
 ```
 
-Create a `.env` beside it:
+Create a `.env` file beside it:
 
-```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
+```env
+NOX_SYNC_PUBLIC_URL=https://backend.example.com
 NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
 NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
 NOX_SYNC_ADMIN_EMAILS=you@example.com
 ```
 
-Set the Google OAuth authorized redirect URI to:
-
-```text
-https://sync.example.com/auth/google/callback
-```
-
-The production Compose file targets `ghcr.io/mapherez/nox-backend:latest`. It can be used after that image is published from this repository:
+Start the service:
 
 ```bash
 docker compose up -d
 ```
 
-It maps host port `5710` to container port `8080`. Open `/vault-dashboard` at your public URL. For local testing, use `NOX_SYNC_PUBLIC_URL=http://localhost:5710` and the matching OAuth callback.
+The default Compose configuration exposes:
 
-**Existing installations:** follow the [repository separation and update guide](docs/backend-separation.md). Update the image in your existing deployment; preserve its Compose project, volume, mounts, and configuration.
+```text
+localhost:5710 → container:8080
+```
 
-## Connect a client
+The dashboard is available at:
 
-API clients use the backend's base Server URL and a per-user API key obtained from the dashboard. Send the key as `Authorization: Bearer <API_KEY>`. Access is limited to the vaults owned by that user.
+```text
+http://localhost:5710/vault-dashboard
+```
 
-The existing API supports:
+or through the configured public URL.
 
-- Connection and credential checks through `/v1/health` and `/v1/auth/check`.
-- Vault listing, creation, soft deletion, restoration, and permanent deletion through `/v1/vaults` and its restore/purge routes.
-- File listing and downloads through `/v1/files` and `/v1/files/download`, including conditional downloads documented in the [read API](docs/read-api.md).
-- Manifest-based synchronization through `/v1/sync/*`, with locks, staged uploads, commits, and status events.
+## Google OAuth
 
-Clients choose the operations they need; reading files does not require starting a synchronization session. The current API and storage model remain centered on vaults and files.
+The web dashboard uses Google OAuth.
 
-### Example: NoX Sync
+Configure the authorized redirect URI for your OAuth client:
 
-Install the plugin using the instructions and releases in [mapherez/nox-sync](https://github.com/mapherez/nox-sync).
+```text
+https://backend.example.com/auth/google/callback
+```
 
-1. Sign in to this backend's dashboard with an allowlisted Google account.
-2. Copy the Server URL and your API key.
-3. Enter both in NoX Sync settings and use **Test connection**.
-4. Select or create a backend vault, then manually sync.
+For local testing:
 
-NoX Sync triggers synchronization manually. Existing clients can keep the same Server URL, API key, and vault identifiers after the repository separation. The backend routes, authentication, JSON responses, errors, and SSE behavior are unchanged.
+```text
+http://localhost:5710/auth/google/callback
+```
 
-## Persistent data and compatibility
+`NOX_SYNC_PUBLIC_URL` must match the origin used to access the backend.
 
-All persistent state stays under `/data`:
+Do not include a trailing slash.
 
-- `/data/nox-sync.db`
-- `/data/blobs`
-- `/data/staging`
-- `/data/logs`
+## Client authentication
 
-Back up the complete directory as one consistent unit. Database metadata and blobs must stay together.
+API clients connect using:
 
-The separation does not change the database schema or add migrations. Existing migration files and startup behavior are retained. Before updating an existing installation, verify that its database has already applied the migrations included in this checkout; see the [update guide](docs/backend-separation.md).
+- the backend base URL;
+- a user API key.
 
-For compatibility, runtime identifiers retain their existing names: `NOX_SYNC_*` variables, `noxsync_` keys, the `nox-sync` executable, Compose services and containers, and the `nox-sync-data` volume key. The Go module remains `github.com/mapherez/nox-sync/backend`. These identifiers are retained for compatibility with existing deployments and clients; the service builds and runs independently.
+Example base URL:
 
-## Build from source
+```text
+https://backend.example.com
+```
+
+Clients authenticate using:
+
+```http
+Authorization: Bearer <API_KEY>
+```
+
+API keys are created and managed through the backend dashboard.
+
+## API
+
+The HTTP API is exposed under:
+
+```text
+/v1
+```
+
+Current endpoint groups include:
+
+```text
+/v1/health
+/v1/auth/*
+/v1/vaults/*
+/v1/files/*
+/v1/sync/*
+```
+
+These cover:
+
+- health and credential checks;
+- vault management;
+- file listing and downloads;
+- synchronization sessions;
+- locks and heartbeats;
+- manifest planning;
+- staged uploads;
+- commits;
+- synchronization status events.
+
+See the repository documentation for detailed behavior.
+
+## Example client: NoX Sync
+
+[NoX Sync](https://github.com/mapherez/nox-sync) is an Obsidian plugin that uses NoX Backend as its remote synchronization service.
+
+The plugin connects using the backend's:
+
+```text
+Server URL
+API key
+```
+
+NoX Sync and NoX Backend are separate projects with independent repositories and release cycles.
+
+NoX Backend is not specific to Obsidian and can be consumed by other applications through the same HTTP API.
+
+## Persistent data
+
+All persistent backend state lives under `/data`.
+
+Back up the complete directory as one unit:
+
+```text
+/data
+```
+
+Do not restore only the SQLite database or only the blob directory independently. Metadata and file contents must remain consistent.
+
+## Existing installations
+
+NoX Backend was originally maintained inside the NoX Sync repository.
+
+The repository separation does not intentionally change:
+
+- database schema;
+- stored data;
+- API routes;
+- JSON contracts;
+- authentication behavior;
+- API-key format;
+- storage paths;
+- ports;
+- migration behavior.
+
+Existing deployments should preserve their current Compose project, volumes, configuration and `/data` contents when switching to:
+
+```text
+ghcr.io/mapherez/nox-backend:latest
+```
+
+See:
+
+[Repository separation and update guide](docs/backend-separation.md)
+
+Do not use:
+
+```bash
+docker compose down -v
+```
+
+when the existing data must be preserved.
+
+## Legacy identifiers
+
+Some runtime identifiers still use the original `NOX_SYNC` naming for backwards compatibility:
+
+```text
+NOX_SYNC_*
+noxsync_
+nox-sync
+nox-sync.db
+nox-sync-data
+```
+
+The Go module also retains its existing identifier:
+
+```text
+github.com/mapherez/nox-sync/backend
+```
+
+These names are intentionally preserved to avoid unnecessary compatibility and data migration changes. They do not define the scope of NoX Backend.
+
+## Development
+
+The backend source lives in:
+
+```text
+backend/
+```
+
+Run the test suite:
 
 ```bash
 cd backend
 go test ./...
+```
+
+Run the service locally:
+
+```bash
 go run ./cmd/nox-sync
 ```
 
-Configure environment variables before starting the backend. Use a separate data directory for development.
-
-To build with Docker:
+Build the Docker image:
 
 ```bash
 docker build -t nox-backend:dev ./backend
 ```
 
-For local development with a `./data:/data` bind mount:
+Run the development Compose configuration:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The production image is published manually through the **Publish Docker image** GitHub Actions workflow. Publishing an image and updating a running server are separate operations. Backend version reporting continues to use `NOX_SYNC_VERSION`, and backend releases are independent of client releases.
+The development configuration uses:
+
+```text
+./data:/data
+```
+
+as a local bind mount.
+
+Do not use production data for development or testing.
+
+## Releases
+
+Backend releases are independent from client releases.
+
+The production image is published through the **Publish Docker image** GitHub Actions workflow.
+
+Publishing a new image does not automatically update existing deployments.
 
 ## Documentation
 
-- [Backend setup and client connection](docs/user-setup.md)
+- [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
-- [Repository separation, validation, update, and rollback](docs/backend-separation.md)
-- [Read API for Codex integration](docs/read-api.md)
+- [Repository separation and updates](docs/backend-separation.md)
+- [Read API](docs/read-api.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Security policy](SECURITY.md)
 
-CI runs Go formatting checks, backend tests, and Docker builds. CodeQL, Go vulnerability checks, fuzzing, and OpenSSF Scorecard workflows remain available.
+## Security
+
+NoX Backend stores application data and manages authentication credentials.
+
+For deployments exposed outside a trusted network:
+
+- use HTTPS;
+- restrict administrative access;
+- protect OAuth credentials;
+- treat API keys as secrets;
+- back up `/data`;
+- keep the backend image and host system updated.
+
+Report security issues according to [SECURITY.md](SECURITY.md).
 
 ## License
 
-NoX Backend retains the original [GNU General Public License v3.0](LICENSE).
+NoX Backend is licensed under the [GNU General Public License v3.0](LICENSE).
