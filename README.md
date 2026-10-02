@@ -10,9 +10,11 @@ Made with ❤️ by [Mapherez](https://github.com/mapherez). If you enjoy the pr
 
 ## What is NoX Backend?
 
-NoX Backend is the self-hosted backend for [NoX Sync](https://github.com/mapherez/nox-sync), the Obsidian vault synchronization plugin. This repository contains the Go HTTP service, SQLite metadata, filesystem blob storage, web dashboard, and Docker configuration. The plugin source and releases belong to the separate NoX Sync repository.
+NoX Backend is an independent, self-hosted backend service for the NoX ecosystem. It provides its own HTTP API, authentication, persistent storage, web dashboard, and Docker infrastructure, which multiple projects can reuse without depending on each other's source code or release cycle.
 
-The plugin communicates with the backend through its configured Server URL and API key. Neither repository needs the other's source code to build or run. Synchronization remains manually triggered by the plugin user.
+The service is written in Go and currently organizes data around users, vaults, files, and revisions. A vault is a user-owned collection of files, with access control, synchronization state, and content stored as filesystem blobs alongside SQLite metadata.
+
+Clients integrate through the backend's existing vault, file, and synchronization APIs. These capabilities can serve projects such as `nox-wiki` and `nox-map-engine`; each client implements its own application workflows. [NoX Sync](https://github.com/mapherez/nox-sync) is one current client, using the API to synchronize Obsidian vaults.
 
 ## Features
 
@@ -59,7 +61,20 @@ It maps host port `5710` to container port `8080`. Open `/vault-dashboard` at yo
 
 **Existing installations:** follow the [repository separation and update guide](docs/backend-separation.md). Update the image in your existing deployment; preserve its Compose project, volume, mounts, and configuration.
 
-## Connect NoX Sync
+## Connect a client
+
+API clients use the backend's base Server URL and a per-user API key obtained from the dashboard. Send the key as `Authorization: Bearer <API_KEY>`. Access is limited to the vaults owned by that user.
+
+The existing API supports:
+
+- Connection and credential checks through `/v1/health` and `/v1/auth/check`.
+- Vault listing, creation, soft deletion, restoration, and permanent deletion through `/v1/vaults` and its restore/purge routes.
+- File listing and downloads through `/v1/files` and `/v1/files/download`, including conditional downloads documented in the [read API](docs/read-api.md).
+- Manifest-based synchronization through `/v1/sync/*`, with locks, staged uploads, commits, and status events.
+
+Clients choose the operations they need; reading files does not require starting a synchronization session. The current API and storage model remain centered on vaults and files.
+
+### Example: NoX Sync
 
 Install the plugin using the instructions and releases in [mapherez/nox-sync](https://github.com/mapherez/nox-sync).
 
@@ -68,7 +83,7 @@ Install the plugin using the instructions and releases in [mapherez/nox-sync](ht
 3. Enter both in NoX Sync settings and use **Test connection**.
 4. Select or create a backend vault, then manually sync.
 
-An existing plugin can keep the same Server URL, API key, and selected vault after the repository separation. The backend routes, authentication, JSON responses, errors, and SSE behavior are unchanged.
+NoX Sync triggers synchronization manually. Existing clients can keep the same Server URL, API key, and vault identifiers after the repository separation. The backend routes, authentication, JSON responses, errors, and SSE behavior are unchanged.
 
 ## Persistent data and compatibility
 
@@ -83,7 +98,7 @@ Back up the complete directory as one consistent unit. Database metadata and blo
 
 The separation does not change the database schema or add migrations. Existing migration files and startup behavior are retained. Before updating an existing installation, verify that its database has already applied the migrations included in this checkout; see the [update guide](docs/backend-separation.md).
 
-For compatibility, runtime identifiers retain their existing names: `NOX_SYNC_*` variables, `noxsync_` keys, the `nox-sync` executable, Compose services and containers, and the `nox-sync-data` volume key. The Go module remains `github.com/mapherez/nox-sync/backend`; it is the local module identity, not a runtime dependency on the plugin repository.
+For compatibility, runtime identifiers retain their existing names: `NOX_SYNC_*` variables, `noxsync_` keys, the `nox-sync` executable, Compose services and containers, and the `nox-sync-data` volume key. The Go module remains `github.com/mapherez/nox-sync/backend`. These identifiers are retained for compatibility with existing deployments and clients; the service builds and runs independently.
 
 ## Build from source
 
@@ -107,7 +122,7 @@ For local development with a `./data:/data` bind mount:
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The production image is published manually through the **Publish Docker image** GitHub Actions workflow. Publishing an image and updating a running server are separate operations. Backend version reporting continues to use `NOX_SYNC_VERSION` independently of plugin releases.
+The production image is published manually through the **Publish Docker image** GitHub Actions workflow. Publishing an image and updating a running server are separate operations. Backend version reporting continues to use `NOX_SYNC_VERSION`, and backend releases are independent of client releases.
 
 ## Documentation
 
