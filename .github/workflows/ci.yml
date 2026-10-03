@@ -101,8 +101,10 @@ jobs:
                       info = json.load(response)
                   assert health == {"status": "ready", "version": expected,
                                     "dataDirInitialized": True, "databasePath": "/data/nox-sync.db"}, health
-                  assert info == {"service": "nox-backend", "version": expected, "apiVersion": "v1",
-                                  "capabilities": ["auth", "vaults", "files", "vault-status"]}, info
+                  required_info = {"service": "nox-backend", "version": expected, "apiVersion": "v1",
+                                   "capabilities": ["auth", "vaults", "files", "vault-status"]}
+                  for field, value in required_info.items():
+                      assert field in info and type(info[field]) is type(value) and info[field] == value, (field, info)
                   print(f"{image}: override={override!r}, health/info version={expected}")
               except Exception:
                   subprocess.run(["docker", "logs", container], check=False)

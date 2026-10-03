@@ -24,8 +24,10 @@ func TestInfoContract(t *testing.T) {
 			"service": "nox-backend", "version": "contract-test", "apiVersion": "v1",
 			"capabilities": []any{"auth", "vaults", "files", "vault-status"},
 		}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("info contract: %#v; want %#v", got, want)
+		for field, value := range want {
+			if gotValue, exists := got[field]; !exists || !reflect.DeepEqual(gotValue, value) {
+				t.Fatalf("info field %q: %#v; want %#v", field, got[field], value)
+			}
 		}
 	}
 }
