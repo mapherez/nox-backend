@@ -7,7 +7,8 @@ COPY go.mod go.sum ./
 COPY cmd ./cmd
 COPY internal ./internal
 
-RUN go build -o /out/nox-sync ./cmd/nox-sync
+ARG VERSION=dev
+RUN go build -ldflags "-X main.buildVersion=${VERSION}" -o /out/nox-sync ./cmd/nox-sync
 
 FROM alpine:3.23
 

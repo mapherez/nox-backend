@@ -47,6 +47,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("/auth/logout", s.handleLogout)
 	mux.HandleFunc("/v1/health", s.handleHealth)
+	mux.HandleFunc("/v1/info", s.handleInfo)
 	mux.HandleFunc("/v1/auth/check", s.handleAuthCheck)
 	mux.HandleFunc("/v1/vaults", s.handlePluginVaults)
 	mux.HandleFunc("/v1/vaults/restore", s.handlePluginRestoreVault)

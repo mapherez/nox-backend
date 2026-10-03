@@ -23,6 +23,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve backend version
+        id: version
+        run: |
+          version="$(git describe --tags --exact-match HEAD 2>/dev/null || printf 'git-%s' "$(git rev-parse HEAD)")"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -43,5 +51,7 @@ jobs:
           context: ./backend
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
           tags: |
             ghcr.io/mapherez/nox-backend:${{ inputs.tag }}

@@ -169,9 +169,11 @@ Current endpoint groups include:
 
 ```text
 /v1/health
+/v1/info
 /v1/auth/*
 /v1/vaults/*
 /v1/files/*
+/v1/status
 /v1/sync/*
 ```
 
@@ -187,7 +189,9 @@ These cover:
 - commits;
 - synchronization status events.
 
-See the repository documentation for detailed behavior.
+The [stable client API](docs/client-api.md) covers service discovery, identity,
+vault management, vault status and file reads. `/v1/sync/*` remains the
+specialized synchronization protocol for synchronization clients.
 
 ## Example client: NoX Sync
 
@@ -319,6 +323,11 @@ Backend releases are independent from client releases.
 
 The production image is published through the **Publish Docker image** GitHub Actions workflow.
 
+Images report the exact Git tag of the built commit, or `git-<full commit SHA>`
+when the commit has no tag. This version is separate from the Docker image tag
+and is returned by both `/v1/health` and `/v1/info`. A non-empty
+`NOX_SYNC_VERSION` overrides it at runtime; unversioned local builds report `dev`.
+
 Publishing a new image does not automatically update existing deployments.
 
 ## Documentation
@@ -326,6 +335,7 @@ Publishing a new image does not automatically update existing deployments.
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)
+- [Stable client API](docs/client-api.md)
 - [Read API](docs/read-api.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Security policy](SECURITY.md)

@@ -84,7 +84,7 @@ If you change the left side of the port mapping, also use that host port in your
 | --- | --- | --- |
 | `NOX_SYNC_ADDR` | `:8080` | HTTP listen address inside the container or process. |
 | `NOX_SYNC_DATA_DIR` | `/data` | Persistent backend data directory. |
-| `NOX_SYNC_VERSION` | `dev` | Version string returned by `/v1/health`. |
+| `NOX_SYNC_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
 | `NOX_SYNC_PUBLIC_URL` | request-derived URL | Public base URL used for dashboard display and Google OAuth callback URLs. Set this in production. The provided Compose files default it to `http://localhost:5710` for local use. |
 | `NOX_SYNC_GOOGLE_CLIENT_ID` | none | Google OAuth client ID for dashboard login. |
 | `NOX_SYNC_GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret for dashboard login. |
@@ -234,11 +234,34 @@ This builds `./backend` locally and mounts `./data` to `/data` for easy inspecti
 
 ## Local Docker Image Build
 
+The version is resolved once at startup: a non-empty `NOX_SYNC_VERSION` takes
+precedence over the version embedded in the executable; an empty or unset
+override uses the embedded version. With neither, an unversioned local build
+reports `dev`. Both `/v1/health` and `/v1/info` report the same resolved value.
+
+The publishing workflow embeds the exact Git tag of the checked-out commit,
+or `git-<full commit SHA>` when there is no tag. Docker tags such as `latest`
+are distribution labels and do not replace this backend version.
+
 To build the backend image from a source checkout:
 
 ```bash
 docker build -t nox-backend:dev ./backend
 ```
+
+For a versioned local image:
+
+```bash
+docker build --build-arg VERSION=1.2.3 -t nox-backend:1.2.3 ./backend
+```
+
+For a versioned executable, run from `backend/`:
+
+```bash
+go build -ldflags "-X main.buildVersion=1.2.3" -o nox-sync ./cmd/nox-sync
+```
+
+See the [stable client API](client-api.md) for the health and metadata contracts.
 
 You can then run that local image with:
 
