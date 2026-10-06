@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { normalizeVersion, parseVersionFile, release, runReleaseChecks, validateReleaseTag } from './release.mjs';
+import { releaseMetadata } from './release-metadata.mjs';
 
 const git = (root, ...args) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
@@ -267,4 +268,94 @@ test('CI validation CLI accepts the current tag and refuses a mismatch', async (
   const mismatched = spawnSync(process.execPath, [script, version === '0.0.0' ? 'v0.0.1' : 'v0.0.0'], { encoding: 'utf8' });
   assert.equal(mismatched.status, 1);
   assert.match(mismatched.stderr, /nao corresponde/);
+});
+
+for (const [tag, prerelease, expectedTags] of [
+  ['v1.0.2', false, ['ghcr.io/mapherez/nox-backend:v1.0.2', 'ghcr.io/mapherez/nox-backend:latest']],
+  ['v1.1.0-rc.1', true, ['ghcr.io/mapherez/nox-backend:v1.1.0-rc.1']],
+  ['v1.1.0-0', true, ['ghcr.io/mapherez/nox-backend:v1.1.0-0']],
+]) {
+  test(`${tag}: image tags, four OCI labels and GitHub prerelease flag agree`, async () => {
+    const revision = 'a'.repeat(40);
+    const created = new Date('2026-10-06T12:34:56.000Z');
+    const metadata = releaseMetadata(tag, `${tag.slice(1)}\n`, revision, created);
+    assert.deepEqual(metadata.tags.split('\n'), expectedTags);
+    assert.equal(metadata.prerelease, prerelease);
+    assert.deepEqual(Object.fromEntries(metadata.labels.split('\n').map(line => line.split('='))), {
+      'org.opencontainers.image.version': tag,
+      'org.opencontainers.image.revision': revision,
+      'org.opencontainers.image.source': 'https://github.com/mapherez/nox-backend',
+      'org.opencontainers.image.created': '2026-10-06T12:34:56.000Z',
+    });
+
+    // Exercise the actual workflow's release API call using the generated classification.
+    const workflow = (await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
+    const body = workflow.split('      - name: Create GitHub Release with generated notes')[1].split('          script: |\n')[1];
+    assert.ok(body, 'GitHub Release creation script must exist');
+    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+    let request;
+    await new AsyncFunction('github', 'context', 'process', body)(
+      { rest: { repos: { async createRelease(payload) { request = payload; } } } },
+      { repo: { owner: 'mapherez', repo: 'nox-backend' } },
+      { env: { RELEASE_TAG: tag, RELEASE_PRERELEASE: String(metadata.prerelease) } },
+    );
+    assert.equal(request.tag_name, tag);
+    assert.equal(request.prerelease, prerelease);
+    assert.equal(request.generate_release_notes, true);
+  });
+}
+
+test('image metadata refuses invalid tags, mismatched VERSION and invalid revision', () => {
+  assert.throws(() => releaseMetadata('v1.01.0', '1.01.0\n', 'a'.repeat(40)), /Versao invalida/);
+  assert.throws(() => releaseMetadata('v1.1.0-rc.1', '1.1.0\n', 'a'.repeat(40)), /nao corresponde/);
+  assert.throws(() => releaseMetadata('v1.0.2', '1.0.2\n', 'short-sha'), /SHA completo/);
+});
+
+test('metadata CLI exports exact build tags, UTC creation time and GitHub classification', async t => {
+  const root = await mkdtemp(resolve(tmpdir(), 'nox-backend-metadata-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(resolve(root, 'scripts'));
+  for (const script of ['release.mjs', 'release-metadata.mjs']) {
+    await copyFile(new URL(`./${script}`, import.meta.url), resolve(root, 'scripts', script));
+  }
+  for (const version of ['1.0.2', '1.1.0-rc.1']) {
+    await writeFile(resolve(root, 'VERSION'), `${version}\n`);
+    const output = resolve(root, 'outputs');
+    await writeFile(output, '');
+    const before = Date.now();
+    const result = spawnSync(process.execPath, [resolve(root, 'scripts/release-metadata.mjs'), `v${version}`], {
+      encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: output, RELEASE_REVISION: 'b'.repeat(40) },
+    });
+    const after = Date.now();
+    assert.equal(result.status, 0, result.stderr);
+    // Read outputs using the same multiline format consumed by GitHub Actions.
+    const lines = (await readFile(output, 'utf8')).trimEnd().split('\n');
+    const outputs = {};
+    while (lines.length) {
+      const [key, delimiter] = lines.shift().split('<<');
+      const end = lines.indexOf(delimiter);
+      assert.ok(end >= 0, 'output delimiter must be closed');
+      outputs[key] = lines.splice(0, end).join('\n');
+      lines.shift();
+    }
+    assert.equal(outputs.prerelease, version === '1.0.2' ? 'false' : 'true');
+    assert.deepEqual(outputs.tags.split('\n'), version === '1.0.2'
+      ? ['ghcr.io/mapherez/nox-backend:v1.0.2', 'ghcr.io/mapherez/nox-backend:latest']
+      : ['ghcr.io/mapherez/nox-backend:v1.1.0-rc.1']);
+    const created = outputs.labels.split('\n').find(label => label.startsWith('org.opencontainers.image.created=')).split('=')[1];
+    assert.equal(new Date(created).toISOString(), created);
+    assert.ok(Date.parse(created) >= before && Date.parse(created) <= after);
+  }
+});
+
+test('workflow feeds generated tags and labels to Buildx and classification to GitHub', async () => {
+  const workflow = (await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
+  const build = workflow.split('      - name: Build and push backend image')[1]
+    .split('      - name: Create GitHub Release')[0];
+  assert.match(build, /tags: \$\{\{ steps\.metadata\.outputs\.tags \}\}/);
+  assert.match(build, /labels: \$\{\{ steps\.metadata\.outputs\.labels \}\}/);
+  assert.doesNotMatch(build, /nox-backend:latest/);
+  assert.match(workflow, /RELEASE_PRERELEASE: \$\{\{ steps\.metadata\.outputs\.prerelease \}\}/);
+  assert.match(workflow, /RELEASE_REVISION: \$\{\{ github\.sha \}\}/);
+  assert.ok(workflow.indexOf('id: metadata') < workflow.indexOf('      - name: Build and push backend image'));
 });

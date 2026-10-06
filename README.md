@@ -346,16 +346,23 @@ kept and the command prints the exact recovery push command.
 
 The **Release** GitHub Actions workflow runs only on `v*` tag pushes. It verifies
 the tag against `VERSION`, tests Go, and publishes a multi-architecture image
-(`linux/amd64`, `linux/arm64`) with exactly these image tags:
+(`linux/amd64`, `linux/arm64`). A stable release publishes exactly these image tags:
 
 ```text
 ghcr.io/mapherez/nox-backend:v0.1.0
 ghcr.io/mapherez/nox-backend:latest
 ```
 
-The image includes OCI version, commit revision and repository source labels.
+Prereleases publish only their version tag, for example
+`ghcr.io/mapherez/nox-backend:v1.1.0-rc.1`, and never change `latest`.
+
+The image includes OCI labels `org.opencontainers.image.version`,
+`org.opencontainers.image.revision`, `org.opencontainers.image.source` and
+`org.opencontainers.image.created`. The creation timestamp is generated in UTC
+immediately before the image build.
 After publishing it, the workflow creates a GitHub Release with generated notes;
-an existing release causes failure and is never replaced. Monitor the workflow
+prereleases are marked as prerelease on GitHub. An existing release causes failure
+and is never replaced. Monitor the workflow
 until it completes: a successful local push starts the remote publication.
 
 Release images report their Git tag through the existing `buildVersion` ldflags
@@ -381,8 +388,8 @@ docker compose pull
 docker compose up -d
 ```
 
-`latest` is the default when `NOX_BACKEND_IMAGE_TAG` is unset. Every release,
-including prereleases, publishes both its version tag and `latest`.
+`latest` is the default when `NOX_BACKEND_IMAGE_TAG` is unset. Only stable releases
+update `latest`; deploy a prerelease by explicitly pinning its version tag.
 Publishing an image does not automatically update existing deployments.
 
 Test release tooling without publishing anything:

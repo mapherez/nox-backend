@@ -75,6 +75,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate image metadata from validated release version
+        id: metadata
+        env:
+          RELEASE_REVISION: ${{ github.sha }}
+        run: node scripts/release-metadata.mjs "$RELEASE_TAG"
+
       - name: Build and push backend image
         uses: docker/build-push-action@v7
         with:
@@ -83,16 +89,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             VERSION=${{ github.ref_name }}
-          tags: |
-            ghcr.io/mapherez/nox-backend:${{ github.ref_name }}
-            ghcr.io/mapherez/nox-backend:latest
-          labels: |
-            org.opencontainers.image.version=${{ github.ref_name }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/mapherez/nox-backend
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
 
       - name: Create GitHub Release with generated notes
         uses: actions/github-script@v8
+        env:
+          RELEASE_PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
         with:
           script: |
             // Create only: the API fails if this tag already has a release, including a race.
@@ -101,5 +104,5 @@ jobs:
               tag_name: process.env.RELEASE_TAG,
               name: process.env.RELEASE_TAG,
               generate_release_notes: true,
-              prerelease: process.env.RELEASE_TAG.includes('-'),
+              prerelease: process.env.RELEASE_PRERELEASE === 'true',
             });
