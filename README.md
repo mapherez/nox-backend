@@ -23,7 +23,7 @@ It provides a common backend for applications that need:
 - administrative tooling;
 - self-hosted deployment through Docker.
 
-Clients interact with NoX Backend exclusively through its HTTP API and do not depend on its source code or release cycle.
+Clients interact with NoX Backend through its HTTP API or native MCP endpoint and do not depend on its source code or release cycle.
 
 [NoX Sync](https://github.com/mapherez/nox-sync) is one client of NoX Backend, using it to synchronize Obsidian vaults.
 
@@ -53,6 +53,7 @@ The SQLite database and blob storage form a single logical data store and should
 ## Features
 
 - HTTP + JSON API under `/v1`.
+- Native MCP Streamable HTTP at `/mcp`, powered by [NoX MCP](https://github.com/mapherez/nox-mcp).
 - Per-user API keys.
 - Multiple vaults per user.
 - Google-authenticated administration dashboard.
@@ -70,6 +71,15 @@ The SQLite database and blob storage form a single logical data store and should
 - Heartbeats and stale-lock recovery.
 - Server-sent events for synchronization status.
 - Read APIs for external integrations.
+
+The MCP endpoint runs in the same Go process, on the same HTTP server and port.
+Its 10 tools share the existing backend logic and storage with the Stable Client
+API. User operations use the existing per-user API key in
+`Authorization: Bearer <API_KEY>`; health and service information are public.
+Each tool exposes `_meta.cli` for a future NoX CLI. Binary file download remains
+at `/v1/files/download`, and synchronization remains at `/v1/sync/*` through the
+specialized HTTP API. See the [MCP contract](docs/mcp.md) for tools and connection
+details.
 
 ## Docker
 

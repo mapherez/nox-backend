@@ -23,12 +23,5 @@ func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
 	if !s.requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	writeJSON(w, http.StatusOK, ServiceInfo{
-		Service:    serviceName,
-		Version:    s.cfg.Version,
-		APIVersion: apiVersion,
-		Capabilities: []string{
-			capabilityAuth, capabilityVaults, capabilityFiles, capabilityVaultStatus,
-		},
-	})
+	writeJSON(w, http.StatusOK, s.serviceInfo())
 }

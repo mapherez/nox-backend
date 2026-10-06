@@ -32,6 +32,11 @@ func NewServer(cfg Config, store *storage.Store) *Server {
 // Routes returns the backend HTTP handler.
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
+	mcpHandler, err := s.mcpHandler()
+	if err != nil {
+		panic(fmt.Errorf("construct backend MCP runtime: %w", err))
+	}
+	mux.Handle("/mcp", mcpHandler)
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/vault-dashboard", s.handleDashboard)
 	mux.HandleFunc("/vault-dashboard/assets/", s.handleDashboardAsset)
@@ -75,12 +80,7 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":             "ready",
-		"version":            s.cfg.Version,
-		"dataDirInitialized": true,
-		"databasePath":       s.store.DBPath(),
-	})
+	writeJSON(w, http.StatusOK, s.health())
 }
 
 func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
@@ -111,17 +111,12 @@ func (s *Server) handlePluginVaults(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		vaults, err := s.store.ListVaults(r.Context(), user.ID)
+		vaults, err := s.listVaults(r.Context(), user.ID)
 		if err != nil {
 			writeStorageError(w, err)
 			return
 		}
-		deletedVaults, err := s.store.ListDeletedVaults(r.Context(), user.ID)
-		if err != nil {
-			writeStorageError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, storage.VaultListResponse{Vaults: vaults, DeletedVaults: deletedVaults})
+		writeJSON(w, http.StatusOK, vaults)
 	case http.MethodPost:
 		var req storage.CreateVaultRequest
 		if !decodeJSON(w, r, &req) {
@@ -209,15 +204,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload, reaped, err := s.statusPayloadWithRefresh(r.Context(), user.ID, vaultID)
+	payload, err := s.refreshedVaultStatus(r.Context(), user.ID, vaultID)
 	if err != nil {
 		writeStorageError(w, err)
 		return
 	}
-	if reaped {
-		s.events.broadcast(vaultID, payload)
-	}
-
 	writeJSON(w, http.StatusOK, payload)
 }
 
@@ -277,32 +268,25 @@ func (s *Server) handleSyncEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) statusPayload(ctx context.Context, userID string, vaultID string) (map[string]any, error) {
+func (s *Server) statusPayload(ctx context.Context, userID string, vaultID string) (vaultStatusResponse, error) {
 	payload, _, err := s.statusPayloadWithRefresh(ctx, userID, vaultID)
 	return payload, err
 }
 
-func (s *Server) statusPayloadWithRefresh(ctx context.Context, userID string, vaultID string) (map[string]any, bool, error) {
+func (s *Server) statusPayloadWithRefresh(ctx context.Context, userID string, vaultID string) (vaultStatusResponse, bool, error) {
 	revision, err := s.store.ServerRevision(ctx, userID, vaultID)
 	if err != nil {
-		return nil, false, err
+		return vaultStatusResponse{}, false, err
 	}
 
 	syncStatus, reaped, err := s.store.RefreshSyncStatus(ctx, userID, vaultID)
 	if err != nil {
-		return nil, false, err
+		return vaultStatusResponse{}, false, err
 	}
 
-	return map[string]any{
-		"vaultId":        vaultID,
-		"serverRevision": revision,
-		"sync": map[string]any{
-			"state":      syncStatus.State,
-			"sessionId":  syncStatus.SessionID,
-			"clientId":   syncStatus.ClientID,
-			"clientName": syncStatus.ClientName,
-			"startedAt":  syncStatus.StartedAt,
-		},
+	return vaultStatusResponse{
+		VaultID: vaultID, ServerRevision: revision,
+		Sync: syncStatusResponse{syncStatus.State, syncStatus.SessionID, syncStatus.ClientID, syncStatus.ClientName, syncStatus.StartedAt},
 	}, reaped, nil
 }
 
@@ -331,20 +315,9 @@ func (s *Server) broadcastStaleLocksIfNeeded(ctx context.Context) {
 }
 
 func (s *Server) requireAPIUser(w http.ResponseWriter, r *http.Request) (storage.User, bool) {
-	token := authToken(r)
-	if token == "" {
-		writeJSONError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "NoX Sync API key is required.")
-		return storage.User{}, false
-	}
-
-	user, valid, err := s.store.AuthenticateAPIKey(r.Context(), token)
+	user, err := s.apiUser(r.Context(), authToken(r))
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to validate API key.")
-		return storage.User{}, false
-	}
-
-	if !valid {
-		writeJSONError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid NoX Sync API key.")
+		writeJSONError(w, err.status, err.code, err.message)
 		return storage.User{}, false
 	}
 
