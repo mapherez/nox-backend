@@ -27,19 +27,19 @@ curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-com
 Example `.env` file for a domain deployment:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
-NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_SYNC_ADMIN_EMAILS=you@example.com
+NOX_BACKEND_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
+NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
+NOX_BACKEND_ADMIN_EMAILS=you@example.com
 ```
 
 Example `.env` file for local testing:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=http://localhost:5710
-NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_SYNC_ADMIN_EMAILS=you@example.com
+NOX_BACKEND_PUBLIC_URL=http://localhost:5710
+NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
+NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
+NOX_BACKEND_ADMIN_EMAILS=you@example.com
 ```
 
 Start the backend:
@@ -67,7 +67,7 @@ docker compose up -d
 Docker Desktop should then show a container named:
 
 ```text
-nox-sync
+nox-backend
 ```
 
 The container listens internally on port `8080`, but the Compose file exposes it on your machine as port `5710`:
@@ -82,13 +82,13 @@ If you change the left side of the port mapping, also use that host port in your
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `NOX_SYNC_ADDR` | `:8080` | HTTP listen address inside the container or process. |
-| `NOX_SYNC_DATA_DIR` | `/data` | Persistent backend data directory. |
-| `NOX_SYNC_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
-| `NOX_SYNC_PUBLIC_URL` | request-derived URL | Public base URL used for dashboard display and Google OAuth callback URLs. Set this in production. The provided Compose files default it to `http://localhost:5710` for local use. |
-| `NOX_SYNC_GOOGLE_CLIENT_ID` | none | Google OAuth client ID for dashboard login. |
-| `NOX_SYNC_GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret for dashboard login. |
-| `NOX_SYNC_ADMIN_EMAILS` | none | Comma-separated bootstrap admin emails. These users are created or restored as active admins on startup. |
+| `NOX_BACKEND_ADDR` | `:8080` | HTTP listen address inside the container or process. |
+| `NOX_BACKEND_DATA_DIR` | `/data` | Persistent backend data directory. |
+| `NOX_BACKEND_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
+| `NOX_BACKEND_PUBLIC_URL` | request-derived URL | Public base URL used for dashboard display and Google OAuth callback URLs. Set this in production. The provided Compose files default it to `http://localhost:5710` for local use. |
+| `NOX_BACKEND_GOOGLE_CLIENT_ID` | none | Google OAuth client ID for dashboard login. |
+| `NOX_BACKEND_GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret for dashboard login. |
+| `NOX_BACKEND_ADMIN_EMAILS` | none | Comma-separated bootstrap admin emails. These users are created or restored as active admins on startup. |
 
 ## Google OAuth
 
@@ -106,10 +106,10 @@ For local testing:
 http://localhost:5710/auth/google/callback
 ```
 
-Set `NOX_SYNC_PUBLIC_URL` to the same origin, without a trailing slash:
+Set `NOX_BACKEND_PUBLIC_URL` to the same origin, without a trailing slash:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_PUBLIC_URL=https://sync.example.com
 ```
 
 Dashboard users sign in with Google, but plugin sync still uses the per-user `noxsync_` API key from `/vault-dashboard`.
@@ -135,19 +135,19 @@ ports:
   - "5710:8080"
 ```
 
-It retains the existing named Docker volume key:
+The new-installation example uses this Docker volume:
 
 ```text
-nox-sync-data
+nox-backend-data
 ```
 
-The actual volume name is normally prefixed with the Compose project name. Keep the existing project name when updating; the volume key alone does not identify the deployed volume. See the [update guide](backend-separation.md).
+The example explicitly names the volume, without a Compose project prefix. Existing deployments must keep their actual volume name using `NOX_BACKEND_DATA_VOLUME_NAME` or the legacy `NOX_SYNC_DATA_VOLUME_NAME`; see the [update guide](backend-separation.md).
 
 Add the Google OAuth and admin email variables before exposing the dashboard publicly.
 
 ## Domain And Reverse Proxy Deployments
 
-If you run NoX Sync behind a reverse proxy, the proxy should forward traffic to the backend container on port `8080`.
+If you run NoX Backend behind a reverse proxy, the proxy should forward traffic to the backend container on port `8080`.
 
 Example public URL:
 
@@ -158,7 +158,7 @@ https://sync.example.com
 Required matching settings:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_PUBLIC_URL=https://sync.example.com
 ```
 
 Google redirect URI:
@@ -177,18 +177,18 @@ The three values above should use the same scheme and host. A mismatch is the mo
 
 ## Persistent Data
 
-The backend creates and uses these paths under `NOX_SYNC_DATA_DIR`:
+The backend creates and uses these paths under `NOX_BACKEND_DATA_DIR`:
 
 | Path | Purpose |
 | --- | --- |
-| `/data/nox-sync.db` | SQLite database with users, sessions, API keys, vaults, file metadata, revisions, tombstones, locks, staged upload records, and conflict records. |
+| `/data/nox-backend.db` | SQLite database with users, sessions, API keys, vaults, file metadata, revisions, tombstones, locks, staged upload records, and conflict records. |
 | `/data/blobs` | Finalized file contents stored by SHA-256 hash. |
 | `/data/staging` | Temporary upload content for active sync sessions. |
 | `/data/logs` | Reserved log directory. Docker console logs are still the primary runtime log target. |
 
 Back up the whole `/data` directory as one unit. Restoring only the database or only the blobs can leave metadata and file content out of sync.
 
-This release uses the multi-user, multi-vault schema. Metadata from earlier private single-vault test builds is intentionally not migrated.
+This release uses the multi-user, multi-vault schema. Existing databases must already have migrations 1, 2 and 3 with the expected schema. Older or unknown schemas are refused before startup migrations; the historical reset is never used as an automatic upgrade of existing data.
 
 ## Vault Delete, Restore, And Storage Usage
 
@@ -199,7 +199,7 @@ Deleting a vault from the dashboard or plugin is a soft delete:
 - The vault can still be restored.
 - The vault can still occupy backend storage.
 
-Permanently deleting a deleted vault removes its database metadata and makes it unrestorable. After metadata removal, NoX Sync also removes finalized blob files that are no longer referenced by any remaining vault metadata.
+Permanently deleting a deleted vault removes its database metadata and makes it unrestorable. After metadata removal, NoX Backend also removes finalized blob files that are no longer referenced by any remaining vault metadata.
 
 Because blobs are content-addressed by SHA-256 hash, a blob shared by another remaining vault is kept.
 
@@ -234,7 +234,7 @@ This builds `./backend` locally and mounts `./data` to `/data` for easy inspecti
 
 ## Local Docker Image Build
 
-The version is resolved once at startup: a non-empty `NOX_SYNC_VERSION` takes
+The version is resolved once at startup: a non-empty `NOX_BACKEND_VERSION` takes
 precedence over the version embedded in the executable; an empty or unset
 override uses the embedded version. With neither, an unversioned local build
 reports `dev`. Both `/v1/health` and `/v1/info` report the same resolved value.
@@ -258,7 +258,7 @@ docker build --build-arg VERSION=1.2.3 -t nox-backend:1.2.3 ./backend
 For a versioned executable, run from `backend/`:
 
 ```bash
-go build -ldflags "-X main.buildVersion=1.2.3" -o nox-sync ./cmd/nox-sync
+go build -ldflags "-X main.buildVersion=1.2.3" -o nox-backend ./cmd/nox-backend
 ```
 
 See the [stable client API](client-api.md) for the health and metadata contracts.
@@ -266,7 +266,12 @@ See the [stable client API](client-api.md) for the health and metadata contracts
 You can then run that local image with:
 
 ```bash
-docker run --rm --name nox-sync-dev -p 5710:8080 -v nox-sync-dev-data:/data nox-backend:dev
+docker run --rm --name nox-backend-dev -p 5710:8080 -v nox-backend-dev-data:/data nox-backend:dev
 ```
 
-The `ghcr.io/mapherez/nox-backend:latest` tag is the image reference used by the production Compose example; it must be published before the example can pull it. Building a local image does not publish anything to GitHub Container Registry. Running NoX Sync does not require external databases or external sync providers.
+The `ghcr.io/mapherez/nox-backend:latest` tag is the image reference used by the production Compose example; it must be published before the example can pull it. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
+
+Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
+`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
+name shown above is the new-installation default; existing `nox-sync.db` files are
+used in place until an explicit offline migration.

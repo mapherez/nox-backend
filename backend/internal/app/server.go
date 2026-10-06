@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mapherez/nox-sync/backend/internal/storage"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
 const sessionCookieName = "nox_sync_session"
@@ -34,6 +34,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/vault-dashboard", s.handleDashboard)
+	mux.HandleFunc("/vault-dashboard/assets/", s.handleDashboardAsset)
 	mux.HandleFunc("/vault-dashboard/api-key/rotate", s.handleRotateAPIKey)
 	mux.HandleFunc("/vault-dashboard/users/add", s.handleAddUser)
 	mux.HandleFunc("/vault-dashboard/users/status", s.handleSetUserStatus)

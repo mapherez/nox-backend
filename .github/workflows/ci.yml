@@ -72,16 +72,20 @@ jobs:
           def docker(*args):
               return subprocess.check_output(["docker", *args], text=True).strip()
 
-          for image, override, expected in [
-              ("nox-backend:test", None, "dev"),
-              ("nox-backend:contract-test", None, "contract-test"),
-              ("nox-backend:contract-test", "", "contract-test"),
-              ("nox-backend:contract-test", "runtime-test", "runtime-test"),
+          for image, canonical, legacy, expected in [
+              ("nox-backend:test", None, None, "dev"),
+              ("nox-backend:contract-test", None, None, "contract-test"),
+              ("nox-backend:contract-test", "", "", "contract-test"),
+              ("nox-backend:contract-test", None, "runtime-test", "runtime-test"),
+              ("nox-backend:contract-test", "canonical", None, "canonical"),
+              ("nox-backend:contract-test", "canonical", "legacy", "canonical"),
+              ("nox-backend:contract-test", "", "legacy", "legacy"),
           ]:
               args = ["run", "--detach", "--rm", "--publish", "127.0.0.1::8080",
                       "--tmpfs", "/data:uid=10001,gid=10001,mode=0700"]
-              if override is not None:
-                  args += ["--env", "NOX_SYNC_VERSION=" + override]
+              for name, value in [("NOX_BACKEND_VERSION", canonical), ("NOX_SYNC_VERSION", legacy)]:
+                  if value is not None:
+                      args += ["--env", name + "=" + value]
               container = docker(*args, image)
               try:
                   base = "http://" + docker("port", container, "8080/tcp")
@@ -100,12 +104,12 @@ jobs:
                       assert response.headers["Content-Type"] == "application/json"
                       info = json.load(response)
                   assert health == {"status": "ready", "version": expected,
-                                    "dataDirInitialized": True, "databasePath": "/data/nox-sync.db"}, health
+                                    "dataDirInitialized": True, "databasePath": "/data/nox-backend.db"}, health
                   required_info = {"service": "nox-backend", "version": expected, "apiVersion": "v1",
                                    "capabilities": ["auth", "vaults", "files", "vault-status"]}
                   for field, value in required_info.items():
                       assert field in info and type(info[field]) is type(value) and info[field] == value, (field, info)
-                  print(f"{image}: override={override!r}, health/info version={expected}")
+                  print(f"{image}: canonical={canonical!r}, legacy={legacy!r}, health/info version={expected}")
               except Exception:
                   subprocess.run(["docker", "logs", container], check=False)
                   raise

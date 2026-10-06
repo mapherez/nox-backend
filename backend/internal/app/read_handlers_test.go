@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mapherez/nox-sync/backend/internal/storage"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
 func TestReadAPIContentsLegacyDownloadsAndZIP(t *testing.T) {

@@ -5,20 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 const (
-	DatabaseFileName = "nox-sync.db"
+	DatabaseFileName       = "nox-backend.db"
+	LegacyDatabaseFileName = "nox-sync.db"
 )
 
 // Store owns access to backend metadata stored in SQLite.
 type Store struct {
 	db      *sql.DB
 	dataDir string
+	dbPath  string
 }
 
 // SyncStatus is the lightweight sync status shape used by the status API.
@@ -40,7 +41,10 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("create data directory: %w", err)
 	}
 
-	dbPath := filepath.Join(dataDir, DatabaseFileName)
+	dbPath, err := resolveDatabasePath(dataDir)
+	if err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
@@ -50,7 +54,12 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 
-	store := &Store{db: db, dataDir: dataDir}
+	store := &Store{db: db, dataDir: dataDir, dbPath: dbPath}
+	// Inspect before WAL configuration or any migration can modify this database.
+	if err := store.validateExistingSchema(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := store.configure(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -70,7 +79,7 @@ func (s *Store) Close() error {
 
 // DBPath returns the absolute database path used by this store.
 func (s *Store) DBPath() string {
-	return filepath.Join(s.dataDir, DatabaseFileName)
+	return s.dbPath
 }
 
 func (s *Store) configure(ctx context.Context) error {

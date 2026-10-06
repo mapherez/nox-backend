@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mapherez/nox-sync/backend/internal/storage"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
 func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {

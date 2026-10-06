@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mapherez/nox-sync/backend/internal/storage"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"

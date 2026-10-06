@@ -1,4 +1,4 @@
-module github.com/mapherez/nox-sync/backend
+module github.com/mapherez/nox-backend/backend
 
 go 1.26.0
 

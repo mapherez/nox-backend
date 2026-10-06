@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NoX Backend &middot; Dashboard</title>
+    <link
+      rel="icon"
+      href="/vault-dashboard/assets/favicon.svg"
+      type="image/svg+xml"
+    />
+    <link rel="stylesheet" href="/vault-dashboard/assets/dashboard.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="app-bar">
+      <a
+        class="brand"
+        href="/vault-dashboard"
+        aria-label="NoX Backend dashboard"
+        ><span class="brand-mark" aria-hidden="true">N<span>&times;</span></span
+        ><span>NoX <strong>Backend</strong></span></a
+      >
+      <span class="app-bar-label"
+        >{{if .Authenticated}}<span
+          class="status-dot"
+          aria-hidden="true"
+        ></span>
+        Personal workspace{{else}}Self-hosted vault storage{{end}}</span
+      >
+    </div>
+    <main id="main-content">
+      <div
+        id="copy-feedback"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+      ></div>
+      {{if .Authenticated}}
+      <header>
+        <div>
+          <p class="eyebrow">YOUR WORKSPACE</p>
+          <h1>
+            {{if .User.FirstName}}Welcome back, {{.User.FirstName}}{{else}}Your
+            workspace{{end}}
+          </h1>
+          <div class="account-line">
+            <span class="muted">{{.User.Email}}</span
+            ><span class="badge"
+              >{{if .IsAdmin}}Admin{{else}}Member{{end}}</span
+            >
+          </div>
+        </div>
+        <div class="header-actions">
+          <a
+            class="icon-button secondary"
+            href="/vault-dashboard"
+            title="Refresh dashboard"
+            aria-label="Refresh dashboard"
+            >{{icon "refresh"}}</a
+          >
+          <form method="post" action="/auth/logout">
+            <button
+              class="icon-button secondary"
+              type="submit"
+              title="Log out"
+              aria-label="Log out"
+            >
+              {{icon "logout"}}
+            </button>
+          </form>
+        </div>
+      </header>
+
+      {{if .Message}}
+      <div class="message" role="status">
+        <span>{{.Message}}</span>
+        <button
+          class="icon-button secondary message-close"
+          type="button"
+          data-close-message
+          title="Close message"
+          aria-label="Close message"
+        >
+          {{icon "x"}}
+        </button>
+      </div>
+      {{end}}
+
+      <div class="overview" aria-label="Storage overview">
+        <div>
+          <span class="overview-label">Active vaults</span
+          ><strong>{{len .Vaults}}</strong>
+        </div>
+        <div>
+          <span class="overview-label">Stored in active vaults</span
+          ><strong>{{formatBytes (totalBytes .Vaults)}}</strong>
+        </div>
+        <div>
+          <span class="overview-label">Deleted vaults</span
+          ><strong>{{len .DeletedVaults}}</strong>
+        </div>
+      </div>
+      <div class="section-intro">
+        <h2>Connect your apps</h2>
+        <p class="muted">Use the same server URL and API key in each client.</p>
+      </div>
+      <div class="grid">
+        <section>
+          <label class="field-heading" for="server-url">Server URL</label>
+          <div class="copy-row">
+            <input
+              id="server-url"
+              class="mono"
+              spellcheck="false"
+              readonly
+              value="{{.ServerURL}}"
+            />
+            <button
+              class="icon-button"
+              type="button"
+              data-copy="server-url"
+              title="Copy server URL"
+              aria-label="Copy server URL"
+            >
+              {{icon "copy"}}
+            </button>
+          </div>
+          <p class="muted">The base address of your backend, without /v1.</p>
+        </section>
+
+        <section>
+          <label class="field-heading" for="api-key">API key</label>
+          <div class="copy-row">
+            <input
+              id="api-key"
+              class="mono"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              readonly
+              value="{{.APIKey}}"
+            />
+            <button
+              class="icon-button secondary"
+              type="button"
+              data-toggle-key
+              aria-controls="api-key"
+              aria-pressed="false"
+              title="Show API key"
+              aria-label="Show API key"
+            >
+              {{icon "eye"}}
+            </button>
+            <button
+              class="icon-button"
+              type="button"
+              data-copy="api-key"
+              title="Copy API key"
+              aria-label="Copy API key"
+            >
+              {{icon "copy"}}
+            </button>
+          </div>
+          <form
+            method="post"
+            action="/vault-dashboard/api-key/rotate"
+            class="key-actions"
+            data-confirm-rotate
+          >
+            <button class="danger" type="submit">Generate new API key</button>
+          </form>
+          <p class="muted">
+            Generating a new key disconnects apps using the previous key.
+          </p>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">STORAGE</p>
+              <h2>Your vaults <span class="count">{{len .Vaults}}</span></h2>
+            </div>
+            <button
+              class="icon-button secondary"
+              type="button"
+              data-open-restore-vaults
+              title="Restore deleted vaults"
+              aria-label="Restore deleted vaults"
+              {{if not .DeletedVaults}}disabled{{end}}
+            >
+              {{icon "restore"}}
+            </button>
+          </div>
+          {{if .Vaults}}
+          <div
+            class="table-wrapper"
+            role="region"
+            tabindex="0"
+            aria-label="Your vaults"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Revision</th>
+                  <th scope="col">Updated</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range .Vaults}}
+                <tr>
+                  <th scope="row" class="vault-name">
+                    {{icon "vault"}}<span>{{.Name}}</span>
+                  </th>
+                  <td><span class="badge mono">r{{.Revision}}</span></td>
+                  <td>
+                    <time datetime="{{.UpdatedAt}}"
+                      >{{formatTime .UpdatedAt}}</time
+                    >
+                  </td>
+                  <td>{{formatBytes .SizeBytes}}</td>
+                  <td class="action-cell">
+                    <a
+                      class="icon-button secondary"
+                      href="/vault-dashboard/vaults/download?vaultId={{.ID}}"
+                      title="Download vault"
+                      aria-label="Download vault"
+                      >{{icon "download"}}</a
+                    >
+                    <button
+                      class="icon-button danger"
+                      type="button"
+                      data-delete-vault="{{.ID}}"
+                      data-delete-name="{{.Name}}"
+                      title="Delete vault"
+                      aria-label="Delete vault"
+                    >
+                      {{icon "trash"}}
+                    </button>
+                  </td>
+                </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+          {{else}}
+          <p class="empty-state">
+            No vaults yet. Create your first vault from a connected app, such as
+            NoX Sync.
+          </p>
+          {{end}}
+        </section>
+
+        {{if .IsAdmin}}
+        <section>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">ADMINISTRATION</p>
+              <h2>User management <span class="count">{{len .Users}}</span></h2>
+            </div>
+          </div>
+          <div class="add-user-panel">
+            <form
+              class="form-row"
+              method="post"
+              action="/vault-dashboard/users/add"
+            >
+              <div class="field grow">
+                <label for="user-email">Email address</label
+                ><input
+                  id="user-email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="user@example.com"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="user-role">Role</label
+                ><select id="user-role" class="role-select" name="role">
+                  <option value="USER">User</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+              <button type="submit">Add User</button>
+            </form>
+          </div>
+
+          <div
+            class="table-wrapper"
+            role="region"
+            tabindex="0"
+            aria-label="Users"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Email</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range .Users}}
+                <tr>
+                  <th scope="row">{{.Email}}</th>
+                  <td><span class="badge">{{.Role}}</span></td>
+                  <td>
+                    <form method="post" action="/vault-dashboard/users/status">
+                      <input type="hidden" name="userId" value="{{.ID}}" />
+                      {{if eq .Status "ACTIVE"}}
+                      <input type="hidden" name="status" value="DISABLED" />
+                      <button
+                        class="status-toggle is-active"
+                        type="submit"
+                        title="Disable user"
+                        aria-label="Disable user"
+                        {{if isAdminUser .}}disabled{{end}}
+                      >
+                        <span></span>
+                      </button>
+                      {{else}}
+                      <input type="hidden" name="status" value="ACTIVE" />
+                      <button
+                        class="status-toggle"
+                        type="submit"
+                        title="Enable user"
+                        aria-label="Enable user"
+                        {{if isAdminUser .}}disabled{{end}}
+                      >
+                        <span></span>
+                      </button>
+                      {{end}}
+                    </form>
+                  </td>
+                  <td class="action-cell">
+                    {{if eq .Role "ADMIN"}}
+                    <button
+                      class="icon-button secondary"
+                      type="button"
+                      title="Admin users cannot be demoted"
+                      aria-label="Admin users cannot be demoted"
+                      disabled
+                    >
+                      {{icon "user"}}
+                    </button>
+                    {{else}}
+                    <form method="post" action="/vault-dashboard/users/role">
+                      <input type="hidden" name="userId" value="{{.ID}}" />
+                      <input type="hidden" name="role" value="ADMIN" />
+                      <button
+                        class="icon-button secondary"
+                        type="submit"
+                        title="Make admin"
+                        aria-label="Make admin"
+                      >
+                        {{icon "shield"}}
+                      </button>
+                    </form>
+                    {{end}}
+                    <button
+                      class="icon-button danger"
+                      type="button"
+                      data-delete-user="{{.ID}}"
+                      data-delete-user-email="{{.Email}}"
+                      title="Delete user"
+                      aria-label="Delete user"
+                      {{if isAdminUser .}}disabled{{end}}
+                    >
+                      {{icon "user-x"}}
+                    </button>
+                  </td>
+                </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        {{end}}
+      </div>
+
+      <dialog
+        id="delete-dialog"
+        aria-labelledby="delete-title"
+        aria-describedby="delete-dialog-text"
+      >
+        <form method="post" action="/vault-dashboard/vaults/delete">
+          <h2 id="delete-title">Delete vault?</h2>
+          <p id="delete-dialog-text" class="muted">
+            This vault will be hidden and blocked from future sync.
+          </p>
+          <input id="delete-vault-id" type="hidden" name="vaultId" value="" />
+          <div class="actions dialog-actions">
+            <button class="secondary" type="button" data-close-delete autofocus>
+              Cancel
+            </button>
+            <button class="danger" type="submit">Delete vault</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="restore-vaults-dialog" aria-labelledby="restore-title">
+        <div class="section-heading">
+          <h2 id="restore-title">Deleted vaults</h2>
+          <button
+            class="icon-button secondary"
+            type="button"
+            data-close-restore-vaults
+            title="Close"
+            aria-label="Close"
+          >
+            {{icon "x"}}
+          </button>
+        </div>
+        {{if .DeletedVaults}}
+        <div
+          class="table-wrapper"
+          role="region"
+          tabindex="0"
+          aria-label="Deleted vaults"
+        >
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Size</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .DeletedVaults}}
+              <tr>
+                <th scope="row" class="vault-name">
+                  {{icon "vault"}}<span>{{.Name}}</span>
+                </th>
+                <td>{{formatBytes .SizeBytes}}</td>
+                <td class="action-cell">
+                  <form method="post" action="/vault-dashboard/vaults/restore">
+                    <input type="hidden" name="vaultId" value="{{.ID}}" />
+                    <button
+                      class="icon-button secondary"
+                      type="submit"
+                      title="Restore vault"
+                      aria-label="Restore vault"
+                    >
+                      {{icon "restore"}}
+                    </button>
+                  </form>
+                  <button
+                    class="icon-button danger"
+                    type="button"
+                    data-purge-vault="{{.ID}}"
+                    data-purge-name="{{.Name}}"
+                    title="Permanently delete vault"
+                    aria-label="Permanently delete vault"
+                  >
+                    {{icon "trash"}}
+                  </button>
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        {{else}}
+        <p class="muted">No deleted vaults can be restored.</p>
+        {{end}}
+      </dialog>
+
+      <dialog
+        id="purge-vault-dialog"
+        aria-labelledby="purge-title"
+        aria-describedby="purge-vault-text"
+      >
+        <form method="post" action="/vault-dashboard/vaults/purge">
+          <h2 id="purge-title">Permanently delete vault?</h2>
+          <p id="purge-vault-text" class="muted">
+            This vault will be permanently deleted and cannot be restored.
+          </p>
+          <input id="purge-vault-id" type="hidden" name="vaultId" value="" />
+          <div class="actions dialog-actions">
+            <button
+              class="secondary"
+              type="button"
+              data-close-purge-vault
+              autofocus
+            >
+              Cancel
+            </button>
+            <button class="danger" type="submit">Delete permanently</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog
+        id="delete-user-dialog"
+        aria-labelledby="delete-user-title"
+        aria-describedby="delete-user-text"
+      >
+        <form method="post" action="/vault-dashboard/users/delete">
+          <h2 id="delete-user-title">Delete user?</h2>
+          <p id="delete-user-text" class="muted">
+            This user and their sync data will be permanently deleted.
+          </p>
+          <input id="delete-user-id" type="hidden" name="userId" value="" />
+          <div class="actions dialog-actions">
+            <button
+              class="secondary"
+              type="button"
+              data-close-delete-user
+              autofocus
+            >
+              Cancel
+            </button>
+            <button class="danger" type="submit">Delete user</button>
+          </div>
+        </form>
+      </dialog>
+      {{else}}
+      <div class="login-panel">
+        <div class="login-icon" aria-hidden="true">{{icon "vault"}}</div>
+        <p class="eyebrow">NOX BACKEND</p>
+        <h1>Your vaults.<br />Your infrastructure.</h1>
+        <p class="muted">
+          Manage your vaults, connect your apps and keep your data on your own
+          server. Sign in with an allowed Google account to get started.
+        </p>
+        {{if .OAuthConfigured}}
+        <a class="button" href="{{.LoginURL}}">Continue with Google</a>
+        {{else}}
+        <p class="muted">
+          Google OAuth is not configured. Configure NOX_BACKEND_GOOGLE_CLIENT_ID
+          and NOX_BACKEND_GOOGLE_CLIENT_SECRET (legacy NOX_SYNC_* names also
+          work).
+        </p>
+        {{end}}
+      </div>
+      {{end}}
+    </main>
+    <footer>
+      NoX Backend <span aria-hidden="true">&middot;</span> Your data, on your
+      server.
+    </footer>
+    <script src="/vault-dashboard/assets/dashboard.js" defer></script>
+  </body>
+</html>

@@ -3,14 +3,14 @@
 Backend metadata uses SQLite at:
 
 ```text
-/data/nox-sync.db
+/data/nox-backend.db
 ```
 
 File contents are stored outside SQLite:
 
 ```text
 /data/
-  nox-sync.db
+  nox-backend.db
   blobs/
   staging/
   logs/
@@ -35,9 +35,11 @@ Upload content is staged under `/data/staging/{sessionId}` until a sync commit s
 
 Migrations live in `migrations/` and are applied in numeric order. The `schema_migrations` table records applied versions.
 
-Migration execution is wired into backend startup.
+Startup validates any existing database before applying migrations. New databases are initialized automatically.
 
-The multi-vault migration is intentionally breaking for earlier private single-vault test builds. Old single-vault metadata is not automatically migrated.
+The historical migration 3 contains a destructive reset. Existing databases without the complete supported history (1, 2, 3) or expected structure are refused; the reset cannot run as an automatic upgrade.
+
+Existing `nox-sync.db` is used in place. `nox-backend migrate-database` performs an explicit offline SQLite copy to `nox-backend.db`, retaining `nox-sync.db.legacy`. Both active filenames at once, or an interrupted migration with only the archive left, cause startup to fail rather than create an empty replacement. Back up all of `/data` before running the command. See [the update guide](../../../docs/backend-separation.md).
 
 ## Delete Behavior
 

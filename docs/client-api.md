@@ -48,7 +48,7 @@ Public; returns `200` and `Content-Type: application/json`:
   "status": "ready",
   "version": "1.2.3",
   "dataDirInitialized": true,
-  "databasePath": "/data/nox-sync.db"
+  "databasePath": "/data/nox-backend.db"
 }
 ```
 
@@ -78,7 +78,7 @@ synchronization protocol as stable client API. Unsupported methods return
 `405`, `Allow: GET`, and the standard JSON error with `code: "BAD_REQUEST"`.
 
 Both health and info expose the same version resolved at startup:
-non-empty `NOX_SYNC_VERSION`, then the embedded build version, then `dev` for
+non-empty `NOX_BACKEND_VERSION`, then the embedded build version, then `dev` for
 unversioned local builds. Published images embed the exact Git tag of their
 commit or `git-<full commit SHA>`; `latest` is only an image tag. See
 [backend configuration](backend-configuration.md#local-docker-image-build).

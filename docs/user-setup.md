@@ -46,13 +46,13 @@ curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-com
 Create `.env` beside it:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
-NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_SYNC_ADMIN_EMAILS=you@example.com
+NOX_BACKEND_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
+NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
+NOX_BACKEND_ADMIN_EMAILS=you@example.com
 ```
 
-For local testing, set `NOX_SYNC_PUBLIC_URL=http://localhost:5710`.
+For local testing, set `NOX_BACKEND_PUBLIC_URL=http://localhost:5710`.
 
 After `ghcr.io/mapherez/nox-backend:latest` has been published, start the service:
 
@@ -60,11 +60,11 @@ After `ghcr.io/mapherez/nox-backend:latest` has been published, start the servic
 docker compose up -d
 ```
 
-The service retains the name `nox-sync`. Host port `5710` maps to container port `8080`. The named volume key remains `nox-sync-data`; its actual Docker name depends on the Compose project.
+For new installations, the service is named `nox-backend`. Host port `5710` maps to container port `8080`. The default volume is `nox-backend-data`. Existing installations must preserve their actual data volume; both `NOX_BACKEND_DATA_VOLUME_NAME` and the legacy `NOX_SYNC_DATA_VOLUME_NAME` are supported.
 
 ## Open the dashboard
 
-Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault-dashboard` for local testing. Sign in with an admin email listed in `NOX_SYNC_ADMIN_EMAILS`.
+Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault-dashboard` for local testing. Sign in with an admin email listed in `NOX_BACKEND_ADMIN_EMAILS`.
 
 The dashboard provides your Server URL and API key, vault management and downloads, and admin user management. Each user owns their own vaults and API key.
 
@@ -80,7 +80,7 @@ In NoX Sync settings:
 4. Select or create a backend vault.
 5. Trigger manual sync.
 
-Use the same public origin for `NOX_SYNC_PUBLIC_URL`, the OAuth callback, and the plugin Server URL. Do not append `/v1` to the Server URL.
+Use the same public origin for `NOX_BACKEND_PUBLIC_URL`, the OAuth callback, and the plugin Server URL. Do not append `/v1` to the Server URL.
 
 A second device can connect with the same user's API key, select the same vault, and manually sync to receive its files. Admin users can allowlist additional users from the dashboard; each user gets their own key and vaults.
 
@@ -97,3 +97,7 @@ docker compose -f docker-compose.dev.yml up --build
 The development configuration builds `./backend` and mounts `./data` to `/data`. Use separate test data rather than a production data directory.
 
 For Go development and all environment variables, see the [README](../README.md) and [backend configuration](backend-configuration.md).
+Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
+`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
+name shown above is the new-installation default; existing `nox-sync.db` files are
+used in place until an explicit offline migration.

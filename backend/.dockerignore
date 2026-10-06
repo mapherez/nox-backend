@@ -3,5 +3,8 @@
 Dockerfile
 *.db
 *.db-*
+*.db.legacy
+bin
+coverage.out
 data
 tmp

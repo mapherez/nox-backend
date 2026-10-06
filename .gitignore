@@ -1,12 +1,15 @@
 # Backend
 backend/bin/
 backend/coverage.out
+.playwright-cli/
+output/playwright/
 
 # Local runtime data
 data/
 *.db
 *.db-shm
 *.db-wal
+*.db.legacy
 
 # Logs and OS/editor noise
 *.log

@@ -13,9 +13,9 @@ The backend is running, but one or both Google OAuth variables are missing.
 Check your `.env` file:
 
 ```bash
-NOX_SYNC_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_SYNC_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_SYNC_ADMIN_EMAILS=you@example.com
+NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
+NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
+NOX_BACKEND_ADMIN_EMAILS=you@example.com
 ```
 
 Then restart the container:
@@ -28,14 +28,14 @@ docker compose up -d
 
 The most common cause is a mismatch between:
 
-- `NOX_SYNC_PUBLIC_URL`
+- `NOX_BACKEND_PUBLIC_URL`
 - The Google OAuth redirect URI
 - The URL you use in the browser
 
 For a domain deployment, these should line up:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_PUBLIC_URL=https://sync.example.com
 ```
 
 ```text
@@ -49,7 +49,7 @@ https://sync.example.com/vault-dashboard
 For local testing with the default Compose port:
 
 ```bash
-NOX_SYNC_PUBLIC_URL=http://localhost:5710
+NOX_BACKEND_PUBLIC_URL=http://localhost:5710
 ```
 
 ```text
@@ -64,16 +64,16 @@ http://localhost:5710/vault-dashboard
 
 The Google account is not allowlisted or has been disabled.
 
-Make sure the first admin email is in `NOX_SYNC_ADMIN_EMAILS`:
+Make sure the first admin email is in `NOX_BACKEND_ADMIN_EMAILS`:
 
 ```bash
-NOX_SYNC_ADMIN_EMAILS=you@example.com
+NOX_BACKEND_ADMIN_EMAILS=you@example.com
 ```
 
 Emails are comma-separated:
 
 ```bash
-NOX_SYNC_ADMIN_EMAILS=you@example.com,other-admin@example.com
+NOX_BACKEND_ADMIN_EMAILS=you@example.com,other-admin@example.com
 ```
 
 Bootstrap admin emails are created or restored as active admins on backend startup.
@@ -111,7 +111,7 @@ docker compose ps
 Check backend logs:
 
 ```bash
-docker compose logs nox-sync
+docker compose logs nox-backend
 ```
 
 Verify the Server URL in plugin settings, including protocol and port.
@@ -122,7 +122,7 @@ For the default Compose file, local Server URL is:
 http://localhost:5710
 ```
 
-If you use a domain or reverse proxy, the plugin Server URL should be the same public origin as `NOX_SYNC_PUBLIC_URL`.
+If you use a domain or reverse proxy, the plugin Server URL should be the same public origin as `NOX_BACKEND_PUBLIC_URL`.
 
 ## Docker Container Is Running But Browser Cannot Open The Dashboard
 
@@ -157,7 +157,7 @@ Then open:
 http://localhost:5711/vault-dashboard
 ```
 
-Also update `NOX_SYNC_PUBLIC_URL` and the Google OAuth redirect URI to use the same port.
+Also update `NOX_BACKEND_PUBLIC_URL` and the Google OAuth redirect URI to use the same port.
 
 ## `BLOCKED_REMOTE`
 
@@ -204,7 +204,11 @@ Back up the complete backend `/data` directory, not just the SQLite database. Th
 If you use the production Compose file, the named volume key for `/data` is:
 
 ```text
-nox-sync-data
+nox-backend-data
 ```
 
 The actual Docker volume name normally includes the Compose project prefix. If vaults disappear after the image switch, stop and verify that the container mounts the original data volume. Do not create replacement vaults, rename the project, reset the database, rotate keys, or run `docker compose down -v` to fix it. See the [repository separation and rollback guide](backend-separation.md).
+Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
+`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
+name shown above is the new-installation default; existing `nox-sync.db` files are
+used in place until an explicit offline migration.

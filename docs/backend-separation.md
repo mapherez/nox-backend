@@ -1,135 +1,144 @@
-# Repository separation, validation, update, and rollback
+# Backend refactor: compatibility, validation, update and rollback
 
-NoX Backend now owns the Go backend and Docker image. The Obsidian plugin remains in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). The repository cleanup does not modify backend source, dependencies, dashboard, migrations, or the HTTP contract.
+NoX Backend is independent from the [NoX Sync plugin](https://github.com/mapherez/nox-sync).
+The refactor changes internal names and the dashboard presentation, preserving
+HTTP routes, JSON, error contracts, API keys, sessions, vault identities and sync behavior.
+The nox-wiki-codex read integration keeps its conditional downloads and original headers.
 
-The new production image reference is `ghcr.io/mapherez/nox-backend:latest`. This guide is for a later deployment update, after the image has been built, tested, and published. Cleaning this repository does not update a running server.
+## Configuration and storage compatibility
 
-## Compatibility guarantees
+Use `NOX_BACKEND_*` for new configuration. All matching `NOX_SYNC_*` runtime
+variables remain accepted: non-empty canonical value, then non-empty legacy
+value, then the existing default. Compose resolves both names using the same rule.
+The legacy executable `nox-sync` remains available. Container UID/GID stay 10001.
 
-The separation retains:
+New databases use `/data/nox-backend.db`. An existing `/data/nox-sync.db` is used
+in place, without automatic renaming. If both active files exist, startup fails
+rather than choosing one. Database schema, migration records, blobs and staging
+layout are unchanged. An interrupted filename migration cannot silently create
+a replacement empty database.
 
-- `/v1` routes, request and response formats, errors, and SSE status events.
-- Dashboard and Google OAuth routes, session cookies, API keys, and vault IDs.
-- All `NOX_SYNC_*` variables and the `nox-sync` executable.
-- `/data/nox-sync.db`, blobs, staging, logs, and their existing layout.
-- Existing migration files and startup behavior.
-- Compose service/container names, ports, mounts, and the `nox-sync-data` volume key.
+Existing data volumes do not need renaming. In particular this remains valid:
 
-No schema change or new migration is part of this transition. Existing plugin installations keep their Server URL, API key, selected vault, and local sync state.
-
-## Record the current deployment
-
-Work in the **existing deployment folder**, with its original Compose project name and `.env`. If you normally pass `-p`, `-f`, or other Compose options, keep using exactly those options throughout this procedure.
-
-Before changing anything:
-
-1. Record the running image ID/digest and keep that image available for rollback. Record any mounts and existing image overrides.
-2. Record the actual source volume or bind-mount path for `/data`. Check the current container's mounts with `docker inspect nox-sync`, or the actual container name if your deployment differs.
-3. Record the resolved configuration with `docker compose config`. It may contain secrets; store it privately.
-4. Confirm the public URL, ports, OAuth configuration, admin allowlist, and existing API key configuration will stay unchanged.
-
-Compose normally prefixes volume names with its project name, which defaults to the deployment directory's name. Moving to a folder named `nox-backend` can therefore select a different volume even when the YAML still says `nox-sync-data`. See [Compose project names](https://docs.docker.com/compose/how-tos/project-name/) and [volume naming](https://docs.docker.com/reference/compose-file/volumes/).
-
-Do not rename the deployment folder or project, change volume declarations, copy data to a new production location, or use `docker compose down -v`. An empty vault list after updating is a reason to stop and check the mount, not to create replacement vaults.
-
-## Make a consistent validation copy
-
-Let active syncs finish and pause client syncs. Stop the existing backend service briefly, without removing its container or volume:
-
-```bash
-docker compose stop nox-sync
+```env
+NOX_SYNC_DATA_VOLUME_NAME=nox-sync_nox-sync-data
 ```
 
-Use your existing backup method to copy the **complete** mounted `/data` directory to an isolated validation location. Include any SQLite WAL/SHM files if present. Copying only the database or only blobs is insufficient. Restart the original service after the consistent copy is complete:
+It can later be replaced by the equivalent canonical variable, preserving its value:
 
-```bash
-docker compose start nox-sync
+```env
+NOX_BACKEND_DATA_VOLUME_NAME=nox-sync_nox-sync-data
 ```
 
-Treat the copy and backup as secrets: they contain credentials and vault contents. Keep an untouched backup separate from the writable validation copy.
+Do not replace a working deployment with the new-installation Compose example.
+Keep its service/container names, project, public URL, ports and mounts. Proxies
+or automation may depend on the container name; wiki import identity depends on
+the public URL. Do not run `docker compose down -v`.
 
-## Verify that no migrations are pending
+## Record and back up the current installation
 
-Inspect the validation copy before starting the candidate backend. With SQLite tooling on the host, open the copied database read-only:
+1. Work in the existing deployment folder with its original Compose options and `.env`.
+2. Record the running image ID/digest and retain the old image for rollback.
+3. Check the actual `/data` mount with `docker inspect <actual-container-name>`.
+4. Inspect the resolved Compose configuration privately; it can contain secrets.
+5. Pause sync clients, let active operations finish, and stop the backend.
+6. Back up the complete mounted `/data`, including SQLite WAL/SHM files if present.
+   Keep this backup untouched and create a separate writable validation copy.
 
-```bash
-sqlite3 -readonly /path/to/validation-data/nox-sync.db "SELECT version, name, applied_at FROM schema_migrations ORDER BY version;"
+For updates using a named volume, make it explicit and external in the deployment
+Compose file so a missing name fails instead of creating an empty volume:
+
+```yaml
+volumes:
+  nox-backend-data:
+    external: true
+    name: "${NOX_BACKEND_DATA_VOLUME_NAME:-${NOX_SYNC_DATA_VOLUME_NAME:?Set the existing volume name}}"
 ```
 
-This checkout contains these existing migrations:
+Keep the existing logical volume key if your service references a different one.
+For bind mounts, preserve the existing source path instead.
+
+## Validate the data before starting the candidate
+
+Inspect the copied database with read-only SQLite tooling:
+
+```bash
+sqlite3 -readonly /path/to/validation-data/nox-sync.db "SELECT version, name, applied_at FROM schema_migrations ORDER BY version; PRAGMA integrity_check;"
+```
+
+The supported migration history is exactly:
 
 | Version | Name |
 | --- | --- |
-| 1 | `initial` |
-| 2 | `sync_plan_actions` |
-| 3 | `multi_user_multi_vault_reset` |
+| 1 | initial |
+| 2 | sync_plan_actions |
+| 3 | multi_user_multi_vault_reset |
 
-All three must already be recorded as applied. If any are missing, stop the transition: the unchanged startup mechanism would apply pending migrations, and migration 3 contains a reset of older tables. If the database contains newer migrations than this checkout, stop as well; do not downgrade an unknown schema. Do not run SQL to mark migrations applied or alter their records.
+Existing databases with pending, newer or inconsistent migrations are refused.
+Migration 3 contains a historical reset; do not execute it manually or mark it as
+applied to bypass validation. Unsupported older databases need a separately
+planned data migration. Fresh installations initialize an empty schema normally.
 
-Save the database schema and migration query results before validation. The candidate must not change either of them.
-
-## Validate the candidate on the copy
-
-Build the candidate locally:
+Build the candidate and run it against the validation copy on a separate port,
+using the current settings. Never route normal clients to this instance.
 
 ```bash
 docker build -t nox-backend:validation ./backend
+docker run --rm --name nox-backend-validation --env-file /path/to/private-runtime.env -e NOX_BACKEND_ADDR=:8080 -e NOX_BACKEND_DATA_DIR=/data -p 127.0.0.1:5711:8080 --mount type=bind,source=/absolute/path/to/validation-data,target=/data nox-backend:validation
 ```
 
-Run it against the writable validation copy only, on a separate port, with the same runtime settings needed by the existing deployment. For example:
+Check health, existing-key authentication, vault IDs, file metadata, bytes/hashes,
+conditional download rejection on changed selections, dashboard login and roles.
+Test plugin sync in a disposable vault on the copy; test wiki import using an
+isolated wiki state/content directory. Compare schema, migration records, keys,
+vault revisions and finalized blob hashes with the baseline.
+Startup still bootstraps configured admins and recovers expired sync locks.
+Those normal effects can update timestamps and abandoned session/staging state.
+
+## Optional offline database filename migration
+
+This is a separate, explicit step. First validate it on the copy with all backend
+processes stopped. The command checks schema and SQLite integrity, obtains an
+exclusive connection, checkpoints WAL, copies committed data with `VACUUM INTO`,
+checks the copy and retains the source as `nox-sync.db.legacy`. It refuses to
+overwrite an existing destination or archive. It needs free space for a database
+copy in addition to your independent backup. It does not copy or alter blobs.
+
+Using the already built candidate image:
 
 ```bash
-docker run --rm --name nox-backend-validation --env-file /path/to/private-runtime.env -e NOX_SYNC_ADDR=:8080 -e NOX_SYNC_DATA_DIR=/data -p 127.0.0.1:5711:8080 --mount type=bind,source=/absolute/path/to/validation-data,target=/data nox-backend:validation
+docker run --rm -e NOX_BACKEND_DATA_DIR=/data --mount type=bind,source=/absolute/path/to/validation-data,target=/data nox-backend:validation migrate-database
 ```
 
-The runtime env file must contain resolved values, not Compose interpolation expressions. Preserve the existing public URL and OAuth configuration; do not route real users to the validation instance. The validation port is accessed directly by test clients. Test dashboard display using an existing session on the copy or a separately isolated OAuth test configuration.
+After success, health reports `/data/nox-backend.db`. Existing keys, sessions,
+vault IDs and revisions remain valid. An installation can also keep using the
+legacy filename indefinitely; the volume name is independent of the DB filename.
 
-First perform read-only checks:
-
-- `GET /v1/health` reports ready and uses `/data/nox-sync.db`.
-- `GET /v1/auth/check` accepts the existing user's API key.
-- `GET /v1/vaults` returns the expected vault IDs and metadata.
-- File listing and downloads return existing content with the expected hashes.
-- Schema and `schema_migrations` records match the saved versions.
-- Existing vault revisions, keys, and finalized blob contents remain unchanged.
-
-The existing startup behavior still bootstraps configured admins and recovers stale sync locks. Those runtime effects are not schema migrations; abandoned staging may be cleaned as before.
-
-For an end-to-end plugin check, use the plugin from the other repository in a separate disposable Obsidian vault. Configure it with the validation URL and the same API key from the copied backend. Verify **Test connection**, vault listing, and upload/download in a disposable remote vault on the validation copy. Do not change settings or sync state in a real user vault, and do not perform this test against production.
-
-Stop the validation container when finished. Keep its data separate from the production volume. Document the results before publishing or deploying.
-
-## Switch the production image
-
-After validation succeeds and the new image is published, edit only the image reference in the **existing** Compose deployment:
-
-```yaml
-services:
-  nox-sync:
-    image: ghcr.io/mapherez/nox-backend:latest
-```
-
-Leave every other deployment setting unchanged. Confirm that `docker compose config` resolves to the same project, ports, environment, and actual `/data` mount as before.
-
-Pause client syncs and take a fresh consistent backup before the update. Then, using the original Compose options:
+For production, after a fresh backup and with the service stopped, run the same
+command through the existing Compose service using the verified candidate image:
 
 ```bash
-docker compose pull nox-sync
-docker compose up -d --no-deps nox-sync
-docker compose ps
-docker compose logs --tail=100 nox-sync
+docker compose run --rm --no-deps nox-backend migrate-database
 ```
 
-Verify health, existing API key authentication, expected vaults, and an existing file download before resuming client syncs. The plugin Server URL, API key, and selected vault do not change.
+Use the actual existing service name (for example `nox-sync`) if it differs.
+Do not run this via `docker exec` inside an active backend server.
 
-## Roll back
+## Update and rollback
 
-If validation after the switch fails, pause clients. Restore the previous image reference in the existing Compose configuration, preferably the exact recorded digest or retained local image. Recreate only the backend service using the image already kept locally:
+Publish only after validation. Pin the candidate image to a version/digest. In
+the existing deployment change the image reference; keep the real `/data` source,
+public URL, credentials and service name. Confirm mounts before starting it.
+Verify existing auth, vaults, downloads and wiki access before resuming clients.
+An unexpectedly empty vault list means stop and inspect the mount, not recreate data.
 
-```bash
-docker compose up -d --no-deps --pull never nox-sync
-```
+Without the optional filename migration, rollback just reuses the previous image
+and the same volume. If the filename was migrated, the old image needs the legacy
+filename again. Stop the backend, take a fresh full backup and checkpoint the
+current `nox-backend.db` before renaming it back to `nox-sync.db`. Confirm no old
+active database would be overwritten. This retains writes made after the update.
+Do not substitute the `.legacy` archive after clients have resumed: it is a
+snapshot from migration time and would discard subsequent writes.
 
-Reuse the same project, volume, mounts, paths, and credentials. Since the separation makes no schema change, rollback does not require a data migration.
-
-Do not replace live data with the validation copy. If a separate data incident requires restoring a backup, stop the service and restore the complete consistent backup using the existing recovery procedure; restoring an older backup can discard later syncs.
+A consistent backup restore is a separate recovery operation and can discard
+writes after that backup. Never restore the writable validation copy to production.

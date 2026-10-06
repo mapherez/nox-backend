@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mapherez/nox-sync/backend/internal/storage"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
 // Config contains the minimal backend runtime configuration.
@@ -66,7 +66,7 @@ func Run(ctx context.Context, cfg Config) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("nox-sync backend listening on %s data_dir=%s", cfg.Addr, cfg.DataDir)
+		log.Printf("nox-backend listening on %s data_dir=%s", cfg.Addr, cfg.DataDir)
 		errCh <- httpServer.ListenAndServe()
 	}()
 
