@@ -1,0 +1,7 @@
+{
+  "name": "nox-backend",
+  "private": true,
+  "scripts": {
+    "release": "node scripts/release.mjs"
+  }
+}

@@ -3,7 +3,7 @@
 [![CI](https://github.com/mapherez/nox-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/mapherez/nox-backend/actions/workflows/codeql.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mapherez/nox-backend/badge)](https://securityscorecards.dev/viewer/?uri=github.com/mapherez/nox-backend)
-[![Docker](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/docker-publish.yml)
+[![Release](https://github.com/mapherez/nox-backend/actions/workflows/release.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/release.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 A self-hosted backend service providing storage, authentication, vault management and synchronization APIs for NoX applications and external integrations.
@@ -323,14 +323,73 @@ Do not use production data for development or testing.
 
 Backend releases are independent from client releases.
 
-The production image is published through the **Publish Docker image** GitHub Actions workflow.
+Release from a clean working tree on the branch you want to publish, with Node.js
+24+, npm, Git, Go and a running Docker daemon available:
 
-Images report the exact Git tag of the built commit, or `git-<full commit SHA>`
-when the commit has no tag. This version is separate from the Docker image tag
-and is returned by both `/v1/health` and `/v1/info`. A non-empty
-`NOX_BACKEND_VERSION` overrides it at runtime; unversioned local builds report `dev`.
+```bash
+npm run release -- 0.1.0
+```
 
-Publishing a new image does not automatically update existing deployments.
+`VERSION` contains the current version without `v` (initially `1.0.1`, matching the
+latest historical release). Choose a different unused version for each release.
+The example above illustrates the command syntax. An optional `v` prefix is
+normalized; stable SemVer and prereleases such as `0.2.0-rc.1` are supported.
+Build metadata (`+build`) is refused because Docker tags cannot contain `+`;
+the complete tag must fit Docker's 128-character limit.
+
+The command checks local and origin tags, updates `VERSION`, runs `go test ./...`
+in `backend`, and builds the image with `VERSION=v0.1.0`. Failed checks restore
+`VERSION` and create no commit, tag or push. Successful checks create
+`chore: release v0.1.0`, an annotated `v0.1.0` tag, and push the current branch and
+that tag atomically to origin. If the push fails, the local commit and tag are
+kept and the command prints the exact recovery push command.
+
+The **Release** GitHub Actions workflow runs only on `v*` tag pushes. It verifies
+the tag against `VERSION`, tests Go, and publishes a multi-architecture image
+(`linux/amd64`, `linux/arm64`) with exactly these image tags:
+
+```text
+ghcr.io/mapherez/nox-backend:v0.1.0
+ghcr.io/mapherez/nox-backend:latest
+```
+
+The image includes OCI version, commit revision and repository source labels.
+After publishing it, the workflow creates a GitHub Release with generated notes;
+an existing release causes failure and is never replaced. Monitor the workflow
+until it completes: a successful local push starts the remote publication.
+
+Release images report their Git tag through the existing `buildVersion` ldflags
+mechanism in both `/v1/health` and `/v1/info`. A non-empty `NOX_BACKEND_VERSION`
+overrides it at runtime; unversioned local builds report `dev`.
+
+To deploy latest, set this in the deployment's `.env`:
+
+```env
+NOX_BACKEND_IMAGE_TAG=latest
+```
+
+To deploy a pinned release instead:
+
+```env
+NOX_BACKEND_IMAGE_TAG=v0.1.0
+```
+
+Then pull and apply the selected image:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+`latest` is the default when `NOX_BACKEND_IMAGE_TAG` is unset. Every release,
+including prereleases, publishes both its version tag and `latest`.
+Publishing an image does not automatically update existing deployments.
+
+Test release tooling without publishing anything:
+
+```bash
+node --test scripts/release.test.mjs
+```
 
 ## Documentation
 

@@ -1,6 +1,6 @@
 services:
   nox-backend:
-    image: ghcr.io/mapherez/nox-backend:latest
+    image: ghcr.io/mapherez/nox-backend:${NOX_BACKEND_IMAGE_TAG:-latest}
     container_name: nox-backend
     restart: unless-stopped
     ports:

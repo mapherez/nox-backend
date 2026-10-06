@@ -11,6 +11,10 @@ on:
       - ".github/workflows/ci.yml"
       - "docker-compose.yml"
       - "docker-compose.dev.yml"
+      - "scripts/**"
+      - "package.json"
+      - "VERSION"
+      - ".github/workflows/release.yml"
 
 permissions:
   contents: read
@@ -20,6 +24,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-tooling:
+    name: Release tooling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test
+        run: node --test scripts/release.test.mjs
+
   backend:
     name: Backend
     runs-on: ubuntu-latest
