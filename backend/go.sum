@@ -39,8 +39,8 @@ github.com/googleapis/gax-go/v2 v2.24.1 h1:AtqTN21IXMMWo99LiEVAiBfNNQmO40d8xUfZI
 github.com/googleapis/gax-go/v2 v2.24.1/go.mod h1:bWeBei0NVwaNZKb2y1HUBS7gLXIF3/Tu3pq7j8D2Tb0=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
-github.com/mapherez/nox-mcp v0.4.1 h1:+LFHuJR7VGrgWA3fpAaBGkVsrzWD0x+nL8D5nlcPHbM=
-github.com/mapherez/nox-mcp v0.4.1/go.mod h1:tSH8r/lnUU/gCcMMivFa1ZpmSC3q6QLHiO7Yl3X/G0k=
+github.com/mapherez/nox-mcp v0.4.3 h1:mpb7Wsj4zcBI0cVqIFTb1SXX4vYF522oPxLkD0Dp8lc=
+github.com/mapherez/nox-mcp v0.4.3/go.mod h1:tSH8r/lnUU/gCcMMivFa1ZpmSC3q6QLHiO7Yl3X/G0k=
 github.com/mattn/go-isatty v0.0.24 h1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=
 github.com/mattn/go-isatty v0.0.24/go.mod h1:nMCL3Zebbrt45jsMDgnfIwz6ydEQApk5oEI3HqDio6A=
 github.com/modelcontextprotocol/go-sdk v1.8.0 h1:KIvahhYqwtbeniWVPs3TcXEA7b8jEtwfBpOTAI+Urx4=

@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/mapherez/nox-mcp v0.4.1
+	github.com/mapherez/nox-mcp v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.299.0
