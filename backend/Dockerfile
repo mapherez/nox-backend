@@ -23,4 +23,7 @@ RUN ln -s /usr/local/bin/nox-backend /usr/local/bin/nox-sync
 
 USER noxbackend
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["/usr/local/bin/nox-backend", "healthcheck"]
+
 ENTRYPOINT ["/usr/local/bin/nox-backend"]

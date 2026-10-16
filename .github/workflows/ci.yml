@@ -117,6 +117,16 @@ jobs:
                           time.sleep(0.5)
                   else:
                       raise AssertionError("Backend did not become ready")
+                  docker("exec", container, "/usr/local/bin/nox-backend", "healthcheck")
+                  for attempt in range(60):
+                      status = docker("inspect", "--format", "{{.State.Health.Status}}", container)
+                      if status == "healthy":
+                          break
+                      if status == "unhealthy":
+                          raise AssertionError("Docker healthcheck failed")
+                      time.sleep(0.5)
+                  else:
+                      raise AssertionError("Docker did not mark the container healthy")
                   with urllib.request.urlopen(base + "/v1/info", timeout=2) as response:
                       assert response.status == 200
                       assert response.headers["Content-Type"] == "application/json"

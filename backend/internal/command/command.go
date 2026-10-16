@@ -15,10 +15,15 @@ import (
 // Run is shared by the canonical command and the legacy entrypoint.
 func Run(buildVersion string) error {
 	if len(os.Args) > 1 {
-		if len(os.Args) != 2 || os.Args[1] != "migrate-database" {
-			return fmt.Errorf("usage: nox-backend [migrate-database]")
+		if len(os.Args) == 2 {
+			switch os.Args[1] {
+			case "healthcheck":
+				return checkHealth(context.Background(), getenv("NOX_SYNC_ADDR", ":8080"))
+			case "migrate-database":
+				return storage.MigrateDatabaseFile(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
+			}
 		}
-		return storage.MigrateDatabaseFile(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
+		return fmt.Errorf("usage: nox-backend [healthcheck|migrate-database]")
 	}
 	cfg := app.Config{
 		Addr:               getenv("NOX_SYNC_ADDR", ":8080"),

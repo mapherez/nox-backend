@@ -126,6 +126,19 @@ http://localhost:5710/vault-dashboard
 
 or through the configured public URL.
 
+The Docker image includes a healthcheck using `nox-backend healthcheck`, with no
+`wget` or `curl` dependency. It requests `/v1/health` directly inside the container
+and succeeds only on HTTP 200, with a 3-second request timeout. It uses
+`NOX_BACKEND_ADDR` (or the legacy `NOX_SYNC_ADDR`), defaulting to `:8080`, and
+replaces wildcard listen addresses with loopback addresses.
+
+Docker checks every 30 seconds, with a 5-second timeout, a 10-second startup grace
+period and 3 consecutive failures before marking the container unhealthy. Docker
+managers can display this health status without additional Compose configuration.
+The endpoint checks HTTP responsiveness after initialization; it does not probe
+ongoing database or disk health. Rebuild or pull an image containing this change
+and recreate existing containers to enable the healthcheck.
+
 Dashboard HTML, CSS and JavaScript live in `backend/internal/app/dashboard/` and
 are embedded in the Go executable. Editing these files requires rebuilding the
 backend image; no frontend build or external assets are required.
