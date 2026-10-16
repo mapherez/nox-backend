@@ -1,8 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -20,10 +21,10 @@ export function normalizeVersion(input) {
   return version;
 }
 
-export function parseVersionFile(contents) {
-  const version = contents.replace(/\r?\n$/, '');
-  if (version.startsWith('v') || normalizeVersion(version) !== version) {
-    throw new Error('VERSION deve conter apenas a versao SemVer sem prefixo v.');
+export function parsePackageVersion(contents) {
+  const version = JSON.parse(contents)?.version;
+  if (typeof version !== 'string' || version.startsWith('v') || normalizeVersion(version) !== version) {
+    throw new Error('package.json deve conter uma version SemVer sem prefixo v.');
   }
   return version;
 }
@@ -33,26 +34,17 @@ export function validateReleaseTag(tag, contents) {
     throw new Error('A tag de release deve ser SemVer com prefixo v.');
   }
   const version = normalizeVersion(tag);
-  if (`v${version}` !== tag || parseVersionFile(contents) !== version) {
-    throw new Error(`VERSION nao corresponde exactamente a ${tag}.`);
+  if (`v${version}` !== tag || parsePackageVersion(contents) !== version) {
+    throw new Error(`package.json nao corresponde exactamente a ${tag}.`);
   }
   return version;
-}
-
-export function validatePackageVersion(contents, version) {
-  const manifest = JSON.parse(contents);
-  if (manifest.version !== version) {
-    throw new Error(`package.json nao corresponde exactamente a VERSION (${version}).`);
-  }
-  return manifest;
 }
 
 export async function runReleaseCLI(root, args, {
   input = process.stdin, output = process.stdout, publish = release,
 } = {}) {
   if (args.length > 1) throw new Error('Uso: npm run release [-- X.Y.Z]');
-  const current = parseVersionFile(await readFile(resolve(root, 'VERSION'), 'utf8'));
-  validatePackageVersion(await readFile(resolve(root, 'package.json'), 'utf8'), current);
+  const current = parsePackageVersion(await readFile(resolve(root, 'package.json'), 'utf8'));
   output.write(`Versao atual: ${current}\n`);
   let version = args[0];
   if (version === undefined) {
@@ -71,10 +63,46 @@ export async function runReleaseCLI(root, args, {
   return publish(root, normalizeVersion(version));
 }
 
-export function runReleaseChecks(root, tag, run = execFileSync) {
-  run('go', ['test', './...'], { cwd: resolve(root, 'backend'), stdio: 'inherit' });
-  run('docker', ['build', '--build-arg', `VERSION=${tag}`, '-t', 'nox-backend:release-check', './backend'],
-    { cwd: root, stdio: 'inherit' });
+export function runReleaseCommand(command, args, options) {
+  return new Promise((resolveCommand, reject) => {
+    const child = spawn(command, args, { ...options, stdio: ['inherit', 'inherit', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', chunk => {
+      process.stderr.write(chunk);
+      stderr = (stderr + chunk.toString()).slice(-65536);
+    });
+    child.once('error', reject);
+    child.once('close', (code, signal) => {
+      if (code === 0) return resolveCommand();
+      const error = new Error(`Command failed: ${command} ${args.join(' ')} (${signal || code})`);
+      error.stderr = stderr;
+      reject(error);
+    });
+  });
+}
+
+export async function runReleaseChecks(root, tag, run = runReleaseCommand, {
+  wait = delay, report = message => console.error(message),
+} = {}) {
+  await run('go', ['test', './...'], { cwd: resolve(root, 'backend'), stdio: 'inherit' });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await run('docker', ['build', '--build-arg', `VERSION=${tag}`, '-t', 'nox-backend:release-check', './backend'],
+        { cwd: root, stdio: 'inherit' });
+      return;
+    } catch (error) {
+      const details = error.stderr?.toString() || error.message;
+      const contextLocked = /failed to read metadata/i.test(details) &&
+        /contexts[\\/]meta[\\/]/i.test(details) && /being used by another process/i.test(details);
+      if (!contextLocked) throw error;
+      if (attempt === 3) {
+        throw new Error('O Docker manteve os metadados do contexto bloqueados apos 3 tentativas. ' +
+          'Reinicia o Docker Desktop e volta a executar npm run release. A versao sera restaurada; nenhuma release foi publicada.');
+      }
+      report(`Metadados do contexto Docker temporariamente bloqueados. Nova tentativa em 2s (${attempt + 1}/3).`);
+      await wait(2000);
+    }
+  }
 }
 
 export async function release(root, input, { check = runReleaseChecks } = {}) {
@@ -90,13 +118,11 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
     throw new Error('A arvore Git tem alteracoes. Faz commit ou stash antes da release.');
   }
   const branch = git('symbolic-ref', '--quiet', '--short', 'HEAD');
-  const path = resolve(root, 'VERSION');
-  const original = await readFile(path, 'utf8');
-  const current = parseVersionFile(original);
   const packagePath = resolve(root, 'package.json');
   const originalPackage = await readFile(packagePath, 'utf8');
-  const manifest = validatePackageVersion(originalPackage, current);
-  if (current === version) throw new Error('VERSION ja usa essa versao; escolhe uma nova versao.');
+  const current = parsePackageVersion(originalPackage);
+  const manifest = JSON.parse(originalPackage);
+  if (current === version) throw new Error('package.json ja usa essa versao; escolhe uma nova versao.');
   if (git('tag', '--list', tag)) throw new Error(`A tag ${tag} ja existe localmente.`);
   // A failed remote lookup must abort too; never assume an unreachable origin has no tag.
   if (git('ls-remote', '--tags', 'origin', `refs/tags/${tag}`, `refs/tags/${tag}^{}`)) {
@@ -106,28 +132,25 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
   git('var', 'GIT_COMMITTER_IDENT');
   const head = git('rev-parse', 'HEAD');
   try {
-    await writeFile(path, `${version}${original.endsWith('\r\n') ? '\r\n' : '\n'}`);
     manifest.version = version;
     const indent = originalPackage.match(/\n([\t ]+)"/)?.[1] ?? 2;
     const newline = originalPackage.includes('\r\n') ? '\r\n' : '\n';
     const updatedPackage = JSON.stringify(manifest, null, indent).replaceAll('\n', newline);
     await writeFile(packagePath, updatedPackage + (originalPackage.endsWith('\n') ? newline : ''));
     await check(root, tag);
-    validateReleaseTag(tag, await readFile(path, 'utf8'));
-    validatePackageVersion(await readFile(packagePath, 'utf8'), version);
+    validateReleaseTag(tag, await readFile(packagePath, 'utf8'));
     if (git('rev-parse', 'HEAD') !== head || git('symbolic-ref', '--quiet', '--short', 'HEAD') !== branch ||
-        git('diff', '--name-only').split('\n').filter(Boolean).some(file => !['VERSION', 'package.json'].includes(file)) ||
+        git('diff', '--name-only').split('\n').filter(Boolean).some(file => file !== 'package.json') ||
         git('diff', '--cached', '--name-only') || git('ls-files', '--others', '--exclude-standard')) {
-      throw new Error('A validacao alterou o repositorio fora de VERSION e package.json. Reve as alteracoes antes de publicar.');
+      throw new Error('A validacao alterou o repositorio fora de package.json. Reve as alteracoes antes de publicar.');
     }
-    git('add', '--', 'VERSION', 'package.json');
+    git('add', '--', 'package.json');
     git('commit', '-m', `chore: release ${tag}`);
   } catch (error) {
     // Restore our edit only if a release commit was not created. Keep unrelated changes.
     if (git('rev-parse', 'HEAD') === head) {
-      await writeFile(path, original);
       await writeFile(packagePath, originalPackage);
-      git('restore', '--staged', '--', 'VERSION', 'package.json');
+      git('restore', '--staged', '--', 'package.json');
     }
     throw error;
   }

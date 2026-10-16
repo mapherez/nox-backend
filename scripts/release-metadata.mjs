@@ -27,7 +27,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   (async () => {
     if (process.argv.length !== 3) throw new Error('Uso: node scripts/release-metadata.mjs vX.Y.Z');
     const metadata = releaseMetadata(process.argv[2],
-      await readFile(new URL('../VERSION', import.meta.url), 'utf8'), process.env.RELEASE_REVISION);
+      await readFile(new URL('../package.json', import.meta.url), 'utf8'), process.env.RELEASE_REVISION);
     if (process.env.GITHUB_OUTPUT) {
       const delimiter = `metadata_${randomUUID()}`;
       await appendFile(process.env.GITHUB_OUTPUT, Object.entries(metadata)

@@ -360,23 +360,28 @@ Versao atual: 1.0.4
 Nova versao (X.Y.Z): 1.0.5
 ```
 
-`package.json` and `VERSION` store the same version without `v`. Choose a different
+`package.json` is the source of the current version, stored without `v`. Choose a different
 unused version for each release. For automation, `npm run release -- X.Y.Z` is
 still supported. An optional `v` prefix is normalized; stable SemVer and
 prereleases such as `1.1.0-rc.1` are supported.
 Build metadata (`+build`) is refused because Docker tags cannot contain `+`;
 the complete tag must fit Docker's 128-character limit.
 
-The command checks local and origin tags, updates `package.json` and `VERSION`,
+The command checks local and origin tags, updates `package.json`,
 runs `go test ./...` in `backend`, and builds the image with `VERSION=v1.0.5`
-for the example above. Failed checks restore both version files and create no
-commit, tag or push. Successful checks commit both files as
+for the example above. Failed checks restore `package.json` and create no
+commit, tag or push. Successful checks commit the version change as
 `chore: release v1.0.5`, create an annotated `v1.0.5` tag, and push the current branch and
 that tag atomically to origin. If the push fails, the local commit and tag are
 kept and the command prints the exact recovery push command.
 
+If Windows temporarily locks Docker context metadata, the command retries the
+build up to 3 times, waiting 2 seconds between attempts. If the lock persists,
+restart Docker Desktop and rerun the command. Other build failures abort
+immediately and restore the package version.
+
 The **Release** GitHub Actions workflow runs only on `v*` tag pushes. It verifies
-the tag against `VERSION` and `package.json`, tests Go, and publishes a multi-architecture image
+the tag against `package.json`, tests Go, and publishes a multi-architecture image
 (`linux/amd64`, `linux/arm64`). A stable release publishes exactly these image tags:
 
 ```text

@@ -13,7 +13,6 @@ on:
       - "docker-compose.dev.yml"
       - "scripts/**"
       - "package.json"
-      - "VERSION"
       - ".github/workflows/release.yml"
 
 permissions:

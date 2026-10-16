@@ -34,7 +34,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Validate release tag, VERSION and package.json
+      - name: Validate release tag against package.json
         run: node scripts/check-release-version.mjs "$RELEASE_TAG"
 
       - name: Refuse an existing GitHub Release
