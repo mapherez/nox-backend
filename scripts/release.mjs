@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -38,6 +39,38 @@ export function validateReleaseTag(tag, contents) {
   return version;
 }
 
+export function validatePackageVersion(contents, version) {
+  const manifest = JSON.parse(contents);
+  if (manifest.version !== version) {
+    throw new Error(`package.json nao corresponde exactamente a VERSION (${version}).`);
+  }
+  return manifest;
+}
+
+export async function runReleaseCLI(root, args, {
+  input = process.stdin, output = process.stdout, publish = release,
+} = {}) {
+  if (args.length > 1) throw new Error('Uso: npm run release [-- X.Y.Z]');
+  const current = parseVersionFile(await readFile(resolve(root, 'VERSION'), 'utf8'));
+  validatePackageVersion(await readFile(resolve(root, 'package.json'), 'utf8'), current);
+  output.write(`Versao atual: ${current}\n`);
+  let version = args[0];
+  if (version === undefined) {
+    const prompt = createInterface({ input, output });
+    try {
+      version = await new Promise((resolveAnswer, reject) => {
+        prompt.once('close', () => reject(new Error('Release cancelada. Nenhuma versao indicada.')));
+        prompt.once('SIGINT', () => reject(new Error('Release cancelada.')));
+        prompt.once('error', reject);
+        prompt.question('Nova versao (X.Y.Z): ', answer => resolveAnswer(answer.trim()));
+      });
+    } finally {
+      prompt.close();
+    }
+  }
+  return publish(root, normalizeVersion(version));
+}
+
 export function runReleaseChecks(root, tag, run = execFileSync) {
   run('go', ['test', './...'], { cwd: resolve(root, 'backend'), stdio: 'inherit' });
   run('docker', ['build', '--build-arg', `VERSION=${tag}`, '-t', 'nox-backend:release-check', './backend'],
@@ -59,7 +92,11 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
   const branch = git('symbolic-ref', '--quiet', '--short', 'HEAD');
   const path = resolve(root, 'VERSION');
   const original = await readFile(path, 'utf8');
-  if (parseVersionFile(original) === version) throw new Error('VERSION ja usa essa versao; escolhe uma nova versao.');
+  const current = parseVersionFile(original);
+  const packagePath = resolve(root, 'package.json');
+  const originalPackage = await readFile(packagePath, 'utf8');
+  const manifest = validatePackageVersion(originalPackage, current);
+  if (current === version) throw new Error('VERSION ja usa essa versao; escolhe uma nova versao.');
   if (git('tag', '--list', tag)) throw new Error(`A tag ${tag} ja existe localmente.`);
   // A failed remote lookup must abort too; never assume an unreachable origin has no tag.
   if (git('ls-remote', '--tags', 'origin', `refs/tags/${tag}`, `refs/tags/${tag}^{}`)) {
@@ -70,20 +107,27 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
   const head = git('rev-parse', 'HEAD');
   try {
     await writeFile(path, `${version}${original.endsWith('\r\n') ? '\r\n' : '\n'}`);
+    manifest.version = version;
+    const indent = originalPackage.match(/\n([\t ]+)"/)?.[1] ?? 2;
+    const newline = originalPackage.includes('\r\n') ? '\r\n' : '\n';
+    const updatedPackage = JSON.stringify(manifest, null, indent).replaceAll('\n', newline);
+    await writeFile(packagePath, updatedPackage + (originalPackage.endsWith('\n') ? newline : ''));
     await check(root, tag);
     validateReleaseTag(tag, await readFile(path, 'utf8'));
+    validatePackageVersion(await readFile(packagePath, 'utf8'), version);
     if (git('rev-parse', 'HEAD') !== head || git('symbolic-ref', '--quiet', '--short', 'HEAD') !== branch ||
-        git('diff', '--name-only').split('\n').filter(Boolean).some(file => file !== 'VERSION') ||
+        git('diff', '--name-only').split('\n').filter(Boolean).some(file => !['VERSION', 'package.json'].includes(file)) ||
         git('diff', '--cached', '--name-only') || git('ls-files', '--others', '--exclude-standard')) {
-      throw new Error('A validacao alterou o repositorio fora de VERSION. Reve as alteracoes antes de publicar.');
+      throw new Error('A validacao alterou o repositorio fora de VERSION e package.json. Reve as alteracoes antes de publicar.');
     }
-    git('add', '--', 'VERSION');
+    git('add', '--', 'VERSION', 'package.json');
     git('commit', '-m', `chore: release ${tag}`);
   } catch (error) {
     // Restore our edit only if a release commit was not created. Keep unrelated changes.
     if (git('rev-parse', 'HEAD') === head) {
       await writeFile(path, original);
-      git('restore', '--staged', '--', 'VERSION');
+      await writeFile(packagePath, originalPackage);
+      git('restore', '--staged', '--', 'VERSION', 'package.json');
     }
     throw error;
   }
@@ -105,8 +149,7 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   (async () => {
-    if (process.argv.length !== 3) throw new Error('Uso: npm run release -- X.Y.Z');
-    const tag = await release(repoRoot, process.argv[2]);
+    const tag = await runReleaseCLI(repoRoot, process.argv.slice(2));
     console.log(`Commit e tag ${tag} publicados. O GitHub Actions vai publicar a imagem e criar a release.`);
     console.log(`https://github.com/mapherez/nox-backend/actions/workflows/release.yml`);
   })().catch(error => {

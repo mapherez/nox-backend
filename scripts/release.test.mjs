@@ -3,9 +3,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { PassThrough, Readable } from 'node:stream';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { normalizeVersion, parseVersionFile, release, runReleaseChecks, validateReleaseTag } from './release.mjs';
+import { normalizeVersion, parseVersionFile, release, runReleaseChecks, runReleaseCLI, validatePackageVersion, validateReleaseTag } from './release.mjs';
 import { releaseMetadata } from './release-metadata.mjs';
 
 const git = (root, ...args) => execFileSync('git', args, {
@@ -20,6 +21,12 @@ async function repository(t, original = '0.0.0\n') {
   await mkdir(root);
   await mkdir(resolve(root, 'backend'));
   await writeFile(resolve(root, 'VERSION'), original);
+  const newline = original.endsWith('\r\n') ? '\r\n' : '\n';
+  const originalPackage = JSON.stringify({
+    name: 'nox-backend', version: parseVersionFile(original), private: true,
+    scripts: { release: 'node scripts/release.mjs' },
+  }, null, 2).replaceAll('\n', newline) + newline;
+  await writeFile(resolve(root, 'package.json'), originalPackage);
   await writeFile(resolve(root, 'tracked.txt'), 'original\n');
   git(root, 'init', '--initial-branch=main');
   git(root, 'config', 'user.name', 'Release test');
@@ -33,7 +40,7 @@ async function repository(t, original = '0.0.0\n') {
   git(root, 'init', '--bare', origin);
   git(root, 'remote', 'add', 'origin', origin);
   git(root, 'push', 'origin', 'main');
-  return { root, origin, head: git(root, 'rev-parse', 'HEAD'), original };
+  return { root, origin, head: git(root, 'rev-parse', 'HEAD'), original, originalPackage };
 }
 
 function unchanged({ root, origin, head }, expectedTags = '') {
@@ -44,7 +51,7 @@ function unchanged({ root, origin, head }, expectedTags = '') {
 
 const noChecks = { check() {} };
 
-test('invalid versions are rejected before changing Git or VERSION', async t => {
+test('invalid versions are rejected before changing Git or version files', async t => {
   const fixture = await repository(t);
   for (const version of ['bad', '1.2', '01.2.3', '1.02.3', '1.2.03', '1.2.3-01', '1.2.3-rc..1',
     '1.2.3-', '1.2.3\n', ' 1.2.3', 'vv1.2.3', '', undefined]) {
@@ -54,6 +61,7 @@ test('invalid versions are rejected before changing Git or VERSION', async t => 
   await assert.rejects(release(fixture.root, `1.2.3-${'a'.repeat(128)}`, noChecks), /128/);
   unchanged(fixture);
   assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
+  assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
 });
 
 test('unchanged version refuses release', async t => {
@@ -109,12 +117,14 @@ test('detached HEAD refuses release', async t => {
 });
 
 for (const failedCommand of ['go', 'docker']) {
-  test(`${failedCommand} check failure restores VERSION byte-for-byte without commit, tag or push`, async t => {
+  test(`${failedCommand} check failure restores both version files byte-for-byte without commit, tag or push`, async t => {
     const fixture = await repository(t, '0.0.0\r\n');
     const calls = [];
     await assert.rejects(release(fixture.root, '0.1.0', {
       async check(root, tag) {
         assert.equal(await readFile(resolve(root, 'VERSION'), 'utf8'), '0.1.0\r\n');
+        assert.equal(await readFile(resolve(root, 'package.json'), 'utf8'),
+          fixture.originalPackage.replace('"version": "0.0.0"', '"version": "0.1.0"'));
         runReleaseChecks(root, tag, command => {
           calls.push(command);
           if (command === failedCommand) throw new Error(`${command} failed`);
@@ -123,6 +133,7 @@ for (const failedCommand of ['go', 'docker']) {
     }), new RegExp(`${failedCommand} failed`));
     assert.deepEqual(calls, failedCommand === 'go' ? ['go'] : ['go', 'docker']);
     assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
+    assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
     assert.equal(git(fixture.root, 'status', '--porcelain'), '');
     unchanged(fixture);
   });
@@ -149,13 +160,30 @@ test('checks changing other files abort and preserve unrelated changes', async t
   unchanged(fixture);
 });
 
-test('checks cannot silently change the release version', async t => {
+for (const file of ['VERSION', 'package.json']) {
+  test(`checks cannot silently change the release version in ${file}`, async t => {
+    const fixture = await repository(t);
+    await assert.rejects(release(fixture.root, '0.1.0', {
+      check: () => writeFile(resolve(fixture.root, file), file === 'VERSION' ? '0.2.0\n' : '{"version":"0.2.0"}\n'),
+    }), /nao corresponde/);
+    assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
+    assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
+    unchanged(fixture);
+  });
+}
+
+test('mismatched package.json refuses release before checks or changes', async t => {
   const fixture = await repository(t);
+  await writeFile(resolve(fixture.root, 'package.json'), fixture.originalPackage.replace('0.0.0', '0.0.1'));
+  git(fixture.root, 'add', 'package.json');
+  git(fixture.root, 'commit', '-m', 'Mismatched package version');
+  const head = git(fixture.root, 'rev-parse', 'HEAD');
   await assert.rejects(release(fixture.root, '0.1.0', {
-    check: () => writeFile(resolve(fixture.root, 'VERSION'), '0.2.0\n'),
-  }), /nao corresponde/);
-  assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
-  unchanged(fixture);
+    check() { assert.fail('Must not run checks'); },
+  }), /package.json nao corresponde/);
+  assert.equal(git(fixture.root, 'rev-parse', 'HEAD'), head);
+  assert.equal(git(fixture.root, 'status', '--porcelain'), '');
+  assert.equal(git(fixture.root, 'tag', '--list'), '');
 });
 
 for (const input of ['0.1.0', 'v0.1.0-rc.1']) {
@@ -171,6 +199,8 @@ for (const input of ['0.1.0', 'v0.1.0-rc.1']) {
       checked = true;
       assert.equal(checkedTag, tag);
       assert.equal(await readFile(resolve(root, 'VERSION'), 'utf8'), `${version}\n`);
+      assert.deepEqual(JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')),
+        { ...JSON.parse(fixture.originalPackage), version });
       assert.equal(git(root, 'rev-parse', 'HEAD'), fixture.head);
       assert.equal(git(root, 'tag', '--list', tag), '');
     } }), tag);
@@ -178,10 +208,11 @@ for (const input of ['0.1.0', 'v0.1.0-rc.1']) {
     const head = git(fixture.root, 'rev-parse', 'HEAD');
     assert.notEqual(head, fixture.head);
     assert.equal(git(fixture.root, 'log', '-1', '--format=%s'), `chore: release ${tag}`);
-    assert.equal(git(fixture.root, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'), 'VERSION');
+    assert.equal(git(fixture.root, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'), 'VERSION\npackage.json');
     assert.equal(git(fixture.root, 'cat-file', '-t', tag), 'tag');
     assert.equal(git(fixture.root, 'rev-parse', `${tag}^{commit}`), head);
     assert.equal(git(fixture.root, 'show', `${tag}:VERSION`), version);
+    assert.equal(JSON.parse(git(fixture.root, 'show', `${tag}:package.json`)).version, version);
     assert.equal(git(fixture.root, 'status', '--porcelain'), '');
     assert.equal(git(fixture.origin, 'rev-parse', `refs/heads/${branch}`), head);
     assert.equal(git(fixture.origin, 'rev-parse', `${tag}^{commit}`), head);
@@ -209,17 +240,19 @@ test('push failure preserves local release and atomic push leaves remote refs un
   assert.equal(git(fixture.root, 'rev-parse', 'v0.1.0^{commit}'), head);
   assert.equal(git(fixture.root, 'cat-file', '-t', 'v0.1.0'), 'tag');
   assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), '0.1.0\n');
+  assert.equal(JSON.parse(await readFile(resolve(fixture.root, 'package.json'), 'utf8')).version, '0.1.0');
   assert.equal(git(fixture.root, 'status', '--porcelain'), '');
   assert.equal(git(fixture.origin, 'rev-parse', 'refs/heads/main'), remoteHead);
   assert.equal(git(fixture.origin, 'tag', '--list'), '');
 });
 
-test('failed commit restores VERSION and index without tag or push', async t => {
+test('failed commit restores both version files and index without tag or push', async t => {
   const fixture = await repository(t);
   git(fixture.root, 'config', 'core.hooksPath', resolve(fixture.root, '.git/hooks'));
   await writeFile(resolve(fixture.root, '.git/hooks/pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
   await assert.rejects(release(fixture.root, '0.1.0', noChecks));
   assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
+  assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
   assert.equal(git(fixture.root, 'status', '--porcelain'), '');
   unchanged(fixture);
 });
@@ -251,11 +284,67 @@ test('VERSION and CI tags use the same strict version validation', () => {
   assert.throws(() => validateReleaseTag('v0.2.0', '0.1.0\n'), /nao corresponde/);
 });
 
-test('release CLI rejects missing or extra arguments without touching the real repository', () => {
+test('interactive CLI shows current version, prompts and releases the entered version', async t => {
+  const fixture = await repository(t, '1.0.4\n');
+  const output = new PassThrough();
+  let transcript = '';
+  output.on('data', chunk => { transcript += chunk; });
+  assert.equal(await runReleaseCLI(fixture.root, [], {
+    input: Readable.from(['  v1.0.5  \n']), output,
+    publish: (root, version) => release(root, version, noChecks),
+  }), 'v1.0.5');
+  assert.match(transcript, /Versao atual: 1\.0\.4\nNova versao \(X\.Y\.Z\): /);
+  assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), '1.0.5\n');
+  assert.equal(JSON.parse(await readFile(resolve(fixture.root, 'package.json'), 'utf8')).version, '1.0.5');
+  assert.equal(JSON.parse(git(fixture.origin, 'show', 'v1.0.5:package.json')).version, '1.0.5');
+});
+
+test('CLI still accepts an explicit version without prompting', async t => {
+  const fixture = await repository(t);
+  const output = new PassThrough();
+  let transcript = '';
+  output.on('data', chunk => { transcript += chunk; });
+  const result = await runReleaseCLI(fixture.root, ['v0.1.0'], {
+    input: Readable.from([]), output,
+    publish(root, version) {
+      assert.equal(root, fixture.root);
+      assert.equal(version, '0.1.0');
+      return `v${version}`;
+    },
+  });
+  assert.equal(result, 'v0.1.0');
+  assert.equal(transcript, 'Versao atual: 0.0.0\n');
+  unchanged(fixture);
+});
+
+for (const input of ['', '\n', 'bad\n']) {
+  test(`interactive CLI refuses EOF or invalid input ${JSON.stringify(input)} without changes`, async t => {
+    const fixture = await repository(t);
+    await assert.rejects(runReleaseCLI(fixture.root, [], {
+      input: Readable.from(input ? [input] : []), output: new PassThrough(),
+      publish() { assert.fail('Must not publish'); },
+    }), /Release cancelada|Versao invalida/);
+    assert.equal(await readFile(resolve(fixture.root, 'VERSION'), 'utf8'), fixture.original);
+    assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
+    unchanged(fixture);
+  });
+}
+
+test('release CLI rejects extra arguments or EOF without touching the real repository', () => {
   for (const args of [[], ['0.1.0', 'extra']]) {
-    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./release.mjs', import.meta.url)), ...args], { encoding: 'utf8' });
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./release.mjs', import.meta.url)), ...args], {
+      encoding: 'utf8', input: '', timeout: 5000,
+    });
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Uso: npm run release/);
+    assert.match(result.stderr, args.length ? /Uso: npm run release/ : /Release cancelada/);
+    if (!args.length) assert.match(result.stdout, /Versao atual: .*\nNova versao/);
+  }
+});
+
+test('package version must match VERSION exactly', () => {
+  assert.equal(validatePackageVersion('{"version":"1.0.4","private":true}', '1.0.4').private, true);
+  for (const manifest of [{}, { version: '1.0.3' }, { version: 'v1.0.4' }, { version: 104 }]) {
+    assert.throws(() => validatePackageVersion(JSON.stringify(manifest), '1.0.4'), /package.json nao corresponde/);
   }
 });
 
