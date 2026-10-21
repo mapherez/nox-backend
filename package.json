@@ -1,6 +1,6 @@
 {
   "name": "nox-backend",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "scripts": {
     "release": "node scripts/release.mjs"
