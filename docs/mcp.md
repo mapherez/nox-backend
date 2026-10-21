@@ -1,8 +1,8 @@
 # Native MCP API
 
 NoX Backend exposes **POST `/mcp`** through the official
-[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.4.1/go), using
-the published `github.com/mapherez/nox-mcp v0.4.1` module. It runs in the same
+[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.6.1/go), using
+the published `github.com/mapherez/nox-mcp v0.6.1` module. It runs in the same
 Go process, HTTP server, bind address and port as the existing API and dashboard.
 There is no second service or port. Configure a Streamable HTTP MCP client with
 the backend's base URL plus `/mcp`, retaining any reverse-proxy path prefix.
@@ -83,8 +83,8 @@ registered tool lacks a unique app-local mapping.
 
 ## Results and Stable Client API behavior
 
-Results are structured JSON in MCP `structuredContent`, with equivalent JSON
-text content for compatibility. These tools represent the
+Successful results are structured JSON in MCP `structuredContent`, with equivalent
+JSON text content for compatibility. These tools represent the
 [Stable Client API](client-api.md) and use its real storage and shared helpers
 directly, without internal requests to `/v1`.
 
@@ -115,9 +115,12 @@ result, including values above the exact integer range of a floating-point numbe
 
 Known backend failures use `noxmcp.Error` with stable codes `BAD_REQUEST`,
 `NOT_FOUND`, `FILE_CHANGED` (when applicable), `AUTH_REQUIRED`, `AUTH_FAILED`
-and `SERVER_ERROR`. Failed calls set `isError: true` and contain `code`,
-`message`, `retryable` (false for these backend failures). Unexpected internal
-failures return a generic message without SQL, paths, stack traces or secrets.
+and `SERVER_ERROR`. Failed calls set `isError: true` and carry their JSON body in
+`content[].text`, without `structuredContent`, which is reserved for results that
+match the success output schema. Clients must read errors from the text body,
+which contains `code`, `message`, `retryable` (false for these backend failures).
+Unexpected internal failures return a generic message without SQL, paths, stack
+traces or secrets.
 MCP errors do not wrap HTTP responses.
 
 The official NoX MCP runtime validates schemas and enforces its own execution

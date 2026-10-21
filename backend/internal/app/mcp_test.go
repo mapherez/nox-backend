@@ -62,24 +62,31 @@ func callBackendMCP(t *testing.T, session *mcp.ClientSession, name string, args 
 	if err != nil {
 		t.Fatalf("MCP %s protocol error: %v", name, err)
 	}
-	data, err := json.Marshal(result.StructuredContent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var value map[string]any
-	if err := json.Unmarshal(data, &value); err != nil {
-		t.Fatal(err)
-	}
-	if result.IsError != (code != "") || code != "" && (value["code"] != code || value["message"] == "" || value["retryable"] != false) {
-		t.Fatalf("MCP %s: isError=%v value=%s; want code %q", name, result.IsError, data, code)
-	}
 	if len(result.Content) != 1 {
 		t.Fatalf("MCP %s missing text content: %+v", name, result)
 	}
 	text, ok := result.Content[0].(*mcp.TextContent)
-	var textValue map[string]any
-	if !ok || json.Unmarshal([]byte(text.Text), &textValue) != nil || !reflect.DeepEqual(value, textValue) {
-		t.Fatalf("MCP text and structured content differ: %+v", result)
+	var value map[string]any
+	if !ok || json.Unmarshal([]byte(text.Text), &value) != nil || value == nil {
+		t.Fatalf("MCP %s invalid JSON text content: %+v", name, result)
+	}
+	if result.IsError != (code != "") || code != "" && (value["code"] != code || value["message"] == "" || value["retryable"] != false) {
+		t.Fatalf("MCP %s: isError=%v value=%s; want code %q", name, result.IsError, text.Text, code)
+	}
+	if result.IsError {
+		// Error bodies do not conform to the tool's success output schema.
+		if result.StructuredContent != nil {
+			t.Fatalf("MCP %s error includes structured content: %+v", name, result)
+		}
+	} else {
+		data, err := json.Marshal(result.StructuredContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var structured map[string]any
+		if json.Unmarshal(data, &structured) != nil || !reflect.DeepEqual(value, structured) {
+			t.Fatalf("MCP %s text and structured content differ: %+v", name, result)
+		}
 	}
 	return value
 }
