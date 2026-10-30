@@ -37,7 +37,14 @@ Migrations live in `migrations/` and are applied in numeric order. The `schema_m
 
 Startup validates any existing database before applying migrations. New databases are initialized automatically.
 
-The historical migration 3 contains a destructive reset. Existing databases without the complete supported history (1, 2, 3) or expected structure are refused; the reset cannot run as an automatic upgrade.
+The historical migration 3 contains a destructive reset. Existing databases must
+already have the intact multi-user/multi-vault baseline (1, 2, 3); that reset never
+runs as an automatic upgrade. Later additive migrations are applied only after
+validating the exact schema corresponding to the recorded history. Migration 4
+adds non-secret foundation connection intent (origin, opaque revision, timestamp).
+Unknown histories, missing historical baseline and schema mismatches are refused
+before modification. Older binaries reject migration 4; retain a pre-upgrade
+backup for rollback. See [administration persistence](../../../docs/administration-api.md#persistence-and-delivery).
 
 Existing `nox-sync.db` is used in place. `nox-backend migrate-database` performs an explicit offline SQLite copy to `nox-backend.db`, retaining `nox-sync.db.legacy`. Both active filenames at once, or an interrupted migration with only the archive left, cause startup to fail rather than create an empty replacement. Back up all of `/data` before running the command. See [the update guide](../../../docs/backend-separation.md).
 

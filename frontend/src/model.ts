@@ -16,6 +16,13 @@ export interface Vault {
   deletedAt?: string;
   status: string;
 }
+export interface FoundationConnection {
+  service: "yard" | "gateway";
+  origin: string;
+  revision: string;
+  updatedAt: string;
+  status: "not_configured" | "not_paired";
+}
 export interface Dashboard {
   authenticated: boolean;
   oauthConfigured: boolean;
@@ -27,6 +34,7 @@ export interface Dashboard {
   deletedVaults: Vault[] | null;
   isAdmin: boolean;
   users: User[] | null;
+  connections?: FoundationConnection[];
 }
 export function formatBytes(value: string | bigint) {
   const mb = Number(value) / 1048576;

@@ -22,7 +22,10 @@ The production image serves the build with Nginx and forwards the same routes
 on one public origin. The image contains no Go service, database or Google secret.
 
 Native forms and redirects remain compatible. `GET /api/dashboard` supplies the
-session-filtered initial view; the full administration JSON API is point 3.
+session-filtered initial view. Changes use the [authenticated JSON administration
+APIs](../docs/administration-api.md), with same-origin session protection, visible
+errors and refreshed state. Initial Yard/Gateway addresses are saved as configuration
+intent and explicitly await pairing; they do not imply a connected/trusted service.
 No personal key is persisted by React in localStorage or used to replace the
 existing browser session. Presentation revisions and sizes are decimal strings
 to retain 64-bit accuracy. Rendered controls do not grant permissions.

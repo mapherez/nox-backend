@@ -12,4 +12,5 @@ var (
 	ErrFileChanged         = errors.New("file changed")
 	ErrConflictDetected    = errors.New("conflict detected")
 	ErrForbidden           = errors.New("forbidden")
+	ErrPreconditionFailed  = errors.New("precondition failed")
 )

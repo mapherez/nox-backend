@@ -55,7 +55,7 @@ func TestDashboardDataSessionIsolation(t *testing.T) {
 			} else if data.APIKey != "" || data.User.ID != "" {
 				t.Fatal("anonymous view disclosed credentials")
 			}
-			if !tc.admin && len(data.Users) != 0 {
+			if !tc.admin && (len(data.Users) != 0 || len(data.Connections) != 0) {
 				t.Fatal("user registry leaked")
 			}
 		})

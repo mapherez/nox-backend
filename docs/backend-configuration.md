@@ -294,3 +294,14 @@ origin, including a changed host port. Register the same public origin's
 Server URLs or OAuth callback addresses. Public HTTPS may terminate at the
 installation's existing trusted reverse proxy; the frontend preserves its
 forwarded protocol. Read the [deployment guide](frontend-deployment.md).
+
+
+## Initial foundation-service configuration
+
+The native frontend's **Service connections** section and the
+[administration APIs](administration-api.md) store approved Yard/Gateway HTTPS
+origins in SQLite. These are administrator-managed settings, not additional
+environment variables. Saved entries remain explicitly awaiting pairing until the
+trust work is implemented. No service is contacted by saving its address.
+Migration 4 adds the configuration table without resetting existing data. Retain
+a pre-upgrade backup for rollback to a binary that predates migration 4.

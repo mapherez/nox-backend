@@ -45,4 +45,5 @@ type dashboardPageData struct {
 	DeletedVaults   []dashboardVault `json:"deletedVaults"`
 	IsAdmin         bool             `json:"isAdmin"`
 	Users           []dashboardUser  `json:"users"`
+	Connections     []connectionView `json:"connections,omitempty"`
 }

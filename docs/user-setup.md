@@ -68,6 +68,17 @@ Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault
 
 The dashboard provides your Server URL and API key, vault management and downloads, and admin user management. Each user owns their own vaults and API key.
 
+## Initial Suite service addresses
+
+Admins can use **Service connections** to save the approved HTTPS origin of Yard
+and Gateway, for example `https://192.168.10.10:8443` or a dedicated hostname.
+Do not include an application path. This configuration survives restart and needs
+no additional environment variables. A saved address shows **Awaiting pairing**:
+service trust, pairing and registration are subsequent implementation points.
+Saving does not contact the service or establish a working connection. If another
+administrator changes the configuration, refresh/review before saving again.
+See the [administration API](administration-api.md) for equivalent API operations.
+
 ## Connect the plugin
 
 Plugin installation, releases, local builds, settings, conflict handling, and local trash instructions are maintained in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). Plugin assets are available from its [releases](https://github.com/mapherez/nox-sync/releases).

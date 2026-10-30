@@ -604,3 +604,26 @@ footer {
       filter 120ms ease;
   }
 }
+
+/* API forms preserve the existing layout while disabling changes in flight. */
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+.error-message {
+  color: var(--danger, #fca5a5);
+  overflow-wrap: anywhere;
+}
+.connection-card {
+  border-block-start: 1px solid var(--border, #334155);
+  margin-block-start: 1.5rem;
+  padding-block-start: 1rem;
+}
+.connection-card form + form {
+  margin-block-start: 0.75rem;
+}
+.connection-card input {
+  inline-size: 100%;
+}

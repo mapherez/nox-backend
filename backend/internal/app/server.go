@@ -39,6 +39,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("/mcp", mcpHandler)
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/api/dashboard", s.handleDashboardData)
+	s.registerAdministration(mux)
 	mux.HandleFunc("/vault-dashboard/api-key/rotate", s.handleRotateAPIKey)
 	mux.HandleFunc("/vault-dashboard/users/add", s.handleAddUser)
 	mux.HandleFunc("/vault-dashboard/users/status", s.handleSetUserStatus)
@@ -67,7 +68,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/sync/abort", s.handleAbortSync)
 	mux.HandleFunc("/v1/files", s.handleListFiles)
 	mux.HandleFunc("/v1/files/download", s.handleDownloadFile)
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && (strings.HasPrefix(r.URL.Path, "/vault-dashboard/") || r.URL.Path == "/auth/logout") && !s.sameManagementOrigin(r) {
+			writeJSONError(w, http.StatusForbidden, "FORBIDDEN", "A same-origin browser request is required.")
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {

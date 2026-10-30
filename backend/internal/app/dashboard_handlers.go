@@ -61,6 +61,11 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 				writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load users.")
 				return
 			}
+			data.Connections, err = s.foundationConnectionViews(r.Context())
+			if err != nil {
+				writeManagementError(w, err)
+				return
+			}
 			for _, item := range users {
 				data.Users = append(data.Users, presentDashboardUser(item))
 			}
@@ -230,15 +235,18 @@ func (s *Server) handleDownloadVaultZip(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/vault-dashboard", http.StatusSeeOther)
 		return
 	}
-	vaultID := strings.TrimSpace(r.URL.Query().Get("vaultId"))
+	s.downloadVaultZip(w, r, user, strings.TrimSpace(r.URL.Query().Get("vaultId")), writeStorageError)
+}
+
+func (s *Server) downloadVaultZip(w http.ResponseWriter, r *http.Request, user storage.User, vaultID string, writeError func(http.ResponseWriter, error)) {
 	vault, err := s.store.VaultByID(r.Context(), user.ID, vaultID)
 	if err != nil {
-		writeStorageError(w, err)
+		writeError(w, err)
 		return
 	}
 	files, err := s.store.CurrentVaultFiles(r.Context(), user.ID, vaultID)
 	if err != nil {
-		writeStorageError(w, err)
+		writeError(w, err)
 		return
 	}
 

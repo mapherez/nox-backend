@@ -36,6 +36,15 @@ func (s *Store) BootstrapAdmins(ctx context.Context, emails []string) error {
 
 // UpsertAllowedUser adds or re-enables an allowlisted user.
 func (s *Store) UpsertAllowedUser(ctx context.Context, email string, role string) (User, error) {
+	return s.upsertAllowedUser(ctx, email, role, false)
+}
+
+// UpsertManagedUser preserves administrator protection atomically during upsert.
+func (s *Store) UpsertManagedUser(ctx context.Context, email string, role string) (User, error) {
+	return s.upsertAllowedUser(ctx, email, role, true)
+}
+
+func (s *Store) upsertAllowedUser(ctx context.Context, email string, role string, protectAdmin bool) (User, error) {
 	email, err := normalizeEmail(email)
 	if err != nil {
 		return User{}, err
@@ -50,15 +59,22 @@ func (s *Store) UpsertAllowedUser(ctx context.Context, email string, role string
 		return User{}, err
 	}
 	now := timestamp(time.Now())
-	if _, err := s.db.ExecContext(ctx, `
+	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO users (id, email, first_name, display_name, role, status, created_at, updated_at)
 		VALUES (?, ?, '', ?, ?, ?, ?, ?)
 		ON CONFLICT(email) DO UPDATE SET
 			role = excluded.role,
 			status = excluded.status,
-			updated_at = excluded.updated_at
-	`, userID, email, email, role, UserStatusActive, now, now); err != nil {
+            updated_at = excluded.updated_at
+        WHERE ? = 0 OR users.role <> 'ADMIN' OR excluded.role = 'ADMIN'
+    `, userID, email, email, role, UserStatusActive, now, now, protectAdmin)
+	if err != nil {
 		return User{}, fmt.Errorf("upsert allowed user: %w", err)
+	}
+	if n, err := result.RowsAffected(); err != nil {
+		return User{}, err
+	} else if n == 0 {
+		return User{}, fmt.Errorf("%w: admin users cannot be demoted", ErrBadRequest)
 	}
 
 	user, err := s.UserByEmail(ctx, email)
@@ -450,4 +466,46 @@ func safeRedirectPath(value string) string {
 
 func hashSecret(value string) string {
 	return hashAPIKey(value)
+}
+
+// UpdateManagedUser and DeleteManagedUser check the target's current role within
+// the write itself, after any concurrent promotion has committed.
+func (s *Store) UpdateManagedUser(ctx context.Context, id, field, value string) error {
+	var query string
+	switch field {
+	case "status":
+		if value != UserStatusActive && value != UserStatusDisabled {
+			return ErrBadRequest
+		}
+		query = `UPDATE users SET status = ?, updated_at = ? WHERE id = ? AND (role <> 'ADMIN' OR ? = 'ACTIVE')`
+	case "role":
+		if value != UserRoleUser && value != UserRoleAdmin {
+			return ErrBadRequest
+		}
+		query = `UPDATE users SET role = ?, updated_at = ? WHERE id = ? AND (role <> 'ADMIN' OR ? = 'ADMIN')`
+	default:
+		return ErrBadRequest
+	}
+	result, err := s.db.ExecContext(ctx, query, value, timestamp(time.Now()), id, value)
+	return s.managedMutationResult(ctx, id, result, err)
+}
+func (s *Store) DeleteManagedUser(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND role <> 'ADMIN'`, id)
+	return s.managedMutationResult(ctx, id, result, err)
+}
+func (s *Store) managedMutationResult(ctx context.Context, id string, result sql.Result, err error) error {
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 1 {
+		return nil
+	}
+	if _, err := s.UserByID(ctx, id); err != nil {
+		return err
+	}
+	return fmt.Errorf("%w: admin users cannot be disabled, demoted or deleted", ErrBadRequest)
 }

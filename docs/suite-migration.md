@@ -2,7 +2,7 @@
 
 Updated **October 30, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-application version remains `1.0.7`. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.8`; point-3 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -20,8 +20,8 @@ Work stops after each numbered point until the owner approves the next one.
 | Point | Work | State |
 | --- | --- | --- |
 | 1 | Record the existing baseline and consume SDK `0.7.0` | Completed and approved to proceed |
-| 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Implemented and locally validated; awaiting owner approval for point 3 |
-| 3 | Complete administration APIs and retain native frontend functionality | Pending |
+| 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Completed; owner confirmed split deployment working and authorized point 3 |
+| 3 | Complete administration APIs and retain native frontend functionality | Completed and locally validated; awaiting owner approval for point 4 |
 | 4 | Implement persistent service trust and pairing | Pending |
 | 5 | Implement registry and durable events | Pending |
 | 6 | Implement authorization issuance | Pending |
@@ -111,7 +111,7 @@ retain administrative permission rules independently of the presentation.
 Compose groups `backend` and `frontend` in one project. The frontend forwards the
 existing public routes and consumes a session-filtered dashboard data endpoint.
 Public APIs, direct MCP, sync, data migrations, and their ownership rules retain
-their behavior. Full JSON administration API work remains point 3. Deployment,
+their behavior. Full JSON administration API work is recorded separately under point 3 below. Deployment,
 independent frontend publication and migration boundaries are documented in the
 [frontend guide](frontend-deployment.md). No installed deployment is migrated by
 this source change.
@@ -142,5 +142,57 @@ external product's complete frontend flow, installed-data rollout, remote GitHub
 CI and multi-architecture publication remain delivery validation in point 8.
 The Google redirect and real Backend session/form behavior were exercised here;
 the browser tests use sessions seeded only in a disposable, stopped database.
-Points 3–8 remain pending. No commit, push, image publication or installed service
-migration was performed as part of point 2.
+At the end of point 2, points 3–8 remained pending. No commit, push, image
+publication or installed service migration was performed by the agent as part of point 2.
+
+
+## Point 3 implementation
+
+The owner authorized this point after confirming the separate frontend/backend
+containers appear to work in Yard. The [administration API](administration-api.md)
+now exposes authenticated account, personal-key, user/role/status, owned vault
+lifecycle/ZIP and initial Yard/Gateway configuration operations. React mutations
+use JSON APIs with same-origin session protection, visible errors and refreshed
+state. Legacy browser forms/OAuth and the dependent-product entry points remain;
+existing `/v1/*` and direct `/mcp` policies retain their own behavior.
+
+Admin invariants also apply to user upserts and concurrent writes. Administrator
+status never grants another account's vault data. Personal-key rotation invalidates
+the old key without ending the browser session. Current roles/statuses are resolved
+from Backend state for each administration request, without a new Google login.
+
+Foundation addresses are validated by the released SDK origin normalizer and
+persisted as configuration intent with conditional opaque revisions. No service
+is contacted or marked connected; saved entries are `not_paired`. This configures
+the foundation roles, not a limited product catalog. Points 4–7 will implement
+the approved trust, registry/event, issuance and product execution mechanisms.
+
+Migration 4 adds only the configuration table after validating the existing
+baseline. Old histories still cannot trigger reset 3. Pre-upgrade data must be
+retained for an older-binary rollback, because it rejects the new migration history.
+Existing CI/release jobs already execute the changed Go/frontend/browser suites;
+no new publication trigger or application version is required for this point.
+
+### Point 3 validation results
+
+- All 81 top-level Go tests passed with the race detector (201 passing results
+  including subtests/fuzz seeds); `go vet` and Go formatting checks passed.
+- Frontend type/lint/format checks, 11 React behavior tests and production build
+  passed. Failure cases cover API refusal, unconfirmed network responses, a saved
+  write with failed refresh, and stale connection revisions without silent replay.
+- Both candidate Docker images built. The real split-deployment script passed,
+  including preserved browser forms, API/MCP, session/role/ownership isolation,
+  OAuth public redirect, exact revisions, sync SSE and frontend-only replacement.
+- All three Chromium workflows passed. Admin flow now exercises JSON changes,
+  visible errors, persistent foundation configuration, stale-tab conflict handling,
+  removal, key rotation and logout. Member flow cannot view or call admin APIs.
+- SQLite checks cover an actual supported baseline upgrade retaining users,
+  personal keys, sessions, vaults and historical migration records; repeated
+  startup; persisted connection revisions; concurrent changes; and protected
+  administrator updates/upserts/deletes. Historical-reset refusal tests still pass.
+- Dashboard rendering was visually inspected. No Compose/environment variable
+  change is needed for this point. Existing CI/release jobs cover the new tests;
+  remote GitHub execution, real Google exchange and the external product's full
+  integration remain delivery validation in point 8.
+No commit, push, tag, release or installed deployment change is performed here.
+Points 4–8 remain pending; work stops after point 3 for owner approval.

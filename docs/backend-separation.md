@@ -17,7 +17,8 @@ The legacy executable `nox-sync` remains available. Container UID/GID stay 10001
 New databases use `/data/nox-backend.db`. An existing `/data/nox-sync.db` is used
 in place, without automatic renaming. If both active files exist, startup fails
 rather than choosing one. Database schema, migration records, blobs and staging
-layout are unchanged. An interrupted filename migration cannot silently create
+layout were unchanged by that earlier refactor. Later additive Suite migration
+notes are linked below. An interrupted filename migration cannot silently create
 a replacement empty database.
 
 Existing data volumes do not need renaming. In particular this remains valid:
@@ -76,10 +77,16 @@ The supported migration history is exactly:
 | 2 | sync_plan_actions |
 | 3 | multi_user_multi_vault_reset |
 
-Existing databases with pending, newer or inconsistent migrations are refused.
+This table is the preserved multi-vault baseline. Current point-3 builds also
+include migration 4, `foundation_connections`, an additive non-secret
+configuration table. Intact baseline installations are validated before that
+migration runs. Newer/unknown histories and inconsistent schemas are refused.
 Migration 3 contains a historical reset; do not execute it manually or mark it as
 applied to bypass validation. Unsupported older databases need a separately
 planned data migration. Fresh installations initialize an empty schema normally.
+Older binaries reject migration 4, so rollback across that addition requires the
+pre-upgrade `/data` backup and matching images. See the
+[administration API migration notes](administration-api.md#persistence-and-delivery).
 
 Build the candidate and run it against the validation copy on a separate port,
 using the current settings. Never route normal clients to this instance.

@@ -149,6 +149,9 @@ ongoing database or disk health. Rebuild or pull an image containing this change
 and recreate existing containers to enable the healthcheck.
 
 The native dashboard lives in `frontend/`, using React, TypeScript and Vite+.
+Its [authenticated administration APIs](docs/administration-api.md) cover users,
+personal keys, vault operations and persistent initial Yard/Gateway addresses.
+Saved service addresses remain explicitly awaiting pairing until trust is implemented.
 Its independent image serves `/vault-dashboard` and its assets and forwards the
 existing API, auth, form and MCP routes to Backend. The backend image contains
 no frontend assets or templates. Frontend-only changes require rebuilding only
@@ -454,6 +457,7 @@ node --test scripts/release.test.mjs
 
 - [Suite migration status and compatibility baseline](docs/suite-migration.md)
 - [Frontend development, split deployment and migration](docs/frontend-deployment.md)
+- [Administration API and initial foundation configuration](docs/administration-api.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

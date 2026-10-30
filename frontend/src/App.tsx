@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode, SubmitEvent } from "react";
+import type { ReactNode } from "react";
+import { MutationContext, MutationForm, requestJSON } from "./MutationForm";
+import { Connections } from "./Connections";
 import type { Dashboard, User, Vault } from "./model";
 import { formatBytes, formatTime, messages } from "./model";
 
@@ -127,13 +129,10 @@ function Credentials({ data }: { data: Dashboard }) {
       );
     }
   }
-  function rotate(event: SubmitEvent<HTMLFormElement>) {
-    if (
-      !window.confirm(
-        "Generate a new API key? Apps using the current key will stop connecting until you update them.",
-      )
-    )
-      event.preventDefault();
+  function rotate() {
+    return window.confirm(
+      "Generate a new API key? Apps using the current key will stop connecting until you update them.",
+    );
   }
   return (
     <>
@@ -197,16 +196,16 @@ function Credentials({ data }: { data: Dashboard }) {
               onClick={() => void copy(data.apiKey, "key")}
             />
           </div>
-          <form
-            method="post"
-            action="/vault-dashboard/api-key/rotate"
+          <MutationForm
+            path="/api/account/api-key/rotate"
             className="key-actions"
-            onSubmit={rotate}
+            confirm={rotate}
+            message={messages["api-key-rotated"]!}
           >
             <button className="danger" type="submit">
               Generate new API key
             </button>
-          </form>
+          </MutationForm>
           <p className="muted">Generating a new key disconnects apps using the previous key.</p>
         </section>
       </div>
@@ -262,7 +261,7 @@ function Vaults({ vaults, deleted }: { vaults: Vault[]; deleted: Vault[] }) {
                   <td className="action-cell">
                     <a
                       className="icon-button secondary"
-                      href={`/vault-dashboard/vaults/download?vaultId=${encodeURIComponent(vault.vaultId)}`}
+                      href={`/api/vaults/${encodeURIComponent(vault.vaultId)}/download`}
                       title="Download vault"
                       aria-label="Download vault"
                     >
@@ -291,12 +290,16 @@ function Vaults({ vaults, deleted }: { vaults: Vault[]; deleted: Vault[] }) {
             Delete &quot;{selected.name}&quot;? This vault will be hidden and blocked from future
             sync.
           </p>
-          <form method="post" action="/vault-dashboard/vaults/delete">
-            <Hidden name="vaultId" value={selected.vaultId} />
+          <MutationForm
+            path={`/api/vaults/${encodeURIComponent(selected.vaultId)}`}
+            method="DELETE"
+            message={messages["vault-deleted"]!}
+            onSuccess={() => setSelected(null)}
+          >
             <button className="danger" type="submit">
               Delete vault
             </button>
-          </form>
+          </MutationForm>
         </Dialog>
       )}
       {restoring && (
@@ -307,12 +310,15 @@ function Vaults({ vaults, deleted }: { vaults: Vault[]; deleted: Vault[] }) {
                 <tr key={vault.vaultId}>
                   <th scope="row">{vault.name}</th>
                   <td>
-                    <form method="post" action="/vault-dashboard/vaults/restore">
-                      <Hidden name="vaultId" value={vault.vaultId} />
+                    <MutationForm
+                      path={`/api/vaults/${encodeURIComponent(vault.vaultId)}/restore`}
+                      message={messages["vault-restored"]!}
+                      onSuccess={() => setRestoring(false)}
+                    >
                       <button className="secondary" type="submit">
                         Restore vault
                       </button>
-                    </form>
+                    </MutationForm>
                   </td>
                   <td>
                     <Action
@@ -334,12 +340,16 @@ function Vaults({ vaults, deleted }: { vaults: Vault[]; deleted: Vault[] }) {
       {purge && (
         <Dialog title="Permanently delete vault" onClose={() => setPurge(null)}>
           <p>Permanently delete &quot;{purge.name}&quot;? This cannot be restored.</p>
-          <form method="post" action="/vault-dashboard/vaults/purge">
-            <Hidden name="vaultId" value={purge.vaultId} />
+          <MutationForm
+            path={`/api/vaults/${encodeURIComponent(purge.vaultId)}/purge`}
+            method="DELETE"
+            message={messages["vault-purged"]!}
+            onSuccess={() => setPurge(null)}
+          >
             <button className="danger" type="submit">
               Permanently delete vault
             </button>
-          </form>
+          </MutationForm>
         </Dialog>
       )}
     </section>
@@ -357,7 +367,11 @@ function Users({ users }: { users: User[] }) {
           </h2>
         </div>
       </div>
-      <form method="post" action="/vault-dashboard/users/add" className="add-user-panel">
+      <MutationForm
+        path="/api/admin/users"
+        className="add-user-panel"
+        message={messages["user-saved"]!}
+      >
         <div className="form-row">
           <div className="field grow">
             <label htmlFor="new-email">Google account email</label>
@@ -379,7 +393,7 @@ function Users({ users }: { users: User[] }) {
           </div>
           <button type="submit">Add user</button>
         </div>
-      </form>
+      </MutationForm>
       <div className="table-wrapper" role="region" tabIndex={0} aria-label="Users">
         <table>
           <thead>
@@ -398,8 +412,11 @@ function Users({ users }: { users: User[] }) {
                   <span className="badge">{user.role === "ADMIN" ? "Admin" : "Member"}</span>
                 </td>
                 <td>
-                  <form method="post" action="/vault-dashboard/users/status">
-                    <Hidden name="userId" value={user.id} />
+                  <MutationForm
+                    path={`/api/admin/users/${encodeURIComponent(user.id)}/status`}
+                    method="PUT"
+                    message={messages["user-saved"]!}
+                  >
                     <Hidden
                       name="status"
                       value={user.status === "ACTIVE" ? "DISABLED" : "ACTIVE"}
@@ -413,14 +430,17 @@ function Users({ users }: { users: User[] }) {
                     >
                       <span />
                     </button>
-                  </form>
+                  </MutationForm>
                 </td>
                 <td className="action-cell">
                   {user.role === "ADMIN" ? (
                     <Action label="Admin users cannot be demoted" icon="user" disabled />
                   ) : (
-                    <form method="post" action="/vault-dashboard/users/role">
-                      <Hidden name="userId" value={user.id} />
+                    <MutationForm
+                      path={`/api/admin/users/${encodeURIComponent(user.id)}/role`}
+                      method="PUT"
+                      message={messages["user-saved"]!}
+                    >
                       <Hidden name="role" value="ADMIN" />
                       <button
                         className="icon-button secondary"
@@ -430,7 +450,7 @@ function Users({ users }: { users: User[] }) {
                       >
                         <Icon name="shield" />
                       </button>
-                    </form>
+                    </MutationForm>
                   )}
                   <Action
                     label="Delete user"
@@ -448,25 +468,66 @@ function Users({ users }: { users: User[] }) {
       {selected && (
         <Dialog title="Delete user" onClose={() => setSelected(null)}>
           <p>Delete &quot;{selected.email}&quot; and all owned sync data? This cannot be undone.</p>
-          <form method="post" action="/vault-dashboard/users/delete">
-            <Hidden name="userId" value={selected.id} />
+          <MutationForm
+            path={`/api/admin/users/${encodeURIComponent(selected.id)}`}
+            method="DELETE"
+            message={messages["user-deleted"]!}
+            onSuccess={() => setSelected(null)}
+          >
             <button className="danger" type="submit">
               Delete user
             </button>
-          </form>
+          </MutationForm>
         </Dialog>
       )}
     </section>
   );
 }
-export function DashboardView({ data }: { data: Dashboard }) {
+export function DashboardView({ data, reload }: { data: Dashboard; reload?: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const inFlight = useRef(false);
+  async function perform(
+    path: string,
+    method: string,
+    body: Record<string, string> | undefined,
+    headers: Record<string, string>,
+    successMessage: string,
+  ) {
+    if (inFlight.current) throw Error("Wait for the current change to finish.");
+    inFlight.current = true;
+    setBusy(true);
+    setRefreshError("");
+    try {
+      await requestJSON(path, {
+        method,
+        headers: {
+          "X-Nox-Request": "1",
+          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...headers,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      setMessage(successMessage);
+      try {
+        await reload?.();
+      } catch {
+        setRefreshError(
+          "The change was saved, but the dashboard could not be refreshed. Refresh before making another change.",
+        );
+      }
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
   const [message, setMessage] = useState(
     () => messages[new URLSearchParams(window.location.search).get("message") ?? ""] ?? "",
   );
   const vaults = data.vaults ?? [];
   const deleted = data.deletedVaults ?? [];
   return (
-    <>
+    <MutationContext.Provider value={{ busy: busy || Boolean(refreshError), perform }}>
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -511,7 +572,7 @@ export function DashboardView({ data }: { data: Dashboard }) {
                 >
                   <Icon name="refresh" />
                 </a>
-                <form method="post" action="/auth/logout">
+                <MutationForm path="/api/session/logout" message="Signed out.">
                   <button
                     className="icon-button secondary"
                     type="submit"
@@ -520,9 +581,15 @@ export function DashboardView({ data }: { data: Dashboard }) {
                   >
                     <Icon name="logout" />
                   </button>
-                </form>
+                </MutationForm>
               </div>
             </header>
+            {refreshError && (
+              <p role="alert" className="error-message">
+                {refreshError}
+              </p>
+            )}
+            {busy && <p role="status">Saving changes…</p>}
             {message && (
               <div className="message" role="status">
                 <span>{message}</span>
@@ -551,6 +618,7 @@ export function DashboardView({ data }: { data: Dashboard }) {
             <div className="stack">
               <Vaults vaults={vaults} deleted={deleted} />
               {data.isAdmin && <Users users={data.users ?? []} />}
+              {data.isAdmin && <Connections connections={data.connections ?? []} />}
             </div>
           </>
         ) : (
@@ -584,7 +652,7 @@ export function DashboardView({ data }: { data: Dashboard }) {
       <footer>
         NoX Backend <span aria-hidden="true">·</span> Your data, on your server.
       </footer>
-    </>
+    </MutationContext.Provider>
   );
 }
 export function App() {
@@ -593,15 +661,7 @@ export function App() {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/dashboard", {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw Error("Backend unavailable");
-        return (await response.json()) as Dashboard;
-      })
+    requestJSON<Dashboard>("/api/dashboard", { signal: controller.signal })
       .then((value) => {
         setData(value);
         setFailed(false);
@@ -611,7 +671,15 @@ export function App() {
       });
     return () => controller.abort();
   }, [attempt]);
-  if (data) return <DashboardView data={data} />;
+  if (data)
+    return (
+      <DashboardView
+        data={data}
+        reload={async () => {
+          setData(await requestJSON<Dashboard>("/api/dashboard"));
+        }}
+      />
+    );
   return (
     <main>
       <h1>NoX Backend</h1>

@@ -21,7 +21,7 @@ test("anonymous login, assets and responsive layout work through the frontend im
   );
   await expect(page.getByLabel("API key", { exact: true })).toHaveCount(0);
 });
-test("admin manages credentials, users and vaults using the preserved native forms", async ({
+test("admin manages credentials, users and vaults through authenticated JSON APIs", async ({
   page,
   context,
 }, testInfo) => {
@@ -37,7 +37,30 @@ test("admin manages credentials, users and vaults using the preserved native for
   const download = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download vault", exact: true }).click();
   expect((await download).suggestedFilename()).toBe("Notes.zip");
+  const browserMutations: string[] = [];
+  page.on("request", (request) => {
+    if (["POST", "PUT", "DELETE"].includes(request.method()))
+      browserMutations.push(new URL(request.url()).pathname);
+  });
+  // A real UI error keeps the input and never replays the write automatically.
+  await page.route(
+    "**/api/admin/users",
+    async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "SERVER_ERROR",
+          message: "Temporary administration failure.",
+        }),
+      });
+    },
+    { times: 1 },
+  );
   await page.getByLabel("Google account email").fill("ui@example.invalid");
+  await page.getByRole("button", { name: "Add user", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("Temporary administration failure.");
+  await expect(page.getByLabel("Google account email")).toHaveValue("ui@example.invalid");
   await page.getByRole("button", { name: "Add user", exact: true }).click();
   await expect(page.getByRole("row").filter({ hasText: "ui@example.invalid" })).toBeVisible();
   await page
@@ -70,6 +93,39 @@ test("admin manages credentials, users and vaults using the preserved native for
   await page.getByRole("button", { name: "Restore deleted vaults", exact: true }).click();
   await page.getByRole("button", { name: "Restore vault", exact: true }).click();
   await expect(page.getByText("r9007199254740993")).toBeVisible();
+  await page.getByLabel("Yard HTTPS address").fill("https://yard.example.invalid");
+  await page.getByRole("button", { name: "Save Yard configuration" }).click();
+  await expect(page.getByText("Configuration saved · Awaiting pairing")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue("https://yard.example.invalid");
+  // Another administrator changes the persisted revision while this tab is stale.
+  const connections = (await (
+    await page.request.get(fixture.base + "/api/admin/connections")
+  ).json()) as { service: string; revision: string }[];
+  const yard = connections.find((connection) => connection.service === "yard")!;
+  const concurrent = await page.request.put(fixture.base + "/api/admin/connections/yard", {
+    headers: { "X-Nox-Request": "1", "If-Match": `"${yard.revision}"` },
+    data: { origin: "https://yard-new.example.invalid:8443" },
+  });
+  expect(concurrent.status()).toBe(200);
+  await page.getByLabel("Yard HTTPS address").fill("https://stale.example.invalid");
+  await page.getByRole("button", { name: "Save Yard configuration" }).click();
+  await expect(page.getByRole("alert")).toContainText("Configuration changed");
+  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue("https://stale.example.invalid");
+  await page.reload();
+  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue(
+    "https://yard-new.example.invalid:8443",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove Yard configuration" }).click();
+  await expect(page.getByRole("button", { name: "Remove Yard configuration" })).toHaveCount(0);
+  await page.getByLabel("Gateway HTTPS address").fill("https://192.168.10.10:8443");
+  await page.getByRole("button", { name: "Save Gateway configuration" }).click();
+  await expect(page.getByLabel("Gateway HTTPS address")).toHaveValue("https://192.168.10.10:8443");
+  await expect(page.getByText("Configuration saved · Awaiting pairing")).toBeVisible();
+  expect(browserMutations.some((path) => path.startsWith("/vault-dashboard/"))).toBe(false);
+  expect(browserMutations).toContain("/api/admin/users");
+  expect(browserMutations).toContain("/api/admin/connections/yard");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Generate new API key", exact: true }).click();
   await expect(page.getByLabel("API key", { exact: true })).not.toHaveValue(fixture.apiKey);
@@ -92,4 +148,7 @@ test("a member retains their frontend and cannot see admin controls", async ({ p
   await expect(page.getByLabel("API key", { exact: true })).toBeVisible();
   await expect(page.getByText("User management")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add user", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Service connections", { exact: true })).toHaveCount(0);
+  expect((await page.request.get(fixture.base + "/api/admin/connections")).status()).toBe(403);
+  expect((await page.request.get(fixture.base + "/api/admin/users")).status()).toBe(403);
 });

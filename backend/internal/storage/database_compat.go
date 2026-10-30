@@ -52,8 +52,8 @@ func databaseExists(path string) (bool, error) {
 	return true, nil
 }
 
-// A populated database must already have the current schema. In particular,
-// never run the historical single-vault reset as an automatic upgrade.
+// A populated database must have the intact multi-vault baseline (1–3).
+// Only later additive migrations may run automatically; never replay reset 3.
 func (s *Store) validateExistingSchema(ctx context.Context) error {
 	var tables int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).Scan(&tables); err != nil {
@@ -89,8 +89,8 @@ func (s *Store) validateExistingSchema(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if index != len(migrations) {
-		return fmt.Errorf("existing database has pending migrations; refusing historical reset (expected versions 1, 2, 3)")
+	if index < 3 {
+		return fmt.Errorf("existing database predates the multi-vault baseline; refusing historical reset (expected versions 1, 2, 3)")
 	}
 	// Compare with the embedded schema, not just migration records that could
 	// have been incorrectly marked as applied. Extra user indexes are harmless.
@@ -99,7 +99,7 @@ func (s *Store) validateExistingSchema(ctx context.Context) error {
 		return err
 	}
 	defer reference.Close()
-	for _, migration := range migrations {
+	for _, migration := range migrations[:index] {
 		body, err := migrationFiles.ReadFile(migration.path)
 		if err != nil {
 			return err

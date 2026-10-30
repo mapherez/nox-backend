@@ -24,7 +24,11 @@ with public login/configuration data when anonymous. It uses `Cache-Control:
 no-store`; the frontend bundle contains no user data. Non-admins do not receive
 the administrative user list. API Bearer keys do not authenticate this browser
 view. Only required presentation fields are projected; Google subjects are absent.
-The full administration JSON API is point 3. Existing form routes remain usable.
+The [administration JSON API](administration-api.md) supplies account/role,
+personal-key, vault and foundation-configuration operations. React uses those
+APIs for changes; existing browser form and authentication routes remain usable.
+Initial Yard/Gateway addresses are persistent admin configuration, explicitly
+awaiting pairing rather than reporting an unverified connection as successful.
 
 The frontend proxy has no response/request buffering for streamed API responses,
 including the existing sync SSE endpoint. Its idle read/send timeout is one day;
@@ -117,7 +121,10 @@ existing keys and sessions, roles, vault IDs/revisions, downloads, sync, wiki/re
 integration and the product that depends on the native frontend before changing
 the installed deployment. Actual production migration/delivery remains point 8.
 Rollback requires restoring the previous image/topology and the same preserved
-data mount; point 2 adds no schema migration or data reset.
+data mount. Point 2 added no schema change. Point 3 adds the non-destructive
+connection-configuration table through migration 4. See the
+[administration migration notes](administration-api.md#persistence-and-delivery)
+before upgrading: older binaries require the pre-upgrade data backup for rollback.
 
 ## Verification
 
