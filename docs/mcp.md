@@ -1,8 +1,8 @@
 # Native MCP API
 
 NoX Backend exposes **POST `/mcp`** through the official
-[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.6.1/go), using
-the published `github.com/mapherez/nox-mcp v0.6.1` module. It runs in the same
+[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.0/go), using
+the published `github.com/mapherez/nox-mcp v0.7.0` module. It runs in the same
 Go process, HTTP server, bind address and port as the existing API and dashboard.
 There is no second service or port. Configure a Streamable HTTP MCP client with
 the backend's base URL plus `/mcp`, retaining any reverse-proxy path prefix.

@@ -436,6 +436,7 @@ node --test scripts/release.test.mjs
 
 ## Documentation
 
+- [Suite migration status and compatibility baseline](docs/suite-migration.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)
