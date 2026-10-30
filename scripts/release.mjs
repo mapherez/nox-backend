@@ -85,22 +85,27 @@ export async function runReleaseChecks(root, tag, run = runReleaseCommand, {
   wait = delay, report = message => console.error(message),
 } = {}) {
   await run('go', ['test', './...'], { cwd: resolve(root, 'backend'), stdio: 'inherit' });
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await run('docker', ['build', '--build-arg', `VERSION=${tag}`, '-t', 'nox-backend:release-check', './backend'],
-        { cwd: root, stdio: 'inherit' });
-      return;
-    } catch (error) {
-      const details = error.stderr?.toString() || error.message;
-      const contextLocked = /failed to read metadata/i.test(details) &&
-        /contexts[\\/]meta[\\/]/i.test(details) && /being used by another process/i.test(details);
-      if (!contextLocked) throw error;
-      if (attempt === 3) {
-        throw new Error('O Docker manteve os metadados do contexto bloqueados apos 3 tentativas. ' +
-          'Reinicia o Docker Desktop e volta a executar npm run release. A versao sera restaurada; nenhuma release foi publicada.');
+  for (const args of [['ci', '--prefix', 'frontend'], ['run', 'check', '--prefix', 'frontend'], ['run', 'test', '--prefix', 'frontend']]) {
+    await run('npm', args, { cwd: root, stdio: 'inherit', ...(process.platform === 'win32' ? { shell: true } : {}) });
+  }
+  for (const component of ['backend', 'frontend']) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await run('docker', ['build', '--build-arg', `VERSION=${tag}`, '-t', `nox-backend${component === 'frontend' ? '-frontend' : ''}:release-check`, `./${component}`],
+          { cwd: root, stdio: 'inherit' });
+        break;
+      } catch (error) {
+        const details = error.stderr?.toString() || error.message;
+        const contextLocked = /failed to read metadata/i.test(details) &&
+          /contexts[\\/]meta[\\/]/i.test(details) && /being used by another process/i.test(details);
+        if (!contextLocked) throw error;
+        if (attempt === 3) {
+          throw new Error('O Docker manteve os metadados do contexto bloqueados apos 3 tentativas. ' +
+            'Reinicia o Docker Desktop e volta a executar npm run release. A versao sera restaurada; nenhuma release foi publicada.');
+        }
+        report(`Metadados do contexto Docker temporariamente bloqueados. Nova tentativa em 2s (${attempt + 1}/3).`);
+        await wait(2000);
       }
-      report(`Metadados do contexto Docker temporariamente bloqueados. Nova tentativa em 2s (${attempt + 1}/3).`);
-      await wait(2000);
     }
   }
 }

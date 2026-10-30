@@ -64,16 +64,16 @@ From a terminal in the folder containing both files:
 docker compose up -d
 ```
 
-Docker Desktop should then show a container named:
+Docker Desktop/Yard should show `backend` and `frontend` services in the same project. The backend container retains the name:
 
 ```text
 nox-backend
 ```
 
-The container listens internally on port `8080`, but the Compose file exposes it on your machine as port `5710`:
+The frontend owns host port `5710`; it forwards backend routes to the internal backend listener on `8080`:
 
 ```text
-localhost:5710 -> container:8080
+localhost:5710 -> frontend:8080 -> backend:8080
 ```
 
 If you change the left side of the port mapping, also use that host port in your browser and plugin Server URL.
@@ -122,13 +122,14 @@ The root `docker-compose.yml` is the minimal production-oriented example:
 docker compose up -d
 ```
 
-It targets the image published by this repository:
+It targets the paired images published by this repository (use a release containing the frontend/backend separation):
 
 ```text
 ghcr.io/mapherez/nox-backend:latest
+ghcr.io/mapherez/nox-backend-frontend:latest
 ```
 
-It exposes container port `8080` on host port `5710`:
+The frontend service exposes container port `8080` on host port `5710`:
 
 ```yaml
 ports:
@@ -263,15 +264,33 @@ go build -ldflags "-X main.buildVersion=1.2.3" -o nox-backend ./cmd/nox-backend
 
 See the [stable client API](client-api.md) for the health and metadata contracts.
 
-You can then run that local image with:
+For backend API-only development, you can run that local image directly (it does not serve the React dashboard):
 
 ```bash
 docker run --rm --name nox-backend-dev -p 5710:8080 -v nox-backend-dev-data:/data nox-backend:dev
 ```
 
-The `ghcr.io/mapherez/nox-backend:latest` tag is the image reference used by the production Compose example; it must be published before the example can pull it. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
+The production Compose example uses both `ghcr.io/mapherez/nox-backend:latest` and `ghcr.io/mapherez/nox-backend-frontend:latest`; both compatible images must be published before it can pull them. Use the development Compose example for the complete native frontend/backend from source. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
 
 Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
 `NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
 name shown above is the new-installation default; existing `nox-sync.db` files are
 used in place until an explicit offline migration.
+
+## Separate frontend configuration
+
+The `frontend` service is part of the same `nox-backend` Compose project.
+It owns the host port; the `backend` service owns data and credentials.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NOX_FRONTEND_PORT` | `5710` | Host port forwarded to the frontend container's port 8080 |
+| `NOX_FRONTEND_BACKEND_URL` | `http://backend:8080` | Internal Backend origin used by the frontend proxy; set it when changing the Backend listener |
+| `NOX_FRONTEND_IMAGE_TAG` | Backend image tag, otherwise `latest` | Independently selected frontend image version or immutable `sha-<commit>` tag |
+
+Keep `NOX_BACKEND_PUBLIC_URL` (or its legacy alias) equal to the external public
+origin, including a changed host port. Register the same public origin's
+`/auth/google/callback` with Google. Internal container addresses are not client
+Server URLs or OAuth callback addresses. Public HTTPS may terminate at the
+installation's existing trusted reverse proxy; the frontend preserves its
+forwarded protocol. Read the [deployment guide](frontend-deployment.md).

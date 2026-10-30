@@ -31,7 +31,9 @@ Clients interact with NoX Backend through its HTTP API or native MCP endpoint an
 
 NoX Backend uses:
 
-- **Go** for the HTTP service;
+- **Go** for the backend HTTP service;
+- **React + TypeScript + Vite+** for the native frontend;
+- **Nginx** in the separate frontend image for static delivery and same-origin API/auth/MCP forwarding;
 - **SQLite** for metadata;
 - **filesystem blob storage** for file contents;
 - **Google OAuth** for dashboard authentication;
@@ -72,7 +74,7 @@ The SQLite database and blob storage form a single logical data store and should
 - Server-sent events for synchronization status.
 - Read APIs for external integrations.
 
-The MCP endpoint runs in the same Go process, on the same HTTP server and port.
+The MCP endpoint runs in the backend Go process, on the same HTTP server and port as its APIs. The separate frontend forwards the existing public `/mcp` route.
 Its 10 tools share the existing backend logic and storage with the Stable Client
 API. User operations use the existing per-user API key in
 `Authorization: Bearer <API_KEY>`; health and service information are public.
@@ -83,13 +85,20 @@ details.
 
 ## Docker
 
-The production image is published to:
+The backend production image is published to:
 
 ```text
 ghcr.io/mapherez/nox-backend:latest
 ```
 
-The repository includes a production `docker-compose.yml`.
+The repository includes a production `docker-compose.yml` with `backend` and
+`frontend` services in one `nox-backend` project. The frontend image is
+`ghcr.io/mapherez/nox-backend-frontend`. It can be built and deployed independently.
+The split topology requires a release containing both this backend data adapter
+and the new frontend image; existing `v1.0.7` images predate this separation.
+For source validation before that release, use `docker-compose.dev.yml`.
+See the [frontend/deployment guide](docs/frontend-deployment.md) before migrating
+an existing installation.
 
 For a new installation:
 
@@ -115,7 +124,7 @@ docker compose up -d
 The default Compose configuration exposes:
 
 ```text
-localhost:5710 → container:8080
+localhost:5710 → frontend:8080 → backend:8080
 ```
 
 The dashboard is available at:
@@ -139,9 +148,11 @@ The endpoint checks HTTP responsiveness after initialization; it does not probe
 ongoing database or disk health. Rebuild or pull an image containing this change
 and recreate existing containers to enable the healthcheck.
 
-Dashboard HTML, CSS and JavaScript live in `backend/internal/app/dashboard/` and
-are embedded in the Go executable. Editing these files requires rebuilding the
-backend image; no frontend build or external assets are required.
+The native dashboard lives in `frontend/`, using React, TypeScript and Vite+.
+Its independent image serves `/vault-dashboard` and its assets and forwards the
+existing API, auth, form and MCP routes to Backend. The backend image contains
+no frontend assets or templates. Frontend-only changes require rebuilding only
+the frontend image. [Development, configuration and migration](docs/frontend-deployment.md).
 
 ## Google OAuth
 
@@ -368,8 +379,9 @@ Build metadata (`+build`) is refused because Docker tags cannot contain `+`;
 the complete tag must fit Docker's 128-character limit.
 
 The command checks local and origin tags, updates `package.json`,
-runs `go test ./...` in `backend`, and builds the image with `VERSION=v1.0.5`
-for the example above. Failed checks restore `package.json` and create no
+runs `go test ./...` in `backend`, installs the locked frontend dependencies,
+checks frontend types/lint/formatting/tests, and builds both images. Backend uses
+`VERSION=v1.0.5` for the example above. Failed checks restore `package.json` and create no
 commit, tag or push. Successful checks commit the version change as
 `chore: release v1.0.5`, create an annotated `v1.0.5` tag, and push the current branch and
 that tag atomically to origin. If the push fails, the local commit and tag are
@@ -381,27 +393,29 @@ restart Docker Desktop and rerun the command. Other build failures abort
 immediately and restore the package version.
 
 The **Release** GitHub Actions workflow runs only on `v*` tag pushes. It verifies
-the tag against `package.json`, tests Go, and publishes a multi-architecture image
-(`linux/amd64`, `linux/arm64`). A stable release publishes exactly these image tags:
+the tag against `package.json`, tests Go and the React/Vite+ frontend, and publishes
+both images for `linux/amd64` and `linux/arm64`. A stable release publishes these tags:
 
 ```text
 ghcr.io/mapherez/nox-backend:v1.0.5
 ghcr.io/mapherez/nox-backend:latest
+ghcr.io/mapherez/nox-backend-frontend:v1.0.5
+ghcr.io/mapherez/nox-backend-frontend:latest
 ```
 
 Prereleases publish only their version tag, for example
 `ghcr.io/mapherez/nox-backend:v1.1.0-rc.1`, and never change `latest`.
 
-The image includes OCI labels `org.opencontainers.image.version`,
+Both images include OCI labels `org.opencontainers.image.version`,
 `org.opencontainers.image.revision`, `org.opencontainers.image.source` and
 `org.opencontainers.image.created`. The creation timestamp is generated in UTC
 immediately before the image build.
-After publishing it, the workflow creates a GitHub Release with generated notes;
+After publishing both, the workflow creates a GitHub Release with generated notes;
 prereleases are marked as prerelease on GitHub. An existing release causes failure
 and is never replaced. Monitor the workflow
 until it completes: a successful local push starts the remote publication.
 
-Release images report their Git tag through the existing `buildVersion` ldflags
+The backend image reports its Git tag through the existing `buildVersion` ldflags
 mechanism in both `/v1/health` and `/v1/info`. A non-empty `NOX_BACKEND_VERSION`
 overrides it at runtime; unversioned local builds report `dev`.
 
@@ -427,6 +441,8 @@ docker compose up -d
 `latest` is the default when `NOX_BACKEND_IMAGE_TAG` is unset. Only stable releases
 update `latest`; deploy a prerelease by explicitly pinning its version tag.
 Publishing an image does not automatically update existing deployments.
+Frontend-only image publication and updates are described in the
+[frontend guide](docs/frontend-deployment.md#published-images-and-independent-frontend-updates).
 
 Test release tooling without publishing anything:
 
@@ -437,6 +453,7 @@ node --test scripts/release.test.mjs
 ## Documentation
 
 - [Suite migration status and compatibility baseline](docs/suite-migration.md)
+- [Frontend development, split deployment and migration](docs/frontend-deployment.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

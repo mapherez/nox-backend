@@ -1,0 +1,54 @@
+name: Publish frontend image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: frontend-image-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run check && npm test
+        working-directory: frontend
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse replacing an existing frontend tag
+        env:
+          IMAGE: ghcr.io/mapherez/nox-backend-frontend:sha-${{ github.sha }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" > /dev/null 2> image-error.txt; then
+            echo 'This immutable frontend tag already exists.' >&2
+            exit 1
+          fi
+          if ! grep -qiE 'manifest unknown|not found|no such manifest' image-error.txt; then
+            cat image-error.txt >&2
+            exit 1
+          fi
+      - name: Publish only the frontend for this source commit
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/mapherez/nox-backend-frontend:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/mapherez/nox-backend

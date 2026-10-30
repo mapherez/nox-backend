@@ -128,7 +128,7 @@ for (const failedCommand of ['go', 'docker']) {
         });
       },
     }), new RegExp(`${failedCommand} failed`));
-    assert.deepEqual(calls, failedCommand === 'go' ? ['go'] : ['go', 'docker']);
+    assert.deepEqual(calls, failedCommand === 'go' ? ['go'] : ['go', 'npm', 'npm', 'npm', 'docker']);
     assert.equal(await readFile(resolve(fixture.root, 'package.json'), 'utf8'), fixture.originalPackage);
     assert.equal(git(fixture.root, 'status', '--porcelain'), '');
     unchanged(fixture);
@@ -141,8 +141,10 @@ test('checks use the backend directory and exact release Docker version', async 
   await runReleaseChecks(root, 'v0.1.0', (...args) => calls.push(args));
   assert.deepEqual(calls, [
     ['go', ['test', './...'], { cwd: resolve(root, 'backend'), stdio: 'inherit' }],
+    ...[['ci', '--prefix', 'frontend'], ['run', 'check', '--prefix', 'frontend'], ['run', 'test', '--prefix', 'frontend']].map(args => ['npm', args, { cwd: root, stdio: 'inherit', ...(process.platform === 'win32' ? {shell:true} : {}) }]),
     ['docker', ['build', '--build-arg', 'VERSION=v0.1.0', '-t', 'nox-backend:release-check', './backend'],
       { cwd: root, stdio: 'inherit' }],
+    ['docker', ['build', '--build-arg', 'VERSION=v0.1.0', '-t', 'nox-backend-frontend:release-check', './frontend'], { cwd: root, stdio: 'inherit' }],
   ]);
 });
 
@@ -161,10 +163,12 @@ test('a transient Docker context lock retries the build and keeps its arguments'
       throw Object.assign(new Error('docker build failed'), { stderr: Buffer.from(dockerContextLock) });
     }
   }, { wait: ms => waits.push(ms), report: message => reports.push(message) });
-  assert.equal(builds, 3);
+  assert.equal(builds, 4);
   assert.equal(calls[0][0], 'go');
-  assert.deepEqual(calls[1], calls[2]);
-  assert.deepEqual(calls[2], calls[3]);
+  const dockerCalls = calls.filter(([command]) => command === 'docker');
+  assert.deepEqual(dockerCalls[0], dockerCalls[1]);
+  assert.deepEqual(dockerCalls[1], dockerCalls[2]);
+  assert.equal(dockerCalls[3][1].at(-1), './frontend');
   assert.deepEqual(waits, [2000, 2000]);
   assert.equal(reports.length, 2);
 });
@@ -496,3 +500,9 @@ test('workflow feeds generated tags and labels to Buildx and classification to G
   assert.match(workflow, /RELEASE_REVISION: \$\{\{ github\.sha \}\}/);
   assert.ok(workflow.indexOf('id: metadata') < workflow.indexOf('      - name: Build and push backend image'));
 });
+
+ test('frontend image metadata is independent and refuses unknown components', () => {
+  const metadata=releaseMetadata('v1.2.3',JSON.stringify({version:'1.2.3'}),'a'.repeat(40),new Date('2026-10-30T00:00:00Z'),'frontend');
+  assert.equal(metadata.tags,'ghcr.io/mapherez/nox-backend-frontend:v1.2.3\nghcr.io/mapherez/nox-backend-frontend:latest');
+  assert.throws(()=>releaseMetadata('v1.2.3',JSON.stringify({version:'1.2.3'}),'a'.repeat(40),new Date(),'unknown'),/Componente/);
+ });

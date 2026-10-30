@@ -38,8 +38,7 @@ func (s *Server) Routes() http.Handler {
 	}
 	mux.Handle("/mcp", mcpHandler)
 	mux.HandleFunc("/", s.handleRoot)
-	mux.HandleFunc("/vault-dashboard", s.handleDashboard)
-	mux.HandleFunc("/vault-dashboard/assets/", s.handleDashboardAsset)
+	mux.HandleFunc("/api/dashboard", s.handleDashboardData)
 	mux.HandleFunc("/vault-dashboard/api-key/rotate", s.handleRotateAPIKey)
 	mux.HandleFunc("/vault-dashboard/users/add", s.handleAddUser)
 	mux.HandleFunc("/vault-dashboard/users/status", s.handleSetUserStatus)
@@ -325,11 +324,7 @@ func (s *Server) requireAPIUser(w http.ResponseWriter, r *http.Request) (storage
 }
 
 func (s *Server) requireWebUser(w http.ResponseWriter, r *http.Request) (storage.User, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return storage.User{}, false
-	}
-	user, ok, err := s.store.UserBySessionToken(r.Context(), cookie.Value)
+	user, ok, err := s.webUser(r)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load session.")
 		return storage.User{}, false

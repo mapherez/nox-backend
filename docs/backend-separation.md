@@ -1,5 +1,7 @@
 # Backend refactor: compatibility, validation, update and rollback
 
+This guide records the earlier repository/name refactor. The subsequent frontend/backend container separation has an explicit [deployment migration](frontend-deployment.md#existing-installations). Preserve the storage and client contracts below while applying that topology change.
+
 NoX Backend is independent from the [NoX Sync plugin](https://github.com/mapherez/nox-sync).
 The refactor changes internal names and the dashboard presentation, preserving
 HTTP routes, JSON, error contracts, API keys, sessions, vault identities and sync behavior.

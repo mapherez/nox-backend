@@ -4,9 +4,11 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateReleaseTag } from './release.mjs';
 
-const image = 'ghcr.io/mapherez/nox-backend';
 
-export function releaseMetadata(tag, contents, revision, created = new Date()) {
+
+export function releaseMetadata(tag, contents, revision, created = new Date(), component = 'backend') {
+  if (!['backend','frontend'].includes(component)) throw new Error('Componente de imagem invalido.');
+  const image = `ghcr.io/mapherez/nox-backend${component === "frontend" ? "-frontend" : ""}`;
   const version = validateReleaseTag(tag, contents);
   // A validated SemVer can contain '-' only when it has a prerelease component.
   const prerelease = version.includes('-');
@@ -25,9 +27,9 @@ export function releaseMetadata(tag, contents, revision, created = new Date()) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   (async () => {
-    if (process.argv.length !== 3) throw new Error('Uso: node scripts/release-metadata.mjs vX.Y.Z');
+    if (process.argv.length !== 3 && process.argv.length !== 4) throw new Error('Uso: node scripts/release-metadata.mjs vX.Y.Z [backend|frontend]');
     const metadata = releaseMetadata(process.argv[2],
-      await readFile(new URL('../package.json', import.meta.url), 'utf8'), process.env.RELEASE_REVISION);
+      await readFile(new URL('../package.json', import.meta.url), 'utf8'), process.env.RELEASE_REVISION, new Date(), process.argv[3] || 'backend');
     if (process.env.GITHUB_OUTPUT) {
       const delimiter = `metadata_${randomUUID()}`;
       await appendFile(process.env.GITHUB_OUTPUT, Object.entries(metadata)

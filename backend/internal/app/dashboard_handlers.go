@@ -11,8 +11,8 @@ import (
 	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/vault-dashboard" {
+func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api/dashboard" {
 		http.NotFound(w, r)
 		return
 	}
@@ -22,13 +22,17 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, authenticated := s.requireWebUser(w, r)
+	w.Header().Set("Cache-Control", "no-store")
+	user, authenticated, err := s.webUser(r)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load session.")
+		return
+	}
 	data := dashboardPageData{
 		Authenticated:   authenticated,
 		OAuthConfigured: s.googleOAuthConfigured(),
 		LoginURL:        "/auth/google/start?redirect=/vault-dashboard",
 		ServerURL:       s.publicURL(r),
-		Message:         dashboardMessage(r.URL.Query().Get("message")),
 	}
 	if authenticated {
 		apiKey, err := s.store.CurrentAPIKey(r.Context(), user.ID)
@@ -46,10 +50,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			writeStorageError(w, err)
 			return
 		}
-		data.User = user
+		data.User = presentDashboardUser(user)
 		data.APIKey = apiKey
-		data.Vaults = vaults
-		data.DeletedVaults = deletedVaults
+		data.Vaults = presentDashboardVaults(vaults)
+		data.DeletedVaults = presentDashboardVaults(deletedVaults)
 		data.IsAdmin = user.Role == storage.UserRoleAdmin
 		if data.IsAdmin {
 			users, err := s.store.ListUsers(r.Context())
@@ -57,13 +61,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 				writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load users.")
 				return
 			}
-			data.Users = users
+			for _, item := range users {
+				data.Users = append(data.Users, presentDashboardUser(item))
+			}
 		}
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_ = dashboardTemplate.Execute(w, data)
+	writeJSON(w, http.StatusOK, data)
 }
 
 func (s *Server) handleRotateAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -91,10 +95,11 @@ func (s *Server) handleAddUser(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusMethodNotAllowed, "BAD_REQUEST", "Method not allowed.")
 		return
 	}
-	if _, ok := s.requireAdminWebUser(w, r); !ok {
+	admin, ok := s.requireAdminWebUser(w, r)
+	if !ok {
 		return
 	}
-	if _, err := s.store.UpsertAllowedUser(r.Context(), r.FormValue("email"), r.FormValue("role")); err != nil {
+	if _, err := s.addManagedUser(r.Context(), admin, r.FormValue("email"), r.FormValue("role")); err != nil {
 		writeStorageError(w, err)
 		return
 	}
@@ -113,23 +118,11 @@ func (s *Server) handleSetUserStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := strings.TrimSpace(r.FormValue("userId"))
 	status := strings.TrimSpace(r.FormValue("status"))
-	target, err := s.store.UserByID(r.Context(), userID)
-	if err != nil {
+	if err := s.setManagedUserStatus(r.Context(), admin, userID, status); err != nil {
 		writeStorageError(w, err)
 		return
 	}
-	if target.ID == admin.ID && status == storage.UserStatusDisabled {
-		writeStorageError(w, fmt.Errorf("%w: admins cannot disable their own account", storage.ErrBadRequest))
-		return
-	}
-	if target.Role == storage.UserRoleAdmin && status == storage.UserStatusDisabled {
-		writeStorageError(w, fmt.Errorf("%w: admin users cannot be disabled", storage.ErrBadRequest))
-		return
-	}
-	if err := s.store.SetUserStatus(r.Context(), userID, status); err != nil {
-		writeStorageError(w, err)
-		return
-	}
+
 	http.Redirect(w, r, "/vault-dashboard?message=user-saved", http.StatusSeeOther)
 }
 
@@ -145,23 +138,11 @@ func (s *Server) handleSetUserRole(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := strings.TrimSpace(r.FormValue("userId"))
 	role := strings.ToUpper(strings.TrimSpace(r.FormValue("role")))
-	target, err := s.store.UserByID(r.Context(), userID)
-	if err != nil {
+	if err := s.setManagedUserRole(r.Context(), admin, userID, role); err != nil {
 		writeStorageError(w, err)
 		return
 	}
-	if target.ID == admin.ID && role != storage.UserRoleAdmin {
-		writeStorageError(w, fmt.Errorf("%w: admins cannot demote their own account", storage.ErrBadRequest))
-		return
-	}
-	if target.Role == storage.UserRoleAdmin && role != storage.UserRoleAdmin {
-		writeStorageError(w, fmt.Errorf("%w: admin users cannot be demoted", storage.ErrBadRequest))
-		return
-	}
-	if err := s.store.SetUserRole(r.Context(), userID, role); err != nil {
-		writeStorageError(w, err)
-		return
-	}
+
 	http.Redirect(w, r, "/vault-dashboard?message=user-saved", http.StatusSeeOther)
 }
 
@@ -176,19 +157,11 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := strings.TrimSpace(r.FormValue("userId"))
-	target, err := s.store.UserByID(r.Context(), userID)
-	if err != nil {
+	if err := s.deleteManagedUser(r.Context(), admin, userID); err != nil {
 		writeStorageError(w, err)
 		return
 	}
-	if target.ID == admin.ID || target.Role == storage.UserRoleAdmin {
-		writeStorageError(w, fmt.Errorf("%w: admin users cannot be deleted", storage.ErrBadRequest))
-		return
-	}
-	if err := s.store.DeleteUser(r.Context(), userID); err != nil {
-		writeStorageError(w, err)
-		return
-	}
+
 	http.Redirect(w, r, "/vault-dashboard?message=user-deleted", http.StatusSeeOther)
 }
 
@@ -297,25 +270,6 @@ func writeZipFile(writer *zip.Writer, blobPath string, vaultPath string) error {
 	}
 	_, err = io.Copy(entry, source)
 	return err
-}
-
-func dashboardMessage(code string) string {
-	switch code {
-	case "api-key-rotated":
-		return "A new API key was generated. Update the key in every connected app."
-	case "user-saved":
-		return "User settings were saved."
-	case "user-deleted":
-		return "User deleted."
-	case "vault-deleted":
-		return "Vault deleted."
-	case "vault-restored":
-		return "Vault restored."
-	case "vault-purged":
-		return "Vault permanently deleted."
-	default:
-		return ""
-	}
 }
 
 func sanitizeFilename(value string) string {

@@ -1,10 +1,10 @@
+name: nox-backend
+
 services:
-  nox-backend:
+  backend:
     image: ghcr.io/mapherez/nox-backend:${NOX_BACKEND_IMAGE_TAG:-latest}
     container_name: nox-backend
     restart: unless-stopped
-    ports:
-      - "5710:8080"
     environment:
       NOX_BACKEND_VERSION: "${NOX_BACKEND_VERSION:-${NOX_SYNC_VERSION:-}}"
       NOX_BACKEND_ADDR: "${NOX_BACKEND_ADDR:-${NOX_SYNC_ADDR:-:8080}}"
@@ -15,6 +15,17 @@ services:
       NOX_BACKEND_ADMIN_EMAILS: "${NOX_BACKEND_ADMIN_EMAILS:-${NOX_SYNC_ADMIN_EMAILS:-}}"
     volumes:
       - nox-backend-data:/data
+
+  frontend:
+    image: ghcr.io/mapherez/nox-backend-frontend:${NOX_FRONTEND_IMAGE_TAG:-${NOX_BACKEND_IMAGE_TAG:-latest}}
+    restart: unless-stopped
+    ports:
+      - "${NOX_FRONTEND_PORT:-5710}:8080"
+    environment:
+      NOX_FRONTEND_BACKEND_URL: "${NOX_FRONTEND_BACKEND_URL:-http://backend:8080}"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   nox-backend-data:

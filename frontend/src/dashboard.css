@@ -11,13 +11,7 @@
   --accent-soft: #e9f5f2;
   --danger: #ab343d;
   --danger-bg: #fff0f0;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {

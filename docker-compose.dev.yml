@@ -1,12 +1,12 @@
+name: nox-backend-dev
+
 services:
-  nox-backend:
+  backend:
     build:
       context: ./backend
     image: nox-backend:dev
     container_name: nox-backend-dev
     restart: unless-stopped
-    ports:
-      - "5710:8080"
     environment:
       NOX_BACKEND_VERSION: "${NOX_BACKEND_VERSION:-${NOX_SYNC_VERSION:-}}"
       NOX_BACKEND_ADDR: "${NOX_BACKEND_ADDR:-${NOX_SYNC_ADDR:-:8080}}"
@@ -17,3 +17,16 @@ services:
       NOX_BACKEND_ADMIN_EMAILS: "${NOX_BACKEND_ADMIN_EMAILS:-${NOX_SYNC_ADMIN_EMAILS:-}}"
     volumes:
       - ./data:/data
+
+  frontend:
+    build:
+      context: ./frontend
+    image: nox-backend-frontend:dev
+    restart: unless-stopped
+    ports:
+      - "${NOX_FRONTEND_PORT:-5710}:8080"
+    environment:
+      NOX_FRONTEND_BACKEND_URL: "${NOX_FRONTEND_BACKEND_URL:-http://backend:8080}"
+    depends_on:
+      backend:
+        condition: service_healthy

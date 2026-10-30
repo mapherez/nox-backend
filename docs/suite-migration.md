@@ -19,8 +19,8 @@ Work stops after each numbered point until the owner approves the next one.
 
 | Point | Work | State |
 | --- | --- | --- |
-| 1 | Record the existing baseline and consume SDK `0.7.0` | Implemented and locally validated; awaiting owner approval to proceed |
-| 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Pending |
+| 1 | Record the existing baseline and consume SDK `0.7.0` | Completed and approved to proceed |
+| 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Implemented and locally validated; awaiting owner approval for point 3 |
 | 3 | Complete administration APIs and retain native frontend functionality | Pending |
 | 4 | Implement persistent service trust and pairing | Pending |
 | 5 | Implement registry and durable events | Pending |
@@ -95,5 +95,52 @@ TMPDIR=/private/tmp/nox-backend-release-tests node --test scripts/release.test.m
 Release script portability remains recorded for point 8; no release script or
 workflow was changed in point 1. These local results do not claim GitHub CI
 approval, multi-architecture image validation, or completed Suite service flows.
-Pairing, registry, issuance, Suite MCP, and frontend separation are still pending
-in their respective numbered points. No application release was created.
+At the end of point 1, pairing, registry, issuance, Suite MCP and frontend
+separation were still pending. The point 2 record below describes subsequent
+progress. No application release was created by these local checks.
+
+## Point 2 implementation
+
+The owner selected **React + TypeScript + Vite+** for the Backend native frontend.
+Presentation now lives in `frontend/`, with its own lockfile and build/image;
+Backend contains no UI templates/assets. Existing CSS, native form routes, session
+cookies, login URLs, key/vault/user controls and downloads remain available.
+The native frontend remains permanent; Portal is separate. Shared Go operations
+retain administrative permission rules independently of the presentation.
+
+Compose groups `backend` and `frontend` in one project. The frontend forwards the
+existing public routes and consumes a session-filtered dashboard data endpoint.
+Public APIs, direct MCP, sync, data migrations, and their ownership rules retain
+their behavior. Full JSON administration API work remains point 3. Deployment,
+independent frontend publication and migration boundaries are documented in the
+[frontend guide](frontend-deployment.md). No installed deployment is migrated by
+this source change.
+
+### Point 2 validation results
+
+- Backend: 69 top-level tests, 183 passing results including subtests/fuzz seeds,
+  with the race detector; `go vet` passed.
+- Frontend: Vite+ format/lint/type checks, six behavior tests and production build
+  passed. React `19.3.1`, TypeScript `7.0.2` and Vite+ `1.4.0` are locked.
+- Release tooling: 40 tests passed with the canonical temporary path described
+  above. CI/release jobs now account for both components; frontend-only publication
+  is a separate manual workflow and does not build/publish Backend.
+- Both Dockerfiles built locally. Disposable-container checks passed for private
+  session views, role/ownership isolation, exact int64 presentation, public origin
+  and OAuth redirect, native forms, API/MCP forwarding, unbuffered sync SSE and
+  frontend-only replacement on the same public port without recreating Backend
+  or changing vault state. Executable healthchecks passed and proxy logs were
+  checked to exclude both users' test API keys.
+- Three Chromium workflows passed: anonymous/mobile login view; admin credentials,
+  account changes, ZIP download, vault deletion/restoration, key rotation/logout;
+  and the non-admin frontend. Desktop rendering was visually inspected.
+- Production/development Compose configurations were resolved and checked for the
+  two services, the preserved public port and backend-only storage/configuration.
+
+These are local implementation checks. Real Google account login, the unnamed
+external product's complete frontend flow, installed-data rollout, remote GitHub
+CI and multi-architecture publication remain delivery validation in point 8.
+The Google redirect and real Backend session/form behavior were exercised here;
+the browser tests use sessions seeded only in a disposable, stopped database.
+Points 3–8 remain pending. No commit, push, image publication or installed service
+migration was performed as part of point 2.

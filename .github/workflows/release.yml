@@ -62,6 +62,21 @@ jobs:
         working-directory: backend
         run: go test ./...
 
+      - name: Install and validate frontend
+        run: |
+          npm ci --prefix frontend
+          npm run check --prefix frontend
+          npm test --prefix frontend
+
+      - name: Validate native split images and browser workflows before publication
+        run: |
+          docker build --build-arg VERSION="$RELEASE_TAG" -t nox-backend:release-check ./backend
+          docker build -t nox-backend-frontend:release-check ./frontend
+          cd frontend
+          npx playwright install --with-deps chromium
+          cd ..
+          python3 scripts/check-split-deployment.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check --browser
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -81,6 +96,12 @@ jobs:
           RELEASE_REVISION: ${{ github.sha }}
         run: node scripts/release-metadata.mjs "$RELEASE_TAG"
 
+      - name: Generate independent frontend image metadata
+        id: frontend_metadata
+        env:
+          RELEASE_REVISION: ${{ github.sha }}
+        run: node scripts/release-metadata.mjs "$RELEASE_TAG" frontend
+
       - name: Build and push backend image
         uses: docker/build-push-action@v7
         with:
@@ -91,6 +112,15 @@ jobs:
             VERSION=${{ github.ref_name }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.frontend_metadata.outputs.tags }}
+          labels: ${{ steps.frontend_metadata.outputs.labels }}
 
       - name: Create GitHub Release with generated notes
         uses: actions/github-script@v8

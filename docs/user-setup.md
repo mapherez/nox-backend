@@ -60,7 +60,7 @@ After `ghcr.io/mapherez/nox-backend:latest` has been published, start the servic
 docker compose up -d
 ```
 
-For new installations, the service is named `nox-backend`. Host port `5710` maps to container port `8080`. The default volume is `nox-backend-data`. Existing installations must preserve their actual data volume; both `NOX_BACKEND_DATA_VOLUME_NAME` and the legacy `NOX_SYNC_DATA_VOLUME_NAME` are supported.
+For new split installations, `backend` and `frontend` are services of the `nox-backend` project. Host port `5710` maps to the frontend, which forwards API/auth/MCP requests to the internal Backend port `8080`. The frontend image must come from a release containing this separation; use the development Compose file while validating unreleased source. The default volume is `nox-backend-data`. Existing installations must preserve their actual data volume; both `NOX_BACKEND_DATA_VOLUME_NAME` and the legacy `NOX_SYNC_DATA_VOLUME_NAME` are supported.
 
 ## Open the dashboard
 
@@ -94,7 +94,7 @@ cd nox-backend
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The development configuration builds `./backend` and mounts `./data` to `/data`. Use separate test data rather than a production data directory.
+The development configuration builds `./backend` and `./frontend` independently and mounts `./data` to `/data` only in the backend container. Use separate test data rather than a production data directory.
 
 For Go development and all environment variables, see the [README](../README.md) and [backend configuration](backend-configuration.md).
 Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching

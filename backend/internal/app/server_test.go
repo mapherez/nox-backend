@@ -59,7 +59,7 @@ func TestStatusEndpointAcceptsActiveAPIKey(t *testing.T) {
 	}
 }
 
-func TestAdminPageShowsReusableAPIKey(t *testing.T) {
+func TestDashboardDataIncludesReusableAPIKey(t *testing.T) {
 	server, store, user, _ := newTestServer(t)
 	apiKey, err := store.CurrentAPIKey(context.Background(), user.ID)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestAdminPageShowsReusableAPIKey(t *testing.T) {
 		t.Fatalf("create web session: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/vault-dashboard", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/dashboard", nil)
 	req.Host = "localhost:8080"
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sessionToken})
 	res := httptest.NewRecorder()

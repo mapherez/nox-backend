@@ -17,3 +17,11 @@ data/
 Thumbs.db
 .idea/
 .vscode/
+
+# Frontend toolchain output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vite-plus/
+frontend/test-results/
+frontend/playwright-report/
