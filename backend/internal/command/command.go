@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -18,7 +19,12 @@ func Run(buildVersion string) error {
 		if len(os.Args) == 2 {
 			switch os.Args[1] {
 			case "healthcheck":
-				return checkHealth(context.Background(), getenv("NOX_SYNC_ADDR", ":8080"))
+				origin, _ := url.Parse(getenv("NOX_SYNC_PUBLIC_URL", ""))
+				name := ""
+				if origin != nil {
+					name = origin.Hostname()
+				}
+				return checkHealthTLS(context.Background(), getenv("NOX_SYNC_ADDR", ":8080"), getenv("NOX_SYNC_TLS_CERT_FILE", "") != "", name, getenv("NOX_SYNC_TLS_CA_FILE", ""))
 			case "migrate-database":
 				return storage.MigrateDatabaseFile(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
 			}
@@ -33,6 +39,10 @@ func Run(buildVersion string) error {
 		GoogleClientID:     getenv("NOX_SYNC_GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getenv("NOX_SYNC_GOOGLE_CLIENT_SECRET", ""),
 		AdminEmails:        splitCSV(getenv("NOX_SYNC_ADMIN_EMAILS", "")),
+		TLSCertFile:        getenv("NOX_SYNC_TLS_CERT_FILE", ""), TLSKeyFile: getenv("NOX_SYNC_TLS_KEY_FILE", ""),
+		SuiteAllowedCIDRs:      splitCSV(getenv("NOX_SYNC_SUITE_ALLOWED_CIDRS", "")),
+		SuiteAllowedPorts:      splitCSV(getenv("NOX_SYNC_SUITE_ALLOWED_PORTS", "443")),
+		SuiteTrustedProxyCIDRs: splitCSV(getenv("NOX_SYNC_SUITE_TRUSTED_PROXY_CIDRS", "")),
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

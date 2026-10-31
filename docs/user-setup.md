@@ -79,8 +79,10 @@ changes there and must be managed through deployment configuration.
 Admins can use **Service connections** to save the approved HTTPS origin of Yard
 and Gateway, for example `https://192.168.10.10:8443` or a dedicated hostname.
 Do not include an application path. This configuration survives restart and needs
-no additional environment variables. A saved address shows **Awaiting pairing**:
-service trust, pairing and registration are subsequent implementation points.
+no additional environment variables for address storage alone. It initially shows
+**Awaiting pairing**. [Suite trust](suite-trust.md) provides the authenticated pairing
+APIs and requires approved HTTPS/network configuration. An acknowledged service
+shows **Service paired · Registration pending**; registration is point 5.
 Saving does not contact the service or establish a working connection. If another
 administrator changes the configuration, refresh/review before saving again.
 See the [administration API](administration-api.md) for equivalent API operations.

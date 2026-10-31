@@ -348,7 +348,15 @@ func (s *Server) foundationConnectionViews(ctx context.Context) ([]connectionVie
 	for i := range result {
 		for _, item := range saved {
 			if result[i].Service == item.Service {
-				result[i] = connectionView{item, "not_paired"}
+				purpose := "gateway"
+				if item.Service == "yard" {
+					purpose = "installer"
+				}
+				state, err := s.store.SuiteFoundationStatus(ctx, purpose, item.Origin)
+				if err != nil {
+					return nil, err
+				}
+				result[i] = connectionView{item, state}
 			}
 		}
 	}

@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -82,9 +84,29 @@ func TestFoundationConnectionPersistsAndConcurrentEditsDoNotOverwrite(t *testing
 func TestAdditiveConnectionMigrationPreservesInstalledBaseline(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := Open(ctx, dir)
+	db, err := sql.Open("sqlite", filepath.Join(dir, DatabaseFileName))
 	if err != nil {
 		t.Fatal(err)
+	}
+	store := &Store{db: db, dataDir: dir, dbPath: filepath.Join(dir, DatabaseFileName)}
+	if err := store.configure(ctx); err != nil {
+		t.Fatal(err)
+	}
+	migrations, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, migration := range migrations[:3] {
+		body, err := migrationFiles.ReadFile(migration.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, string(body)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, `INSERT INTO schema_migrations VALUES (?,?,'baseline')`, migration.version, migration.name); err != nil {
+			t.Fatal(err)
+		}
 	}
 	defer func() { _ = store.Close() }()
 	seedTestUserAndVault(t, store)
@@ -98,10 +120,6 @@ func TestAdditiveConnectionMigrationPreservesInstalledBaseline(t *testing.T) {
 	}
 	var history string
 	if err := store.db.QueryRowContext(ctx, `SELECT group_concat(version || ':' || name || ':' || applied_at) FROM schema_migrations WHERE version <= 3`).Scan(&history); err != nil {
-		t.Fatal(err)
-	}
-	// Reconstruct the actual pre-point-3 schema in this disposable fixture only.
-	if _, err := store.db.ExecContext(ctx, `DROP TABLE foundation_connections; DELETE FROM schema_migrations WHERE version = 4;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Close(); err != nil {

@@ -315,3 +315,28 @@ test("an older Backend without management capabilities does not break the indepe
   for (const button of screen.getAllByRole("button", { name: "Delete user" }))
     expect((button as HTMLButtonElement).disabled).toBe(true);
 });
+
+test("foundation trust states do not claim registry or MCP readiness", () => {
+  const connection = {
+    service: "gateway" as const,
+    origin: "https://gateway.example.com",
+    revision: "connection_current",
+    updatedAt: "",
+  };
+  const { rerender } = render(
+    <DashboardView data={{ ...data, connections: [{ ...connection, status: "paired" }] }} />,
+  );
+  expect(screen.getByText("Service paired · Registration pending")).toBeTruthy();
+  rerender(
+    <DashboardView
+      data={{ ...data, connections: [{ ...connection, status: "recovery_required" }] }}
+    />,
+  );
+  expect(screen.getByText("Service credential recovery required")).toBeTruthy();
+  rerender(
+    <DashboardView
+      data={{ ...data, connections: [{ ...connection, status: "pairing_pending" }] }}
+    />,
+  );
+  expect(screen.getByText("Pairing pending · Awaiting service confirmation")).toBeTruthy();
+});

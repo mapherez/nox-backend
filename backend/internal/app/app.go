@@ -15,13 +15,15 @@ import (
 
 // Config contains the minimal backend runtime configuration.
 type Config struct {
-	Addr               string
-	DataDir            string
-	Version            string
-	PublicURL          string
-	GoogleClientID     string
-	GoogleClientSecret string
-	AdminEmails        []string
+	Addr                                                         string
+	DataDir                                                      string
+	Version                                                      string
+	PublicURL                                                    string
+	GoogleClientID                                               string
+	GoogleClientSecret                                           string
+	AdminEmails                                                  []string
+	TLSCertFile, TLSKeyFile                                      string
+	SuiteAllowedCIDRs, SuiteAllowedPorts, SuiteTrustedProxyCIDRs []string
 }
 
 // Run starts the backend HTTP server.
@@ -36,6 +38,9 @@ func Run(ctx context.Context, cfg Config) error {
 		cfg.Version = "dev"
 	}
 
+	if err := validateSuiteConfig(cfg); err != nil {
+		return err
+	}
 	if err := ensureDataDirs(cfg.DataDir); err != nil {
 		return err
 	}
@@ -57,6 +62,20 @@ func Run(ctx context.Context, cfg Config) error {
 	serverCtx, stopServer := context.WithCancel(ctx)
 	defer stopServer()
 	go server.monitorStaleLocks(serverCtx)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-serverCtx.Done():
+				return
+			case <-ticker.C:
+				if err := store.MaintainSuiteTrust(serverCtx); err != nil && serverCtx.Err() == nil {
+					log.Printf("Suite trust housekeeping failed")
+				}
+			}
+		}
+	}()
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
@@ -67,7 +86,11 @@ func Run(ctx context.Context, cfg Config) error {
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("nox-backend listening on %s data_dir=%s", cfg.Addr, cfg.DataDir)
-		errCh <- httpServer.ListenAndServe()
+		if cfg.TLSCertFile != "" {
+			errCh <- httpServer.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			errCh <- httpServer.ListenAndServe()
+		}
 	}()
 
 	select {

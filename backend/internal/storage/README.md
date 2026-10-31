@@ -59,3 +59,15 @@ Vault delete is soft by default:
 Permanent delete removes the deleted vault row and cascades its vault-scoped metadata. After the transaction commits, storage cleanup removes finalized blob files that are no longer referenced by any remaining file or revision metadata.
 
 Shared content-addressed blobs remain on disk if any remaining vault still references the same SHA-256 hash.
+
+
+## Suite trust storage
+
+Migration 5 adds persistent issuer/public-key metadata, service credential
+verifiers and generations, associations, pairing/idempotency recovery handles,
+installer deployment grants and transactional invalidation records. It does not
+reset account/vault data. Private Suite material is stored as AES-256-GCM files
+under `/data/secrets/suite` (0700 directory, 0600 files/master key), not plaintext
+in SQLite or raw idempotency outcomes. The secret-store master key is never
+silently regenerated for an existing authority. Back up SQLite/WAL and the entire
+secret store together. See [Suite trust](../../../docs/suite-trust.md).

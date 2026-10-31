@@ -87,6 +87,12 @@ def main():
             for asset in ['dashboard.js','dashboard.css','favicon.svg']:
                 status,_,body=request(base,'/vault-dashboard/assets/'+asset);assert status==200 and body,asset
             assert request(backend_base,'/vault-dashboard/assets/dashboard.js')[0]==404
+            # Neither public HTTP nor forged forwarding headers establish Suite TLS trust.
+            for endpoint in [base,backend_base]:
+                status,headers,body=request(endpoint,'/api/nox/keys',headers={'X-Forwarded-Proto':'https','X-Nox-Suite-Transport':'https'})
+                assert status==403 and json.loads(body)['error']['code']=='FORBIDDEN'
+                assert headers['Cache-Control']=='no-store'
+
             status,headers,body=request(base,'/api/dashboard');view=json.loads(body);assert status==200 and not view['authenticated'] and not view['apiKey'];assert headers['Cache-Control']=='no-store'
             status,_,body=request(base,'/api/dashboard',headers=cookie);view=json.loads(body);assert status==200, ('dashboard HTTP',status);assert view['apiKey']==api_key, ('session/key projection',view['authenticated']);assert view['isAdmin'], 'admin projection';assert view['serverUrl']==base, ('public origin',view['serverUrl'],base)
             status,_,body=request(base,'/api/dashboard',headers={**cookie,'X-Forwarded-Proto':'https'});assert json.loads(body)['serverUrl']==base.replace('http:','https:')

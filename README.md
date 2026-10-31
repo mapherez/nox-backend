@@ -458,6 +458,7 @@ node --test scripts/release.test.mjs
 - [Suite migration status and compatibility baseline](docs/suite-migration.md)
 - [Frontend development, split deployment and migration](docs/frontend-deployment.md)
 - [Administration API and initial foundation configuration](docs/administration-api.md)
+- [Suite authority, secure pairing, service credentials and recovery](docs/suite-trust.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

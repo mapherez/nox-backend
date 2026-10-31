@@ -2,7 +2,7 @@
 
 Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.9`; point-3 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.10`; these point-4 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -21,8 +21,8 @@ Work stops after each numbered point until the owner approves the next one.
 | --- | --- | --- |
 | 1 | Record the existing baseline and consume SDK `0.7.0` | Completed and approved to proceed |
 | 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Completed; owner confirmed split deployment working and authorized point 3 |
-| 3 | Complete administration APIs and retain native frontend functionality | Completed and locally validated; awaiting owner approval for point 4 |
-| 4 | Implement persistent service trust and pairing | Pending |
+| 3 | Complete administration APIs and retain native frontend functionality | Completed; owner confirmed operation and authorized point 4 |
+| 4 | Implement persistent service trust and pairing | Completed and locally validated; awaiting owner approval for point 5 |
 | 5 | Implement registry and durable events | Pending |
 | 6 | Implement authorization issuance | Pending |
 | 7 | Adapt Backend as a Suite product | Pending |
@@ -223,3 +223,58 @@ configured-manager/self protection, denial for ordinary admins, configuration
 changes, legacy browser compatibility and access invalidation on deletion.
 An older Backend missing capability fields keeps the frontend usable with account
 management disabled and an update diagnostic; its behavior has a React test.
+
+
+## Point 4 implementation
+
+[Suite trust](suite-trust.md) implements the persistent Backend issuer, ES256
+public/signing-key lifecycle, scoped technical credentials, HMAC pairing,
+verified/pinned HTTPS declarations, encrypted restart/lost-response recovery,
+acknowledgment, rotation/revocation, authorized installer deployment bindings and
+conditional/idempotent state changes. It uses SDK 0.7.0 wire types/validators and
+crypto helpers for any conforming product, without a hardcoded product catalog.
+
+Migration 5 is additive in the same database/volume. Suite private material lives
+in the separate encrypted file store under `/data/secrets/suite`; SQLite holds
+verifiers/opaque handles. Missing secret-store material fails closed. Full `/data`
+backup now includes both the database and those files. Clock safety, expiry and
+current caller authority are checked independently of housekeeping.
+
+The existing UI/client APIs retain their operation. New Suite secret-bearing
+routes require approved HTTPS/proxy/network policy. Frontend rejects forged TLS
+claims on its public HTTP listener and projects actual trust/recovery states.
+A paired service is explicitly shown with registration pending. Native pairing
+controls/delivery integration remain under point 8; the trust management APIs are
+available independently of Portal. Durable trust invalidations commit with their
+mutations; their public event delivery and the registry remain point 5.
+
+CI/release Go tests now use the race detector; CI also runs full vet. No release,
+version bump, push or installed deployment change is performed by this work.
+Point 5 is not started; work stops after this point for owner approval.
+
+
+### Point 4 validation results
+
+- All 105 top-level Go tests passed with the race detector (241 passing results
+  including subtests/fuzz seeds); full `go vet` and formatting checks passed.
+- The published SDK verifies an actual delegation fixture signed by the persisted
+  ES256 key. Real HTTPS tests cover valid pairing, wrong pins/identities/origins,
+  redirects, current caller/grant enforcement, restart and lost-response recovery.
+- Storage tests cover competing completions, conditional/idempotent writes,
+  credential overlap/ack/expiry, full-generation service revocation, key rotation,
+  erased recovery material, missing-master fail-closed behavior, clock rollback,
+  authorized installer deployments and atomic rollback after an injected event
+  write failure. Historical migration/data-preservation tests still pass.
+- Frontend lint/types/format/build and 15 React tests passed. Both candidate images
+  built; all three Chromium workflows and the existing split-deployment tests passed,
+  including admin-manager controls, API/MCP, sync streaming and frontend replacement.
+- The additional image-level TLS test passed through an actual HTTPS proxy with
+  explicit proxy IP trust; forged/direct HTTP claims were rejected, issuer/keys
+  survived a container restart, and direct Backend TLS plus its packaged HTTPS
+  healthcheck passed. CI and release workflows run this test as a required check.
+  The frontend-only publication workflow also validates its own startup, built
+  dashboard/assets and rejection of forged TLS claims without building a Backend.
+- Workflow/Compose YAML, local documentation links and diff whitespace were checked.
+  No installed deployment, real service credential, Google account, GitHub release
+  or remote workflow was changed/executed by these validations. Full actual-product
+  rollout remains point 8. Point 5 remains pending.

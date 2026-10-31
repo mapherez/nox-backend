@@ -280,8 +280,9 @@ func TestFoundationConnectionConfigurationIsNotTrust(t *testing.T) {
 	update["If-Match"] = response.Header().Get("ETag")
 	administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", update), 200)
 	administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", update), 412)
-	// There are no dummy registry, pairing, or authorization implementations in point 3.
-	for _, path := range []string{"/api/nox/pairings", "/api/nox/authorizations", "/api/nox/registry"} {
+	// Registry and issuance remain absent; trust pairing now requires HTTPS.
+	administrationStatus(t, administrationRequest(t, s, "POST", "/api/nox/pairings", `{}`, auth), 403)
+	for _, path := range []string{"/api/nox/authorizations", "/api/nox/registry"} {
 		administrationStatus(t, administrationRequest(t, s, "POST", path, `{}`, auth), 404)
 	}
 }

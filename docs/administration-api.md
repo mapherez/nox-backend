@@ -111,14 +111,17 @@ contract. Each entry contains `service`, `origin`, `revision`, `updatedAt` and:
 
 - `not_configured`: no saved address, with empty origin/revision/timestamp.
 - `not_paired`: address saved; no trust or connection success is implied.
+- `pairing_pending`: awaiting the service's completed/persisted provisioning.
+- `paired`: technical association acknowledged; registry membership remains pending.
+- `recovery_required`: association retained but no usable credential generation.
 
 Origin validation reuses SDK `NormalizeSuiteOrigin`: HTTPS IP/hostname with an
 optional port or dedicated domain, with root slash normalized. Credentials,
 queries, fragments, `/apps/...` and other base paths are rejected. Saving does
 not resolve DNS, fetch a declaration, probe a service, install a pin, provision a
-credential or register a product. Target network policy/TLS verification and
-pairing belong to the subsequent trust/registry implementation. No credential is
-sent to a target by these APIs. No pairing secret is stored in this table.
+credential or register a product. [Suite trust APIs](suite-trust.md) now implement
+network/TLS verification, pairing and credential lifecycle separately. No credential
+is sent to a target by these address APIs. No pairing secret is stored in this table.
 
 Create with `If-None-Match: *`. Change/remove with `If-Match: "<revision>"` using
 the current entry's opaque revision. PUT also returns that quoted value in ETag.
@@ -126,9 +129,9 @@ Missing/invalid preconditions return 428; stale edits, duplicate creation and
 stale/deleted revisions return 412. Refresh and review before retrying; never
 silently overwrite another administrator's change. A successful save generates
 a fresh revision; removing and recreating configuration never recycles one.
-Removing intent here does not uninstall a product or pretend to revoke a future
-paired association. Pairing/association lifecycle will be implemented under its
-own approved contract in points 4–5.
+Removing the saved address does not uninstall a product or revoke a paired
+association. Use the [trust APIs](suite-trust.md) for credential/service revocation;
+registry membership remains separate work in point 5.
 
 Example creation from the same-origin browser session:
 
@@ -190,5 +193,6 @@ A frontend-only rollback to a compatible UI does not roll back the database.
 
 CI and release workflows already run all Go tests, frontend checks/tests and the
 real split-image/browser checks. The point-3 tests run through those existing
-jobs. Pairing/trust (4), registry/events (5), issuance (6), Suite product adaptation
-(7) and complete delivery validation (8) remain separate pending work.
+jobs. [Pairing/trust (4)](suite-trust.md) is now implemented separately.
+Registry/events (5), issuance (6), Suite product adaptation (7) and complete delivery
+validation (8) remain pending.

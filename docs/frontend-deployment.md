@@ -27,8 +27,10 @@ view. Only required presentation fields are projected; Google subjects are absen
 The [administration JSON API](administration-api.md) supplies account/role,
 personal-key, vault and foundation-configuration operations. React uses those
 APIs for changes; existing browser form and authentication routes remain usable.
-Initial Yard/Gateway addresses are persistent admin configuration, explicitly
-awaiting pairing rather than reporting an unverified connection as successful.
+Initial Yard/Gateway addresses are persistent admin configuration. Their status
+reflects [Suite pairing/credential state](suite-trust.md), distinguishing pending
+pairing, acknowledged trust with registration pending, and required recovery.
+The frontend does not report an unverified address as a successful integration.
 
 The frontend proxy has no response/request buffering for streamed API responses,
 including the existing sync SSE endpoint. Its idle read/send timeout is one day;
@@ -146,3 +148,10 @@ and removes its containers/network afterwards. It seeds sessions only in that
 disposable database. It never attaches existing application volumes. To include
 real Chromium flows, install it with `npm exec --prefix frontend -- playwright
 install chromium` and pass `--browser` to the integration script.
+
+
+Suite trust deployment adds optional HTTPS/approved-network settings and a
+frontend trusted-ingress CIDR allowlist. The native HTTP flows are preserved;
+Suite credential/proof traffic requires a trusted HTTPS boundary. See the
+[trust deployment guide](suite-trust.md#tls-deployment-choices). Migration 5 also
+requires backing up the complete secret store with SQLite for rollback/recovery.

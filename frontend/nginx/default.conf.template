@@ -4,6 +4,15 @@ map $http_x_forwarded_proto $public_scheme {
  https https;
  http http;
 }
+geo $nox_suite_ingress_trusted {
+ default 0;
+ include /tmp/nox-suite-ingress.conf;
+}
+map "$scheme:$nox_suite_ingress_trusted:$http_x_forwarded_proto" $nox_suite_transport {
+ default "";
+ ~^https: https;
+ "http:1:https" https;
+}
 server {
  access_log /dev/stdout nox;
  error_log /dev/stderr crit;
@@ -13,20 +22,6 @@ server {
  resolver 127.0.0.11 valid=5s ipv6=off;
  set $backend_origin "${NOX_FRONTEND_BACKEND_URL}";
  client_max_body_size 0;
- location = /healthz { access_log off; default_type application/json; return 200 '{"status":"ready"}'; }
- location = /vault-dashboard {
-  if ($request_method != GET) { return 405; }
-  add_header Cache-Control "no-store" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  try_files /index.html =404;
- }
- location /vault-dashboard/assets/ {
-  alias /usr/share/nginx/html/assets/;
-  add_header Cache-Control "no-cache";
-  add_header X-Content-Type-Options "nosniff" always;
- }
- location / {
-  proxy_pass $backend_origin;
   proxy_http_version 1.1;
   proxy_next_upstream off;
   proxy_ssl_verify on;
@@ -42,5 +37,28 @@ server {
   proxy_read_timeout 86400s;
   proxy_send_timeout 86400s;
   proxy_redirect off;
+ proxy_set_header X-Nox-Suite-Transport $nox_suite_transport;
+ location = /healthz { access_log off; default_type application/json; return 200 '{"status":"ready"}'; }
+ location = /vault-dashboard {
+  if ($request_method != GET) { return 405; }
+  add_header Cache-Control "no-store" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  try_files /index.html =404;
+ }
+ location /vault-dashboard/assets/ {
+  alias /usr/share/nginx/html/assets/;
+  add_header Cache-Control "no-cache";
+  add_header X-Content-Type-Options "nosniff" always;
+ }
+ location /api/nox/ {
+  default_type application/json;
+  proxy_hide_header Cache-Control;
+  add_header Cache-Control "no-store" always;
+  if ($nox_suite_transport = "") { return 403 '{"error":{"code":"FORBIDDEN","message":"Suite trust requires a trusted HTTPS ingress.","retryable":false}}'; }
+  proxy_pass $backend_origin;
+ }
+ location / {
+  proxy_pass $backend_origin;
+
  }
 }

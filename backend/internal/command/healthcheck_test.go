@@ -2,10 +2,12 @@ package command
 
 import (
 	"context"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -109,5 +111,28 @@ func TestRunHealthcheck(t *testing.T) {
 	t.Setenv("NOX_BACKEND_ADDR", "invalid")
 	if err := Run("test"); err == nil {
 		t.Fatal("healthcheck command should return probe failures")
+	}
+}
+
+func TestHealthcheckTLSValidatesConfiguredCertificate(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/health" {
+			t.Error("wrong TLS health path")
+		}
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+	ca := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(ca, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkHealthTLS(context.Background(), server.Listener.Addr().String(), true, "", ca); err != nil {
+		t.Fatal("configured certificate did not verify", err)
+	}
+	if err := checkHealthTLS(context.Background(), server.Listener.Addr().String(), true, "wrong.invalid", ca); err == nil {
+		t.Fatal("wrong TLS server name passed healthcheck")
+	}
+	if err := checkHealthTLS(context.Background(), server.Listener.Addr().String(), true, "", ""); err == nil {
+		t.Fatal("unknown certificate passed healthcheck")
 	}
 }

@@ -60,7 +60,7 @@ jobs:
 
       - name: Test backend
         working-directory: backend
-        run: go test ./...
+        run: go test -race ./...
 
       - name: Install and validate frontend
         run: |
@@ -76,6 +76,9 @@ jobs:
           npx playwright install --with-deps chromium
           cd ..
           python3 scripts/check-split-deployment.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check --browser
+
+      - name: Verify Suite TLS trust boundary
+        run: python3 scripts/check-suite-proxy.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4

@@ -10,6 +10,7 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.29-alpine
 ENV NOX_FRONTEND_BACKEND_URL=http://backend:8080
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 nginx/19-suite-trusted-ingress.sh /docker-entrypoint.d/19-suite-trusted-ingress.sh
 COPY --from=build /src/dist /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1

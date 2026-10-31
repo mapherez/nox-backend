@@ -11,15 +11,21 @@ function Connection({ connection }: { connection: FoundationConnection }) {
     <div className="connection-card">
       <h3>{name}</h3>
       <p className="muted">
-        {connection.status === "not_configured"
-          ? "Not configured"
-          : "Configuration saved · Awaiting pairing"}
+        {
+          {
+            not_configured: "Not configured",
+            not_paired: "Configuration saved · Awaiting pairing",
+            pairing_pending: "Pairing pending · Awaiting service confirmation",
+            paired: "Service paired · Registration pending",
+            recovery_required: "Service credential recovery required",
+          }[connection.status]
+        }
       </p>
       <MutationForm
         path={path}
         method="PUT"
         headers={headers}
-        message={`${name} configuration saved. Pairing is still required.`}
+        message={`${name} configuration saved.`}
       >
         <div className="form-row">
           <div className="field grow">
@@ -63,8 +69,8 @@ export function Connections({ connections }: { connections: FoundationConnection
         dedicated hostname is supported, without an application path.
       </p>
       <p className="muted">
-        Saving an address does not contact or trust the service. Pairing and connection verification
-        are not available yet.
+        Saving an address does not contact or trust the service. Pairing uses the authenticated
+        Suite management API; registration and MCP readiness are separate.
       </p>
       {connections.map((connection) => (
         <Connection key={`${connection.service}:${connection.revision}`} connection={connection} />

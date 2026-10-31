@@ -15,17 +15,19 @@ const sessionCookieName = "nox_sync_session"
 
 // Server owns HTTP routing for the backend.
 type Server struct {
-	cfg    Config
-	store  *storage.Store
-	events *statusBroker
+	cfg         Config
+	store       *storage.Store
+	events      *statusBroker
+	suiteVerify chan struct{}
 }
 
 // NewServer creates a backend server instance.
 func NewServer(cfg Config, store *storage.Store) *Server {
 	return &Server{
-		cfg:    cfg,
-		store:  store,
-		events: newStatusBroker(),
+		cfg:         cfg,
+		store:       store,
+		events:      newStatusBroker(),
+		suiteVerify: make(chan struct{}, 8),
 	}
 }
 
@@ -40,6 +42,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/api/dashboard", s.handleDashboardData)
 	s.registerAdministration(mux)
+	s.registerSuiteTrust(mux)
 	mux.HandleFunc("/vault-dashboard/api-key/rotate", s.handleRotateAPIKey)
 	mux.HandleFunc("/vault-dashboard/users/add", s.handleAddUser)
 	mux.HandleFunc("/vault-dashboard/users/status", s.handleSetUserStatus)

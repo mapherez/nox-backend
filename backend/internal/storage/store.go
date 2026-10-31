@@ -17,9 +17,12 @@ const (
 
 // Store owns access to backend metadata stored in SQLite.
 type Store struct {
-	db      *sql.DB
-	dataDir string
-	dbPath  string
+	db                             *sql.DB
+	dataDir                        string
+	dbPath                         string
+	suiteVault                     *suiteSecretVault
+	suiteClock                     func() time.Time
+	suiteWallStart, suiteMonoStart time.Time
 }
 
 // SyncStatus is the lightweight sync status shape used by the status API.
@@ -54,7 +57,8 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 
-	store := &Store{db: db, dataDir: dataDir, dbPath: dbPath}
+	started := time.Now()
+	store := &Store{db: db, dataDir: dataDir, dbPath: dbPath, suiteWallStart: started.UTC(), suiteMonoStart: started}
 	// Inspect before WAL configuration or any migration can modify this database.
 	if err := store.validateExistingSchema(ctx); err != nil {
 		_ = db.Close()
@@ -69,6 +73,10 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		return nil, err
 	}
 
+	if err := store.initializeSuiteTrust(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return store, nil
 }
 

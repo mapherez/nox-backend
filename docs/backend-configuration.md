@@ -305,3 +305,23 @@ environment variables. Saved entries remain explicitly awaiting pairing until th
 trust work is implemented. No service is contacted by saving its address.
 Migration 4 adds the configuration table without resetting existing data. Retain
 a pre-upgrade backup for rollback to a binary that predates migration 4.
+
+
+## Suite trust configuration
+
+[Suite trust and pairing](suite-trust.md) uses the same database/volume, plus
+private encrypted files under `/data/secrets/suite`. Configure explicit approved
+`NOX_BACKEND_SUITE_ALLOWED_CIDRS` and `NOX_BACKEND_SUITE_ALLOWED_PORTS` for product
+verification. The default port is 443; an empty network policy permits no fetch.
+These are deployment-wide policies for any product, not a fixed product list.
+
+Suite management requires HTTPS `NOX_BACKEND_PUBLIC_URL`, with direct Backend TLS
+(`NOX_BACKEND_TLS_CERT_FILE`, `NOX_BACKEND_TLS_KEY_FILE`, optional healthcheck
+`NOX_BACKEND_TLS_CA_FILE`) or a trusted proxy boundary
+(`NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS` and
+`NOX_FRONTEND_SUITE_TRUSTED_PROXY_CIDRS`). Proxy CIDRs default to empty. Existing
+`NOX_SYNC_*` fallback rules apply to the new Backend variables. Certificate paths
+must be mounted/readable by the process; they are not baked into an image.
+See the trust guide before configuring a proxy: a supplied forwarding header or
+private address is never sufficient on its own. These settings are optional for
+legacy/native operation and necessary for the corresponding Suite deployment.
