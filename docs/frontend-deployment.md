@@ -9,7 +9,9 @@ The future Portal is a separate application; it does not replace this frontend.
 
 The public port remains 5710 by default. The frontend serves `/vault-dashboard`
 and its assets. It forwards `/auth/*`, `/api/*`, `/v1/*`, native dashboard form
-and ZIP-download routes, `/mcp`, and other existing backend routes. It preserves
+and ZIP-download routes, `/mcp`, `/mcp/suite`, `/nox/integration`, and other
+existing backend routes. The protected [Suite MCP path](suite-product.md) uses the
+explicit trusted HTTPS boundary, independently of direct MCP. It preserves
 the public Host, forwarded protocol, cookies, authorization headers, request
 bodies, redirects and streaming responses. HTTPS Backend targets use certificate verification with the image CA bundle;
 install the deployment CA bundle when using a private CA. Forwarded requests

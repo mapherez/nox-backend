@@ -15,6 +15,7 @@ import (
 
 // Config contains the minimal backend runtime configuration.
 type Config struct {
+	DirectMCPDisabled, SuiteMCPEnabled                           bool
 	Addr                                                         string
 	DataDir                                                      string
 	Version                                                      string

@@ -68,15 +68,21 @@ func (s *Server) mcpHandler() (http.Handler, error) {
 	}), nil
 }
 
-func newBackendMCP(version string, tools []noxmcp.Tool) (*noxmcp.Runtime, error) {
+func setBackendCLIMetadata(tools []noxmcp.Tool) error {
 	paths := map[string]bool{}
 	for i := range tools {
 		path := strings.TrimSpace(cliPaths[tools[i].Name])
 		if path == "" || strings.HasPrefix(path, "backend ") || paths[path] {
-			return nil, fmt.Errorf("tool %q requires a unique app-local _meta.cli mapping", tools[i].Name)
+			return fmt.Errorf("tool %q requires a unique app-local _meta.cli mapping", tools[i].Name)
 		}
 		paths[path] = true
 		tools[i].Meta = map[string]any{"cli": path}
+	}
+	return nil
+}
+func newBackendMCP(version string, tools []noxmcp.Tool) (*noxmcp.Runtime, error) {
+	if err := setBackendCLIMetadata(tools); err != nil {
+		return nil, err
 	}
 	return noxmcp.New(noxmcp.Options{AppID: serviceName, Name: serviceName, Version: version, Tools: tools})
 }
@@ -120,6 +126,17 @@ func backendTool[I, O any](definition noxmcp.Tool, authenticated bool, execute f
 		}
 		output, err := execute(ctx, user, input)
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				code := "CANCELLED"
+				if errors.Is(err, context.DeadlineExceeded) {
+					code = "TIMEOUT"
+				}
+				failure := &noxmcp.Error{Code: code, Message: "The request ended before a confirmed result.", Retryable: definition.ReadOnly}
+				if !definition.ReadOnly {
+					failure.Details = map[string]any{"outcome": "unknown"}
+				}
+				return nil, failure
+			}
 			return nil, mcpBackendError(err)
 		}
 		data, err = json.Marshal(output)
@@ -159,7 +176,13 @@ func mcpResultIntegers(value any) any {
 }
 
 func mcpBackendError(err error) *noxmcp.Error {
+	var authorityError *storage.SuiteError
+	if errors.As(err, &authorityError) && (authorityError.Status == 401 || authorityError.Status == 403) {
+		return &noxmcp.Error{Code: "FORBIDDEN", Message: "The Suite authorization is no longer active."}
+	}
 	switch {
+	case errors.Is(err, storage.ErrForbidden):
+		return &noxmcp.Error{Code: "FORBIDDEN", Message: "This operation is not authorized."}
 	case errors.Is(err, storage.ErrBadRequest):
 		return &noxmcp.Error{Code: "BAD_REQUEST", Message: err.Error()}
 	case errors.Is(err, storage.ErrNotFound):

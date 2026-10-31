@@ -4,8 +4,8 @@ Backend point 6 implements the [approved Gateway/integration contract](suite-mig
 using NoX MCP SDK 0.7.0 and wire version 1.0. It uses the persistent
 [issuer/signing keys and service trust](suite-trust.md) and
 [registry/event feed](suite-registry.md). It is generic to every conforming product.
-It does not implement Gateway, Portal, CLI, or Backend's own protected Suite MCP
-adapter (point 7). The existing native frontend, Google login, personal API keys,
+It does not implement Gateway, Portal or CLI. Backend's own protected
+[Suite MCP adapter](suite-product.md) is implemented in point 7. The existing native frontend, Google login, personal API keys,
 client APIs and independently authenticated direct `/mcp` remain operational.
 
 ## Protected exchange routes
@@ -119,8 +119,8 @@ adapters must enforce classification, scopes, ownership, invalidation state and
 execution deadlines for each operation. A probe is limited to `initialize`,
 `notifications/initialized`, `ping` and supported `server/discover`; it cannot list
 or call tools or retrieve a user's catalog. Every message in a batch needs checking.
-The SDK supports those admission checks; implementing Backend's own Suite endpoint
-and tool classification remains point 7.
+The SDK supports those admission checks; [Backend's own Suite endpoint and tool
+classification](suite-product.md) implement them in point 7.
 
 ## Invalidation and long sessions
 

@@ -2,7 +2,7 @@
 
 Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.12`; these point-6 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.13`; these point-7 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -24,8 +24,8 @@ Work stops after each numbered point until the owner approves the next one.
 | 3 | Complete administration APIs and retain native frontend functionality | Completed; owner confirmed operation and authorized point 4 |
 | 4 | Implement persistent service trust and pairing | Completed; owner confirmed installed operation and authorized point 5 |
 | 5 | Implement registry and durable events | Completed; owner confirmed installed operation and authorized point 6 |
-| 6 | Implement authorization issuance | Completed and locally validated; awaiting owner approval for point 7 |
-| 7 | Adapt Backend as a Suite product | Pending |
+| 6 | Implement authorization issuance | Completed; owner confirmed installed operation and authorized point 7 |
+| 7 | Adapt Backend as a Suite product | Completed and locally validated; awaiting owner review/approval for point 8 |
 | 8 | Complete administration, deployment, documentation, CI, and delivery validation | Pending |
 
 The Backend retains its native frontend and all current management functions,
@@ -365,7 +365,7 @@ Fresh verified repair restores issuance; replay of an earlier outcome cannot rep
 an unverified/incompatible endpoint. Exchanges persist no access tokens and do not
 contact Google or refetch products on each renewal. No environment changes are needed.
 
-Point 7 has not started. No version bump, commit, push, remote workflow or release
+At point-6 delivery, point 7 had not started. No version bump, commit, push, remote workflow or release
 was performed by this work; work stops after point 6 for owner approval.
 
 
@@ -400,7 +400,69 @@ was performed by this work; work stops after point 6 for owner approval.
 - Frontend checks and 15 React tests passed; all 40 release-tooling tests passed.
   Python syntax, documentation links and diff whitespace were checked. Existing CI
   and release jobs already run the added Go tests and updated mandatory image check.
-- Point 6 is complete locally; point 7 remains unstarted. No installed deployment,
+- At that delivery, point 6 was complete locally and point 7 remained unstarted. No installed deployment,
   actual Gateway/product adaptation, remote workflow, commit, version bump, tag or
   release was performed by these validations. Native HTTP installs can perform their
   regression checks now; manual Suite exchanges require the later HTTPS setup.
+
+
+## Point 7 implementation
+
+[Backend as a Suite product](suite-product.md) adds the SDK-validated public
+`/nox/integration` declaration and opt-in protected `/mcp/suite` endpoint. The
+existing direct `/mcp` remains enabled by default and independently configurable.
+Both share the existing ten tool implementations and owner-scoped storage.
+Suite policies explicitly classify inspection, writes and sensitive diagnostics;
+private catalogs filter by current verified capabilities. Probe tokens cannot
+list tools or execute business methods.
+
+The local authority adapter verifies current issuer/key, source Gateway/credential,
+registration/association/admission, user/key/revision and scopes without HTTP calls
+to itself or Google. User projection and trust snapshots are request-local. Shared
+vault writes recheck authority inside their own write transaction, with cancellation
+before mutation/commit; a token expiring after admission does not truncate an
+already accepted operation. Execution capacity is shared across factories and stays
+occupied until a timed-out executor actually exits.
+
+Both Compose files expose the independent flags; the frontend protects the new
+Suite path with the existing trusted HTTPS boundary. Required CI/release jobs already
+run the added Go tests and updated image/proxy check. No schema migration is needed.
+Installed HTTP deployments retain their existing frontend/API/direct MCP behavior;
+protected Suite use still needs the later internal HTTPS setup and authorized
+enrollment. Point 8 remains pending. No version bump, commit, push or release was
+performed by this work.
+
+
+### Point 7 validation results
+
+- All 145 top-level Go tests passed with the race detector (291 passing results,
+  including subtests/fuzz seeds). Full `go vet`, Go formatting and diff whitespace
+  checks passed. Existing migration/data/legacy protocol tests remain included.
+- Actual HTTPS Backend enrollment, official MCP client discovery/calls, USER/ADMIN
+  policy, direct-MCP compatibility, owner-only vault lifecycle and concurrent user
+  identity checks passed. Probe business/catalog methods and mixed batches are
+  rejected; missing/expired controls and oversized inputs do not execute writes.
+- Admission rejects revoked Gateway/account/personal/signing keys, removed own
+  registration, incompatible target admission, wrong-target tokens and modified
+  signatures. Shared mutation guards reject stale admitted authority and identity
+  substitution. A separate storage test verifies grant expiry after valid admission
+  without extending the execution deadline, while current revocations remain enforced.
+- Independent SDK runtime factories share execution capacity. A deliberately
+  non-cooperating test executor retains its slot after timeout until actual exit.
+  All four direct/Suite endpoint flag combinations and environment aliases passed.
+- Both final candidate images built. Split deployment and all three real Chromium
+  flows passed, preserving native account/role administration, cookies, vaults,
+  public origin/OAuth redirects, API/direct MCP, sync SSE and frontend replacement.
+- The updated image HTTPS proxy test passed the real product declaration/Suite
+  authentication boundary, forged HTTP rejection on both hops, persistent keys
+  after restart and direct TLS/packaged healthcheck. The frontend-only image check
+  independently passed its new Suite proxy guard without a Backend image.
+- Frontend format/types/lint, all 15 React tests and its production build passed.
+  All 40 release-tooling tests passed with `TMPDIR=/private/tmp` (canonical macOS
+  fixture paths); no release was created. Both Compose configurations, Python
+  syntax and local documentation links passed. Required existing CI/release jobs
+  invoke the new Go tests and updated proxy script automatically.
+- Work stops before point 8 for owner review. The installed deployment, other
+  products, remote workflows, Git history, package version, tags and releases
+  were not changed. Local validation is not a claim that the remaining Backend
+  administration/delivery work or future Suite product adaptations are complete.

@@ -55,6 +55,8 @@ The SQLite database and blob storage form a single logical data store and should
 ## Features
 
 - HTTP + JSON API under `/v1`.
+- Independently configurable direct `/mcp` and protected Suite `/mcp/suite`, with
+  a public `/nox/integration` declaration; see [Suite product setup](docs/suite-product.md).
 - Native MCP Streamable HTTP at `/mcp`, powered by [NoX MCP](https://github.com/mapherez/nox-mcp).
 - Per-user API keys.
 - Multiple vaults per user.
@@ -461,6 +463,7 @@ node --test scripts/release.test.mjs
 - [Suite authority, secure pairing, service credentials and recovery](docs/suite-trust.md)
 - [Suite registry, durable events and availability](docs/suite-registry.md)
 - [Suite user delegation and service probe issuance](docs/suite-authorization.md)
+- [Backend as a Suite product: enrollment, permissions and MCP access paths](docs/suite-product.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

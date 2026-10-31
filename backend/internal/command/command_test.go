@@ -75,3 +75,30 @@ func TestSuiteIntervalsValidateAndSupportAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPConfigurationFlags(t *testing.T) {
+	for _, name := range []string{"DIRECT_MCP_ENABLED", "SUITE_MCP_ENABLED"} {
+		legacy := "NOX_SYNC_" + name
+		canonical := "NOX_BACKEND_" + name
+		t.Setenv(legacy, "")
+		t.Setenv(canonical, "")
+		got, err := mcpEnabled(legacy, true)
+		if err != nil || !got {
+			t.Fatal("default", err)
+		}
+		t.Setenv(legacy, "false")
+		got, err = mcpEnabled(legacy, true)
+		if err != nil || got {
+			t.Fatal("legacy", err)
+		}
+		t.Setenv(canonical, "true")
+		got, err = mcpEnabled(legacy, false)
+		if err != nil || !got {
+			t.Fatal("canonical", err)
+		}
+		t.Setenv(canonical, "typo")
+		if _, err = mcpEnabled(legacy, false); err == nil {
+			t.Fatal("invalid flag ignored")
+		}
+	}
+}

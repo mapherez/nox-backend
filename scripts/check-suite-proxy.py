@@ -54,6 +54,9 @@ def frontend_only(image):
         status, headers, body = request(base, "/api/nox/keys", headers={"X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"})
         assert status == 403 and json.loads(body)["error"]["code"] == "FORBIDDEN"
         assert headers["Cache-Control"] == "no-store"
+        status, headers, body = request(base, "/mcp/suite", headers={"X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"}, data=b"{}")
+        assert status == 403 and json.loads(body)["code"] == "FORBIDDEN"
+        assert headers["Cache-Control"] == "no-store"
         print("PASS: frontend-only startup, dashboard/assets and rejected forged TLS claims; no Backend image required.")
     except Exception:
         subprocess.run(["docker", "logs", "--tail", "30", container], check=False)
@@ -124,7 +127,7 @@ http {
             base = "https://" + docker("port", proxy, "8443/tcp")
             ready(base, "/healthz", context)
             proxy_ip = json.loads(docker("inspect", proxy))[0]["NetworkSettings"]["Networks"][network]["IPAddress"]
-            backend = docker("run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "-e", "NOX_BACKEND_PUBLIC_URL=" + base, "-e", "NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS=" + frontend_ip + "/32", args.backend_image)
+            backend = docker("run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "-e", "NOX_BACKEND_PUBLIC_URL=" + base, "-e", "NOX_BACKEND_SUITE_MCP_ENABLED=true", "-e", "NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS=" + frontend_ip + "/32", args.backend_image)
             containers.append(backend)
             backend_base = "http://" + docker("port", backend, "8080/tcp")
             ready(backend_base, "/v1/health")
@@ -153,6 +156,18 @@ http {
                 for endpoint in [frontend_base, backend_base]:
                     status, _, body = request(endpoint, path, headers={"Content-Type": "application/json", "X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"}, data=b"{}")
                     assert status == 403 and json.loads(body)["error"]["code"] == "FORBIDDEN"
+            status, headers, body = request(base, "/nox/integration", context)
+            declaration = json.loads(body)
+            assert status == 200 and headers["Cache-Control"] == "no-store"
+            assert declaration["productId"] == "nox-backend"
+            assert declaration["capabilities"]["suiteMcp"]["path"] == "/mcp/suite"
+            status, headers, body = request(base, "/mcp/suite", context, {"Content-Type": "application/json"}, b"{}")
+            assert status == 401 and json.loads(body)["code"] == "UNAUTHENTICATED"
+            assert headers["Cache-Control"] == "no-store"
+            for endpoint in [frontend_base, backend_base]:
+                status, headers, body = request(endpoint, "/mcp/suite", headers={"X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"}, data=b"{}")
+                assert status == 403 and json.loads(body)["code"] == "FORBIDDEN"
+                assert headers["Cache-Control"] == "no-store"
             docker("exec", backend, "/usr/local/bin/nox-backend", "healthcheck")
             docker("restart", backend)
             # Docker may reassign an ephemeral host port on restart. The service

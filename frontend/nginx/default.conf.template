@@ -50,6 +50,13 @@ server {
   add_header Cache-Control "no-cache";
   add_header X-Content-Type-Options "nosniff" always;
  }
+ location = /mcp/suite {
+  default_type application/json;
+  proxy_hide_header Cache-Control;
+  add_header Cache-Control "no-store" always;
+  if ($nox_suite_transport = "") { return 403 '{"code":"FORBIDDEN","message":"Suite MCP requires a trusted HTTPS ingress."}'; }
+  proxy_pass $backend_origin;
+ }
  location /api/nox/ {
   default_type application/json;
   proxy_hide_header Cache-Control;

@@ -111,7 +111,7 @@ func (s *Store) CreateVault(ctx context.Context, userID string, name string) (Va
 		return Vault{}, err
 	}
 	now := timestamp(time.Now())
-	if _, err := s.db.ExecContext(ctx, `
+	if _, err := s.vaultMutationExec(ctx, userID, `
 		INSERT INTO vaults (id, user_id, name, revision, status, created_at, updated_at)
 		VALUES (?, ?, ?, 0, ?, ?, ?)
 	`, vaultID, userID, name, VaultStatusActive, now, now); err != nil {
@@ -190,7 +190,7 @@ func (s *Store) SoftDeleteVault(ctx context.Context, userID string, vaultID stri
 	}
 
 	now := timestamp(time.Now())
-	result, err := s.db.ExecContext(ctx, `
+	result, err := s.vaultMutationExec(ctx, userID, `
 		UPDATE vaults
 		SET status = ?, deleted_at = ?, updated_at = ?
 		WHERE user_id = ? AND id = ? AND status = ?
@@ -217,7 +217,7 @@ func (s *Store) RestoreVault(ctx context.Context, userID string, vaultID string)
 	}
 
 	now := timestamp(time.Now())
-	result, err := s.db.ExecContext(ctx, `
+	result, err := s.vaultMutationExec(ctx, userID, `
 		UPDATE vaults
 		SET status = ?, deleted_at = NULL, updated_at = ?
 		WHERE user_id = ? AND id = ? AND status = ?
@@ -243,33 +243,31 @@ func (s *Store) PurgeDeletedVault(ctx context.Context, userID string, vaultID st
 		return fmt.Errorf("%w: userId and vaultId are required", ErrBadRequest)
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin purge vault transaction: %w", err)
-	}
-	defer rollback(tx)
-
-	hashes, err := deletedVaultBlobHashesTx(ctx, tx, userID, vaultID)
+	var hashes []string
+	err := s.vaultMutationTransaction(ctx, userID, func(tx *sql.Tx) error {
+		var err error
+		hashes, err = deletedVaultBlobHashesTx(ctx, tx, userID, vaultID)
+		if err != nil {
+			return err
+		}
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `DELETE FROM vaults WHERE user_id=? AND id=? AND status=?`, userID, vaultID, VaultStatusDeleted)
+		if err != nil {
+			return fmt.Errorf("purge deleted vault: %w", err)
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 	if err != nil {
 		return err
-	}
-
-	result, err := tx.ExecContext(ctx, `
-		DELETE FROM vaults
-		WHERE user_id = ? AND id = ? AND status = ?
-	`, userID, vaultID, VaultStatusDeleted)
-	if err != nil {
-		return fmt.Errorf("purge deleted vault: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("check vault purge: %w", err)
-	}
-	if rows == 0 {
-		return ErrNotFound
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit vault purge: %w", err)
 	}
 
 	s.removeUnreferencedBlobs(ctx, hashes)

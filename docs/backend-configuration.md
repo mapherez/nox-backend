@@ -333,3 +333,17 @@ legacy/native operation and necessary for the corresponding Suite deployment.
 positive integer milliseconds and their `NOX_SYNC_*` aliases. They configure
 installation-wide reporting/freshness, not Google login or work-session duration.
 See [registry/events operations](suite-registry.md) for snapshots and restore handling.
+
+## Independent MCP access paths
+
+`NOX_BACKEND_DIRECT_MCP_ENABLED=true` (default) preserves the existing direct
+`/mcp` personal-key/public-tool policy. `NOX_BACKEND_SUITE_MCP_ENABLED=false`
+(default) keeps protected Suite MCP off until HTTPS/trust/registration is ready.
+Set it to `true` to mount `/mcp/suite` and advertise it in `GET /nox/integration`.
+These flags are independent, accept only `true`/`false`, support the corresponding
+`NOX_SYNC_*` aliases, and are forwarded by both Compose files. The declaration is
+public metadata; it never grants trust or registration automatically.
+
+See [Backend as a Suite product](suite-product.md) for enrollment, permissions,
+request controls and validation. No public Internet exposure is required; internal
+HTTPS is supported through the existing TLS/trusted-proxy configuration.

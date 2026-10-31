@@ -1,12 +1,15 @@
-# Native MCP API
+# Direct MCP API
 
-NoX Backend exposes **POST `/mcp`** through the official
+NoX Backend exposes **POST `/mcp`** (enabled by default) through the official
 [NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.0/go), using
 the published `github.com/mapherez/nox-mcp v0.7.0` module. It runs in the same
 Go process, HTTP server, bind address and port as the existing backend APIs.
 The separate React frontend forwards `/mcp` unchanged on the public origin; it
 does not implement MCP or hold user/service authority. Configure a Streamable HTTP MCP client with
-the backend's base URL plus `/mcp`, retaining any reverse-proxy path prefix.
+the backend's base URL plus `/mcp`. The separate protected
+[Suite MCP adapter](suite-product.md) uses `/mcp/suite` and its own token policy.
+`NOX_BACKEND_DIRECT_MCP_ENABLED=false` disables only this direct endpoint.
+Suite origins do not support reverse-proxy application prefixes.
 
 Responses use JSON request/response mode, without a persistent SSE stream or
 server-side MCP session. Clients should disable standalone SSE. Non-POST

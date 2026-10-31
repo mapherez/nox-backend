@@ -3,9 +3,9 @@
 Backend work point 5 implements the published NoX MCP 0.7.0 / Suite 1.0
 [contract references](suite-migration.md#approved-references-and-progression).
 [Persistent pairing and service trust](suite-trust.md) are prerequisites for
-membership. This work does not implement Gateway, Yard adaptations, Portal, CLI,
-or Backend's own Suite MCP path (point 7). [User/probe issuance](suite-authorization.md)
-is implemented separately in point 6.
+membership. Gateway, Yard adaptations, Portal and CLI are separate product work.
+[User/probe issuance](suite-authorization.md) is implemented in point 6, and
+[Backend's own Suite MCP path](suite-product.md) in point 7.
 Any present or future conforming product can use these APIs; there is no product
 catalog encoded in the registry.
 

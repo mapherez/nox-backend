@@ -48,7 +48,16 @@ func Run(buildVersion string) error {
 	if err != nil {
 		return err
 	}
+	direct, err := mcpEnabled("NOX_SYNC_DIRECT_MCP_ENABLED", true)
+	if err != nil {
+		return err
+	}
+	suite, err := mcpEnabled("NOX_SYNC_SUITE_MCP_ENABLED", false)
+	if err != nil {
+		return err
+	}
 	cfg := app.Config{
+		DirectMCPDisabled: !direct, SuiteMCPEnabled: suite,
 		SuiteReportInterval: report, SuiteObservationFreshness: freshness,
 		Addr:               getenv("NOX_SYNC_ADDR", ":8080"),
 		DataDir:            getenv("NOX_SYNC_DATA_DIR", "/data"),
@@ -114,4 +123,12 @@ func suiteInterval(name string, fallback int64) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be a positive millisecond interval", strings.Replace(name, "NOX_SYNC_", "NOX_BACKEND_", 1))
 	}
 	return time.Duration(value) * time.Millisecond, nil
+}
+
+func mcpEnabled(name string, fallback bool) (bool, error) {
+	raw := getenv(name, strconv.FormatBool(fallback))
+	if raw != "true" && raw != "false" {
+		return false, fmt.Errorf("%s must be true or false", strings.Replace(name, "NOX_SYNC_", "NOX_BACKEND_", 1))
+	}
+	return raw == "true", nil
 }

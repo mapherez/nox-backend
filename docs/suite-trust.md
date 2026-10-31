@@ -10,7 +10,8 @@ Backend now persists its issuer, ES256 signing keys, verified service associatio
 credential generations, pairing recovery and conditional/idempotent outcomes.
 [Registry membership/event delivery](suite-registry.md) is implemented in point 5.
 [User/probe token issuance](suite-authorization.md) is implemented in point 6.
-Backend Suite MCP adaptation (7) and complete UI/delivery integration (8) remain pending.
+[Backend Suite MCP adaptation](suite-product.md) is implemented in point 7.
+Complete native integration setup and delivery validation remain point 8.
 A paired service is not a registered product and has no integrated execution rights.
 Existing direct `/mcp`, `/v1/*`, Google login and native account/vault administration
 retain their own authentication and behavior.

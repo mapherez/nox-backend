@@ -31,7 +31,7 @@ type suiteHTTPFixture struct {
 	dir      string
 }
 
-func suiteHTTPServer(t *testing.T) *suiteHTTPFixture {
+func suiteHTTPServer(t *testing.T, suiteEnabled ...bool) *suiteHTTPFixture {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -47,7 +47,7 @@ func suiteHTTPServer(t *testing.T) *suiteHTTPFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := NewServer(Config{Version: "test", AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
+	s := NewServer(Config{Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
 	backend := httptest.NewTLSServer(s.Routes())
 	s.cfg.PublicURL = backend.URL
 	f := &suiteHTTPFixture{s: s, store: store, backend: backend, client: backend.Client(), adminKey: key, dir: dir}

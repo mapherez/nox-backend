@@ -16,12 +16,13 @@ const sessionCookieName = "nox_sync_session"
 
 // Server owns HTTP routing for the backend.
 type Server struct {
-	cfg         Config
-	store       *storage.Store
-	events      *statusBroker
-	suiteVerify chan struct{}
-	suitePollMu sync.Mutex
-	suitePolls  map[string]bool
+	cfg                                  Config
+	store                                *storage.Store
+	events                               *statusBroker
+	suiteVerify                          chan struct{}
+	suiteMCPRequests, suiteMCPExecutions chan struct{}
+	suitePollMu                          sync.Mutex
+	suitePolls                           map[string]bool
 }
 
 // NewServer creates a backend server instance.
@@ -30,10 +31,11 @@ func NewServer(cfg Config, store *storage.Store) *Server {
 		store.ConfigureSuiteObservationTiming(cfg.SuiteReportInterval, cfg.SuiteObservationFreshness)
 	}
 	return &Server{
-		cfg:         cfg,
-		store:       store,
-		events:      newStatusBroker(),
-		suiteVerify: make(chan struct{}, 8),
+		cfg:              cfg,
+		store:            store,
+		events:           newStatusBroker(),
+		suiteVerify:      make(chan struct{}, 8),
+		suiteMCPRequests: make(chan struct{}, 32), suiteMCPExecutions: make(chan struct{}, 32),
 	}
 }
 
@@ -44,7 +46,13 @@ func (s *Server) Routes() http.Handler {
 	if err != nil {
 		panic(fmt.Errorf("construct backend MCP runtime: %w", err))
 	}
-	mux.Handle("/mcp", mcpHandler)
+	if !s.cfg.DirectMCPDisabled {
+		mux.Handle("/mcp", mcpHandler)
+	}
+	mux.HandleFunc("/nox/integration", s.handleIntegrationDeclaration)
+	if s.cfg.SuiteMCPEnabled {
+		mux.Handle("/mcp/suite", s.suiteMCPHandler())
+	}
 	mux.HandleFunc("/", s.handleRoot)
 	mux.HandleFunc("/api/dashboard", s.handleDashboardData)
 	s.registerAdministration(mux)
