@@ -74,11 +74,23 @@ test("admin manages credentials, users and vaults through authenticated JSON API
       .filter({ hasText: "ui@example.invalid" })
       .getByRole("button", { name: "Enable user", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("row")
-    .filter({ hasText: "ui@example.invalid" })
-    .getByRole("button", { name: "Delete user", exact: true })
-    .click();
+  const testAccountRow = page.getByRole("row").filter({ hasText: "ui@example.invalid" });
+  await testAccountRow.getByRole("button", { name: "Enable user", exact: true }).click();
+  await testAccountRow.getByRole("button", { name: "Make admin", exact: true }).click();
+  await expect(
+    testAccountRow.getByRole("button", { name: "Make member", exact: true }),
+  ).toBeVisible();
+  await expect(
+    testAccountRow.getByRole("button", { name: "Delete user", exact: true }),
+  ).toBeEnabled();
+  await testAccountRow.getByRole("button", { name: "Disable user", exact: true }).click();
+  await testAccountRow.getByRole("button", { name: "Enable user", exact: true }).click();
+  await testAccountRow.getByRole("button", { name: "Make member", exact: true }).click();
+  await testAccountRow.getByRole("button", { name: "Make admin", exact: true }).click();
+  const managerRow = page.getByRole("row").filter({ hasText: "admin@example.invalid" });
+  await expect(managerRow).toContainText("Admin Manager");
+  await expect(managerRow.getByRole("button", { name: "Delete user", exact: true })).toBeDisabled();
+  await testAccountRow.getByRole("button", { name: "Delete user", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete user", exact: true })
     .getByRole("button", { name: "Delete user", exact: true })

@@ -58,10 +58,39 @@ Authorization/cookies or API-key response bodies.
 Successful mutations return HTTP 200 with `{ "ok": true }` except operations
 that explicitly return a user, key or connection. User roles and statuses are
 normalized to uppercase; omitted role on add defaults to `USER` for compatibility
-with the legacy form. Unsupported explicit values are rejected. Admin accounts
-cannot be disabled, demoted (including through the upsert path) or deleted.
-Target protection is enforced in the write itself as well as in shared operations,
-so a concurrent promotion cannot bypass the rule.
+with the legacy form. Unsupported explicit values are rejected.
+
+### Admin Managers and account management
+
+`NOX_BACKEND_ADMIN_EMAILS` explicitly selects the deployment's **Admin Managers**.
+The existing `NOX_SYNC_ADMIN_EMAILS` fallback follows the normal configuration
+precedence. Every listed email has this authority; list only the principal account
+if it should be the sole manager. Account creation order grants no authority.
+No new stored role or database migration is introduced: an active configured
+manager still has role `ADMIN`; its extra account-management authority is derived
+from trusted server configuration on every request.
+
+- Admin Managers can disable/re-enable, demote/promote and delete ordinary admins,
+  including accounts that were previously promoted from `USER`.
+- Ordinary admins retain management of ordinary users and may promote them, but
+  cannot manage other admins or grant manager authority through the dashboard/API.
+- Nobody may delete, disable or change their own role through account management.
+- Configured manager accounts are protected from those operations and upserts by
+  every account, including another manager. Change deployment configuration and
+  restart to remove that protection; keeping an email in bootstrap configuration
+  would otherwise recreate/restore it. Keep a configured manager for recovery.
+
+User representations include `isAdminManager` and actor-specific
+`permissions.canDelete`, `permissions.canChangeRole` and
+`permissions.canChangeStatus`. React uses these to show **Make member**, status
+and delete controls for manageable admins. These fields are read-only projections;
+the API always enforces the same authority independently. If an older Backend
+does not return these capabilities, the independent frontend stays usable and
+disables account changes with an explicit Backend-update message.
+Target/self/configured
+account restrictions are also part of the SQL write, so a concurrent promotion
+cannot bypass the current manager policy. Deleting an admin removes its account,
+keys, sessions and owned sync records with the existing deletion semantics.
 
 An admin role grants no access to another account's vaults. Foreign and missing
 vaults both return 404. Vault IDs must be URL-encoded as a path segment. Vault

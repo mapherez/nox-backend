@@ -177,11 +177,11 @@ func managementOK(w http.ResponseWriter, err error) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
-func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request, user storage.User) {
+func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request, actor storage.User) {
 	if !managementMethod(w, r, "GET") {
 		return
 	}
-	writeJSON(w, 200, presentDashboardUser(user))
+	writeJSON(w, 200, s.presentDashboardUser(actor, actor))
 }
 func (s *Server) handleAccountKey(w http.ResponseWriter, r *http.Request, user storage.User) {
 	if !managementMethod(w, r, "GET") {
@@ -237,7 +237,7 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, actor 
 		}
 		result := make([]dashboardUser, 0, len(users))
 		for _, user := range users {
-			result = append(result, presentDashboardUser(user))
+			result = append(result, s.presentDashboardUser(actor, user))
 		}
 		writeJSON(w, 200, result)
 		return
@@ -254,7 +254,7 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, actor 
 		writeManagementError(w, err)
 		return
 	}
-	writeJSON(w, 200, presentDashboardUser(user))
+	writeJSON(w, 200, s.presentDashboardUser(actor, user))
 }
 func (s *Server) handleAdminUser(w http.ResponseWriter, r *http.Request, actor storage.User) {
 	if !managementMethod(w, r, "DELETE") {

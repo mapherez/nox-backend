@@ -137,21 +137,25 @@ func TestAdditiveConnectionMigrationPreservesInstalledBaseline(t *testing.T) {
 }
 
 func TestManagedWritesCannotOverwriteConcurrentPromotion(t *testing.T) {
+	policy := UserManagementPolicy{ActorID: testUserID}
 	store := newTestStore(t)
 	ctx := context.Background()
 	for i := 0; i < 10; i++ {
 		email := fmt.Sprintf("race-%d@example.com", i)
-		target, err := store.UpsertManagedUser(ctx, email, UserRoleUser)
+		target, err := store.UpsertManagedUser(ctx, email, UserRoleUser, policy)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var wait sync.WaitGroup
 		failures := make(chan error, 2)
 		wait.Add(2)
-		go func() { defer wait.Done(); failures <- store.UpdateManagedUser(ctx, target.ID, "role", UserRoleAdmin) }()
 		go func() {
 			defer wait.Done()
-			_, err := store.UpsertManagedUser(ctx, email, UserRoleUser)
+			failures <- store.UpdateManagedUser(ctx, target.ID, "role", UserRoleAdmin, policy)
+		}()
+		go func() {
+			defer wait.Done()
+			_, err := store.UpsertManagedUser(ctx, email, UserRoleUser, policy)
 			if errors.Is(err, ErrBadRequest) {
 				err = nil
 			}
@@ -168,14 +172,64 @@ func TestManagedWritesCannotOverwriteConcurrentPromotion(t *testing.T) {
 		if err != nil || promoted.Role != UserRoleAdmin {
 			t.Fatal("concurrent upsert demoted admin", err)
 		}
-		if err := store.UpdateManagedUser(ctx, target.ID, "status", UserStatusDisabled); !errors.Is(err, ErrBadRequest) {
+		if err := store.UpdateManagedUser(ctx, target.ID, "status", UserStatusDisabled, policy); !errors.Is(err, ErrBadRequest) {
 			t.Fatal("atomic status guard failed", err)
 		}
-		if err := store.UpdateManagedUser(ctx, target.ID, "role", UserRoleUser); !errors.Is(err, ErrBadRequest) {
+		if err := store.UpdateManagedUser(ctx, target.ID, "role", UserRoleUser, policy); !errors.Is(err, ErrBadRequest) {
 			t.Fatal("atomic role guard failed", err)
 		}
-		if err := store.DeleteManagedUser(ctx, target.ID); !errors.Is(err, ErrBadRequest) {
+		if err := store.DeleteManagedUser(ctx, target.ID, policy); !errors.Is(err, ErrBadRequest) {
 			t.Fatal("atomic deletion guard failed", err)
 		}
+	}
+}
+
+func TestManagerWritesStillProtectSelfAndConfiguredAccounts(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	owner, err := store.UserByID(ctx, testUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondOwner, err := store.UpsertAllowedUser(ctx, "second-owner@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := UserManagementPolicy{ActorID: owner.ID, CanManageAdmins: true, ProtectedEmails: []string{owner.Email, " SECOND-OWNER@EXAMPLE.COM "}}
+	for _, target := range []User{owner, secondOwner} {
+		if err := store.DeleteManagedUser(ctx, target.ID, policy); !errors.Is(err, ErrBadRequest) {
+			t.Fatal("manager removed a protected account", err)
+		}
+		if err := store.UpdateManagedUser(ctx, target.ID, "role", "USER", policy); !errors.Is(err, ErrBadRequest) {
+			t.Fatal("manager demoted a protected account", err)
+		}
+		if err := store.UpdateManagedUser(ctx, target.ID, "status", "DISABLED", policy); !errors.Is(err, ErrBadRequest) {
+			t.Fatal("manager disabled a protected account", err)
+		}
+		if _, err := store.UpsertManagedUser(ctx, target.Email, "USER", policy); !errors.Is(err, ErrBadRequest) {
+			t.Fatal("upsert changed a protected account", err)
+		}
+	}
+	target, err := store.UpsertAllowedUser(ctx, "managed-admin@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateManagedUser(ctx, target.ID, "status", "DISABLED", policy); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateManagedUser(ctx, target.ID, "status", "ACTIVE", policy); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateManagedUser(ctx, target.ID, "role", "USER", policy); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateManagedUser(ctx, target.ID, "role", "ADMIN", policy); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteManagedUser(ctx, target.ID, policy); err != nil {
+		t.Fatal("manager could not remove regular admin", err)
+	}
+	if _, err := store.UpsertManagedUser(ctx, "missing-actor@example.com", "ADMIN", UserManagementPolicy{CanManageAdmins: true}); !errors.Is(err, ErrForbidden) {
+		t.Fatal("missing actor allowed an administrative write", err)
 	}
 }

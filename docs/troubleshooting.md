@@ -76,7 +76,21 @@ Emails are comma-separated:
 NOX_BACKEND_ADMIN_EMAILS=you@example.com,other-admin@example.com
 ```
 
-Bootstrap admin emails are created or restored as active admins on backend startup.
+Every configured email is an **Admin Manager**, created/restored as an active admin
+on startup. Use the dashboard to add ordinary admins instead of adding them to this
+variable unless they should also be managers.
+
+## Cannot Delete a Promoted Admin
+
+Sign in with an **Admin Manager** listed in `NOX_BACKEND_ADMIN_EMAILS` (or the
+supported legacy fallback). That account can delete, disable and demote ordinary
+admins. The frontend displays the manager label and enables the corresponding
+controls; both components must contain this change.
+
+An account listed in the environment configuration remains protected from UI/API
+deletion, even by another manager. Remove its email from the variable and restart
+Backend before managing it as an ordinary admin. Keep your principal manager in
+the variable. No database reset, manual role edit or account recreation is needed.
 
 ## `AUTH_FAILED`
 

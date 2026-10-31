@@ -66,7 +66,13 @@ For new split installations, `backend` and `frontend` are services of the `nox-b
 
 Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault-dashboard` for local testing. Sign in with an admin email listed in `NOX_BACKEND_ADMIN_EMAILS`.
 
-The dashboard provides your Server URL and API key, vault management and downloads, and admin user management. Each user owns their own vaults and API key.
+The dashboard provides your Server URL and API key, vault management and downloads,
+and admin user management. Each user owns their own vaults and API key.
+Accounts listed in `NOX_BACKEND_ADMIN_EMAILS` are labeled **Admin Manager** and can
+also disable, demote or delete ordinary admins. Keep only your principal account
+in that variable if it should be the sole manager; add other admins through the
+user-management interface. Configured manager accounts are protected from account
+changes there and must be managed through deployment configuration.
 
 ## Initial Suite service addresses
 

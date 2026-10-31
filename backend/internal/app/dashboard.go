@@ -3,17 +3,30 @@ package app
 import "github.com/mapherez/nox-backend/backend/internal/storage"
 
 type dashboardUser struct {
-	ID          string `json:"id"`
-	Email       string `json:"email"`
-	FirstName   string `json:"firstName"`
-	DisplayName string `json:"displayName"`
-	Role        string `json:"role"`
-	Status      string `json:"status"`
-	LastLoginAt string `json:"lastLoginAt"`
+	ID             string                    `json:"id"`
+	Email          string                    `json:"email"`
+	FirstName      string                    `json:"firstName"`
+	DisplayName    string                    `json:"displayName"`
+	Role           string                    `json:"role"`
+	Status         string                    `json:"status"`
+	LastLoginAt    string                    `json:"lastLoginAt"`
+	IsAdminManager bool                      `json:"isAdminManager"`
+	Permissions    userManagementPermissions `json:"permissions"`
+}
+type userManagementPermissions struct {
+	CanDelete       bool `json:"canDelete"`
+	CanChangeRole   bool `json:"canChangeRole"`
+	CanChangeStatus bool `json:"canChangeStatus"`
 }
 
-func presentDashboardUser(user storage.User) dashboardUser {
-	return dashboardUser{user.ID, user.Email, user.FirstName, user.DisplayName, user.Role, user.Status, user.LastLoginAt}
+func (s *Server) presentDashboardUser(actor, user storage.User) dashboardUser {
+	canManage := s.canManageUser(actor, user)
+	return dashboardUser{
+		ID: user.ID, Email: user.Email, FirstName: user.FirstName, DisplayName: user.DisplayName,
+		Role: user.Role, Status: user.Status, LastLoginAt: user.LastLoginAt,
+		IsAdminManager: s.configuredAdmin(user.Email),
+		Permissions:    userManagementPermissions{canManage, canManage, canManage},
+	}
 }
 
 type dashboardVault struct {

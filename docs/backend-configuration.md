@@ -88,7 +88,7 @@ If you change the left side of the port mapping, also use that host port in your
 | `NOX_BACKEND_PUBLIC_URL` | request-derived URL | Public base URL used for dashboard display and Google OAuth callback URLs. Set this in production. The provided Compose files default it to `http://localhost:5710` for local use. |
 | `NOX_BACKEND_GOOGLE_CLIENT_ID` | none | Google OAuth client ID for dashboard login. |
 | `NOX_BACKEND_GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret for dashboard login. |
-| `NOX_BACKEND_ADMIN_EMAILS` | none | Comma-separated bootstrap admin emails. These users are created or restored as active admins on startup. |
+| `NOX_BACKEND_ADMIN_EMAILS` | none | Comma-separated Admin Manager emails. Created/restored as active admins on startup; can manage other admins. Every listed account has manager authority and is protected from deletion/demotion/disable through the UI/API. |
 
 ## Google OAuth
 

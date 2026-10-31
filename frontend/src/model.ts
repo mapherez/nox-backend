@@ -6,6 +6,8 @@ export interface User {
   role: string;
   status: string;
   lastLoginAt: string;
+  isAdminManager: boolean;
+  permissions?: { canDelete: boolean; canChangeRole: boolean; canChangeStatus: boolean };
 }
 export interface Vault {
   vaultId: string;

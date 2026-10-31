@@ -1,8 +1,8 @@
 # NoX Suite migration status and compatibility baseline
 
-Updated **October 30, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
+Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.8`; point-3 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.9`; point-3 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -196,3 +196,30 @@ no new publication trigger or application version is required for this point.
   integration remain delivery validation in point 8.
 No commit, push, tag, release or installed deployment change is performed here.
 Points 4–8 remain pending; work stops after point 3 for owner approval.
+
+
+### Owner-requested correction: Admin Manager account authority
+
+The owner requested that the principal account be able to manage/delete promoted
+admins. `NOX_BACKEND_ADMIN_EMAILS` now explicitly selects Admin Managers (including
+the existing legacy fallback); creation order is not used. Managers may change the
+status/role or delete ordinary admins. Ordinary admins cannot manage other admins.
+Self/configured-manager accounts remain protected, including from upserts and
+concurrent changes; deployment configuration controls the manager list.
+
+This is server-derived account-management authority, not another stored role or
+Suite delegation scope. Existing data ownership rules remain. No new database
+migration, Compose change or environment variable is required. No commit, push or
+publication was performed by this work. Both frontend and backend expose the
+corresponding manager label and permissions. Point 4 remains pending.
+
+Validation: all 86 top-level Go tests passed with the race detector (206 passing
+results including subtests/fuzz seeds); `go vet`, Go formatting, frontend
+format/type/lint checks, 14 React tests and the production frontend build passed.
+Both Docker images built and all three real Chromium/split-deployment flows
+passed, including promotion followed by manager disable/re-enable, demotion,
+re-promotion and deletion of the secondary admin. API/storage tests verify
+configured-manager/self protection, denial for ordinary admins, configuration
+changes, legacy browser compatibility and access invalidation on deletion.
+An older Backend missing capability fields keeps the frontend usable with account
+management disabled and an update diagnostic; its behavior has a React test.

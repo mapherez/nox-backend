@@ -367,6 +367,12 @@ function Users({ users }: { users: User[] }) {
           </h2>
         </div>
       </div>
+      {users.some((user) => !user.permissions) && (
+        <p role="alert" className="error-message">
+          Update the Backend service to manage accounts with this frontend. Your vaults remain
+          available.
+        </p>
+      )}
       <MutationForm
         path="/api/admin/users"
         className="add-user-panel"
@@ -391,7 +397,9 @@ function Users({ users }: { users: User[] }) {
               <option value="ADMIN">Admin</option>
             </select>
           </div>
-          <button type="submit">Add user</button>
+          <button type="submit" disabled={users.some((user) => !user.permissions)}>
+            Add user
+          </button>
         </div>
       </MutationForm>
       <div className="table-wrapper" role="region" tabIndex={0} aria-label="Users">
@@ -409,7 +417,13 @@ function Users({ users }: { users: User[] }) {
               <tr key={user.id}>
                 <th scope="row">{user.email}</th>
                 <td>
-                  <span className="badge">{user.role === "ADMIN" ? "Admin" : "Member"}</span>
+                  <span className="badge">
+                    {user.isAdminManager
+                      ? "Admin Manager"
+                      : user.role === "ADMIN"
+                        ? "Admin"
+                        : "Member"}
+                  </span>
                 </td>
                 <td>
                   <MutationForm
@@ -426,29 +440,29 @@ function Users({ users }: { users: User[] }) {
                       type="submit"
                       title={user.status === "ACTIVE" ? "Disable user" : "Enable user"}
                       aria-label={user.status === "ACTIVE" ? "Disable user" : "Enable user"}
-                      disabled={user.role === "ADMIN"}
+                      disabled={!user.permissions?.canChangeStatus}
                     >
                       <span />
                     </button>
                   </MutationForm>
                 </td>
                 <td className="action-cell">
-                  {user.role === "ADMIN" ? (
-                    <Action label="Admin users cannot be demoted" icon="user" disabled />
+                  {!user.permissions?.canChangeRole ? (
+                    <Action label="This account's role is protected" icon="user" disabled />
                   ) : (
                     <MutationForm
                       path={`/api/admin/users/${encodeURIComponent(user.id)}/role`}
                       method="PUT"
                       message={messages["user-saved"]!}
                     >
-                      <Hidden name="role" value="ADMIN" />
+                      <Hidden name="role" value={user.role === "ADMIN" ? "USER" : "ADMIN"} />
                       <button
                         className="icon-button secondary"
                         type="submit"
-                        title="Make admin"
-                        aria-label="Make admin"
+                        title={user.role === "ADMIN" ? "Make member" : "Make admin"}
+                        aria-label={user.role === "ADMIN" ? "Make member" : "Make admin"}
                       >
-                        <Icon name="shield" />
+                        <Icon name={user.role === "ADMIN" ? "user" : "shield"} />
                       </button>
                     </MutationForm>
                   )}
@@ -456,7 +470,7 @@ function Users({ users }: { users: User[] }) {
                     label="Delete user"
                     icon="user-x"
                     danger
-                    disabled={user.role === "ADMIN"}
+                    disabled={!user.permissions?.canDelete}
                     onClick={() => setSelected(user)}
                   />
                 </td>
@@ -560,7 +574,9 @@ export function DashboardView({ data, reload }: { data: Dashboard; reload?: () =
                 </h1>
                 <div className="account-line">
                   <span className="muted">{data.user.email}</span>
-                  <span className="badge">{data.isAdmin ? "Admin" : "Member"}</span>
+                  <span className="badge">
+                    {data.user.isAdminManager ? "Admin Manager" : data.isAdmin ? "Admin" : "Member"}
+                  </span>
                 </div>
               </div>
               <div className="header-actions">

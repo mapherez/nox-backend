@@ -36,15 +36,23 @@ func (s *Store) BootstrapAdmins(ctx context.Context, emails []string) error {
 
 // UpsertAllowedUser adds or re-enables an allowlisted user.
 func (s *Store) UpsertAllowedUser(ctx context.Context, email string, role string) (User, error) {
-	return s.upsertAllowedUser(ctx, email, role, false)
+	return s.upsertAllowedUser(ctx, email, role, nil)
 }
 
-// UpsertManagedUser preserves administrator protection atomically during upsert.
-func (s *Store) UpsertManagedUser(ctx context.Context, email string, role string) (User, error) {
-	return s.upsertAllowedUser(ctx, email, role, true)
+// UpsertManagedUser applies the server-derived policy to the current target row.
+func (s *Store) UpsertManagedUser(ctx context.Context, email string, role string, policy UserManagementPolicy) (User, error) {
+	if policy.ActorID == "" {
+		return User{}, ErrForbidden
+	}
+	for _, protected := range policy.ProtectedEmails {
+		if strings.EqualFold(strings.TrimSpace(protected), strings.TrimSpace(email)) {
+			return User{}, fmt.Errorf("%w: configured manager accounts are protected", ErrBadRequest)
+		}
+	}
+	return s.upsertAllowedUser(ctx, email, role, &policy)
 }
 
-func (s *Store) upsertAllowedUser(ctx context.Context, email string, role string, protectAdmin bool) (User, error) {
+func (s *Store) upsertAllowedUser(ctx context.Context, email string, role string, policy *UserManagementPolicy) (User, error) {
 	email, err := normalizeEmail(email)
 	if err != nil {
 		return User{}, err
@@ -59,22 +67,28 @@ func (s *Store) upsertAllowedUser(ctx context.Context, email string, role string
 		return User{}, err
 	}
 	now := timestamp(time.Now())
-	result, err := s.db.ExecContext(ctx, `
+	query := `
 		INSERT INTO users (id, email, first_name, display_name, role, status, created_at, updated_at)
 		VALUES (?, ?, '', ?, ?, ?, ?, ?)
 		ON CONFLICT(email) DO UPDATE SET
 			role = excluded.role,
 			status = excluded.status,
             updated_at = excluded.updated_at
-        WHERE ? = 0 OR users.role <> 'ADMIN' OR excluded.role = 'ADMIN'
-    `, userID, email, email, role, UserStatusActive, now, now, protectAdmin)
+    `
+	args := []any{userID, email, email, role, UserStatusActive, now, now}
+	if policy != nil {
+		predicate, policyArgs := policy.targetPredicate()
+		query += " WHERE " + predicate
+		args = append(args, policyArgs...)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return User{}, fmt.Errorf("upsert allowed user: %w", err)
 	}
 	if n, err := result.RowsAffected(); err != nil {
 		return User{}, err
 	} else if n == 0 {
-		return User{}, fmt.Errorf("%w: admin users cannot be demoted", ErrBadRequest)
+		return User{}, fmt.Errorf("%w: account cannot be modified by this administrator", ErrBadRequest)
 	}
 
 	user, err := s.UserByEmail(ctx, email)
@@ -468,29 +482,58 @@ func hashSecret(value string) string {
 	return hashAPIKey(value)
 }
 
-// UpdateManagedUser and DeleteManagedUser check the target's current role within
-// the write itself, after any concurrent promotion has committed.
-func (s *Store) UpdateManagedUser(ctx context.Context, id, field, value string) error {
+// UserManagementPolicy is supplied by Backend operations, not HTTP request data.
+// Manager is a deployment-derived authority, not another stored account role.
+type UserManagementPolicy struct {
+	ActorID         string
+	CanManageAdmins bool
+	ProtectedEmails []string
+}
+
+func (p UserManagementPolicy) targetPredicate() (string, []any) {
+	predicate := `users.id <> ? AND (users.role <> 'ADMIN' OR ? = 1)`
+	args := []any{p.ActorID, p.CanManageAdmins}
+	for _, email := range p.ProtectedEmails {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email != "" {
+			predicate += ` AND users.email COLLATE NOCASE <> ?`
+			args = append(args, email)
+		}
+	}
+	return predicate, args
+}
+
+// Apply current role/self/configured-manager restrictions inside the write so a
+// concurrent promotion or profile update cannot bypass Backend policy.
+func (s *Store) UpdateManagedUser(ctx context.Context, id, field, value string, policy UserManagementPolicy) error {
+	if policy.ActorID == "" {
+		return ErrForbidden
+	}
 	var query string
 	switch field {
 	case "status":
 		if value != UserStatusActive && value != UserStatusDisabled {
 			return ErrBadRequest
 		}
-		query = `UPDATE users SET status = ?, updated_at = ? WHERE id = ? AND (role <> 'ADMIN' OR ? = 'ACTIVE')`
+		query = `UPDATE users SET status = ?, updated_at = ? WHERE id = ? AND `
 	case "role":
 		if value != UserRoleUser && value != UserRoleAdmin {
 			return ErrBadRequest
 		}
-		query = `UPDATE users SET role = ?, updated_at = ? WHERE id = ? AND (role <> 'ADMIN' OR ? = 'ADMIN')`
+		query = `UPDATE users SET role = ?, updated_at = ? WHERE id = ? AND `
 	default:
 		return ErrBadRequest
 	}
-	result, err := s.db.ExecContext(ctx, query, value, timestamp(time.Now()), id, value)
+	predicate, args := policy.targetPredicate()
+	result, err := s.db.ExecContext(ctx, query+predicate, append([]any{value, timestamp(time.Now()), id}, args...)...)
 	return s.managedMutationResult(ctx, id, result, err)
 }
-func (s *Store) DeleteManagedUser(ctx context.Context, id string) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND role <> 'ADMIN'`, id)
+func (s *Store) DeleteManagedUser(ctx context.Context, id string, policy UserManagementPolicy) error {
+	if policy.ActorID == "" {
+		return ErrForbidden
+	}
+	predicate, args := policy.targetPredicate()
+	result, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND `+predicate, append([]any{id}, args...)...)
 	return s.managedMutationResult(ctx, id, result, err)
 }
 func (s *Store) managedMutationResult(ctx context.Context, id string, result sql.Result, err error) error {
@@ -507,5 +550,5 @@ func (s *Store) managedMutationResult(ctx context.Context, id string, result sql
 	if _, err := s.UserByID(ctx, id); err != nil {
 		return err
 	}
-	return fmt.Errorf("%w: admin users cannot be disabled, demoted or deleted", ErrBadRequest)
+	return fmt.Errorf("%w: account cannot be modified by this administrator", ErrBadRequest)
 }

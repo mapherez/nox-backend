@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -313,5 +314,159 @@ func TestAdministrationLogoutCannotUseBearerToDeleteAnotherSession(t *testing.T)
 	administrationStatus(t, administrationRequest(t, s, "POST", "/api/session/logout", "", auth), 400)
 	if _, valid, err := store.UserBySessionToken(context.Background(), token); err != nil || !valid {
 		t.Fatal("Bearer endpoint deleted a session", err)
+	}
+}
+
+func TestAdminManagerCanManagePromotedAdmins(t *testing.T) {
+	s, store, manager, _ := newTestServer(t)
+	ctx := context.Background()
+	s.cfg.AdminEmails = []string{"  TEST@EXAMPLE.COM  "}
+	auth := administrationKey(t, store, manager)
+	response := administrationRequest(t, s, "POST", "/api/admin/users", `{"email":"secondary@example.com","role":"USER"}`, auth)
+	administrationStatus(t, response, 200)
+	var target dashboardUser
+	if err := json.Unmarshal(response.Body.Bytes(), &target); err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/admin/users/" + target.ID
+	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"ADMIN"}`, auth), 200)
+	targetUser, err := store.UserByID(ctx, target.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetAuth := administrationKey(t, store, targetUser)
+	targetSession, err := store.CreateWebSession(ctx, target.ID, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vault, err := store.CreateVault(ctx, target.ID, "Secondary test vault")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response = administrationRequest(t, s, "GET", "/api/admin/users", "", auth)
+	administrationStatus(t, response, 200)
+	var users []dashboardUser
+	if err := json.Unmarshal(response.Body.Bytes(), &users); err != nil {
+		t.Fatal(err)
+	}
+	for _, user := range users {
+		if user.ID == manager.ID && (!user.IsAdminManager || user.Permissions.CanDelete || user.Permissions.CanChangeRole || user.Permissions.CanChangeStatus) {
+			t.Fatal("configured manager can lock itself out")
+		}
+		if user.ID == target.ID && (user.IsAdminManager || !user.Permissions.CanDelete || !user.Permissions.CanChangeRole || !user.Permissions.CanChangeStatus) {
+			t.Fatal("promoted admin is still protected from its manager")
+		}
+	}
+	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/status", `{"status":"DISABLED"}`, auth), 200)
+	administrationStatus(t, administrationRequest(t, s, "GET", "/api/account", "", targetAuth), 401)
+	administrationStatus(t, administrationRequest(t, s, "GET", "/api/account", "", map[string]string{"Cookie": sessionCookieName + "=" + targetSession}), 401)
+	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/status", `{"status":"ACTIVE"}`, auth), 200)
+	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"USER"}`, auth), 200)
+	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"ADMIN"}`, auth), 200)
+	targetSession, err = store.CreateWebSession(ctx, target.ID, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", auth), 200)
+	if _, err := store.UserByID(ctx, target.ID); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatal("promoted test account was not removed", err)
+	}
+	if _, err := store.VaultByID(ctx, target.ID, vault.ID); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatal("owned records were not removed", err)
+	}
+	administrationStatus(t, administrationRequest(t, s, "GET", "/api/account", "", targetAuth), 401)
+	administrationStatus(t, administrationRequest(t, s, "GET", "/api/account", "", map[string]string{"Cookie": sessionCookieName + "=" + targetSession}), 401)
+	administrationStatus(t, administrationRequest(t, s, "GET", "/api/account", "", auth), 200)
+}
+
+func TestAdminManagerProtectionCannotBeBypassedByOtherAdminsOrUpsert(t *testing.T) {
+	s, store, manager, _ := newTestServer(t)
+	ctx := context.Background()
+	otherManager, err := store.UpsertAllowedUser(ctx, "second-manager@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordinary, err := store.UpsertAllowedUser(ctx, "ordinary-admin@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	another, err := store.UpsertAllowedUser(ctx, "another-admin@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.cfg.AdminEmails = []string{manager.Email, " SECOND-MANAGER@EXAMPLE.COM "}
+	for _, actor := range []storage.User{manager, ordinary} {
+		auth := administrationKey(t, store, actor)
+		protected := []storage.User{manager, otherManager, actor}
+		if actor.ID == ordinary.ID {
+			protected = append(protected, another)
+		}
+		for _, target := range protected {
+			path := "/api/admin/users/" + target.ID
+			administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"USER"}`, auth), 400)
+			administrationStatus(t, administrationRequest(t, s, "PUT", path+"/status", `{"status":"DISABLED"}`, auth), 400)
+			administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", auth), 400)
+			administrationStatus(t, administrationRequest(t, s, "POST", "/api/admin/users", fmt.Sprintf(`{"email":%q,"role":"USER"}`, strings.ToUpper(target.Email)), auth), 400)
+		}
+	}
+	// An upsert by the manager may demote a regular admin, with the same SQL policy.
+	auth := administrationKey(t, store, manager)
+	administrationStatus(t, administrationRequest(t, s, "POST", "/api/admin/users", `{"email":"another-admin@example.com","role":"USER"}`, auth), 200)
+	// Claims in request data never make an ordinary admin a manager.
+	auth = administrationKey(t, store, ordinary)
+	administrationStatus(t, administrationRequest(t, s, "POST", "/api/admin/users", `{"email":"another-admin@example.com","role":"USER","canManageAdmins":true}`, auth), 400)
+	response := administrationRequest(t, s, "GET", "/api/account?isAdminManager=true", "", auth)
+	administrationStatus(t, response, 200)
+	var account dashboardUser
+	if err := json.Unmarshal(response.Body.Bytes(), &account); err != nil {
+		t.Fatal(err)
+	}
+	if account.IsAdminManager {
+		t.Fatal("manager authority came from request data")
+	}
+}
+
+func TestManagerAuthorityComesOnlyFromCurrentConfiguration(t *testing.T) {
+	s, store, first, _ := newTestServer(t)
+	ctx := context.Background()
+	second, err := store.UpsertAllowedUser(ctx, "later@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.isAdminManager(first) || s.isAdminManager(second) {
+		t.Fatal("creation order granted unconfigured manager authority")
+	}
+	s.cfg.AdminEmails = []string{second.Email}
+	if s.isAdminManager(first) || !s.isAdminManager(second) {
+		t.Fatal("configuration did not select the manager")
+	}
+	// Simulate restarting with the owner configuration changed; no DB role migration.
+	restarted := NewServer(Config{Version: "test", AdminEmails: []string{first.Email}}, store)
+	if !restarted.isAdminManager(first) || restarted.isAdminManager(second) {
+		t.Fatal("manager rights survived removal from deployment configuration")
+	}
+	if user, err := store.UserByID(ctx, second.ID); err != nil || user.Role != "ADMIN" {
+		t.Fatal("configuration change unexpectedly changed the stored role", err)
+	}
+}
+
+func TestManagerCanDeleteAnotherAdminThroughCompatibleBrowserRoute(t *testing.T) {
+	s, store, manager, _ := newTestServer(t)
+	ctx := context.Background()
+	s.cfg.AdminEmails = []string{manager.Email}
+	secondary, err := store.UpsertAllowedUser(ctx, "legacy-admin@example.com", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.CreateWebSession(ctx, manager.ID, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := administrationRequest(t, s, "POST", "/vault-dashboard/users/delete", "userId="+secondary.ID, map[string]string{"Cookie": sessionCookieName + "=" + session, "Content-Type": "application/x-www-form-urlencoded"})
+	if response.Code != 303 || response.Header().Get("Location") != "/vault-dashboard?message=user-deleted" {
+		t.Fatalf("legacy manager action: %d %s", response.Code, response.Body)
+	}
+	if _, err := store.UserByID(ctx, secondary.ID); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatal("legacy route did not delete admin", err)
 	}
 }

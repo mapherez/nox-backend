@@ -17,6 +17,8 @@ const data: Dashboard = {
     role: "ADMIN",
     status: "ACTIVE",
     lastLoginAt: "",
+    isAdminManager: true,
+    permissions: { canDelete: false, canChangeRole: false, canChangeStatus: false },
   },
   isAdmin: true,
   users: [
@@ -28,6 +30,8 @@ const data: Dashboard = {
       role: "ADMIN",
       status: "ACTIVE",
       lastLoginAt: "",
+      isAdminManager: true,
+      permissions: { canDelete: false, canChangeRole: false, canChangeStatus: false },
     },
     {
       id: "m",
@@ -37,6 +41,8 @@ const data: Dashboard = {
       role: "USER",
       status: "ACTIVE",
       lastLoginAt: "",
+      isAdminManager: false,
+      permissions: { canDelete: true, canChangeRole: true, canChangeStatus: true },
     },
   ],
   vaults: [
@@ -81,7 +87,12 @@ test("admin UI uses API routes and preserves exact revisions, encoded download I
 test("member UI retains own credentials and vaults without administrative controls", () => {
   render(
     <DashboardView
-      data={{ ...data, isAdmin: false, user: { ...data.user, role: "USER" }, users: null }}
+      data={{
+        ...data,
+        isAdmin: false,
+        user: { ...data.user, role: "USER", isAdminManager: false },
+        users: null,
+      }}
     />,
   );
   expect(screen.getByLabelText("API key")).toBeTruthy();
@@ -248,4 +259,59 @@ test("connection configuration uses revision preconditions and never claims to b
   expect((screen.getByLabelText("Yard HTTPS address") as HTMLInputElement).value).toBe(
     "https://yard-new.example.com",
   );
+});
+
+test("a manager can manage a regular admin while its configured account remains protected", () => {
+  const secondary = { ...data.users![1]!, role: "ADMIN" };
+  render(<DashboardView data={{ ...data, users: [data.users![0]!, secondary] }} />);
+  const managerRow = screen.getByRole("row", { name: /admin@example.com/ });
+  const adminRow = screen.getByRole("row", { name: /member@example.com/ });
+  expect(
+    (managerRow.querySelector('button[aria-label="Delete user"]') as HTMLButtonElement).disabled,
+  ).toBe(true);
+  expect(
+    (adminRow.querySelector('button[aria-label="Delete user"]') as HTMLButtonElement).disabled,
+  ).toBe(false);
+  expect(screen.getByRole("button", { name: "Make member" }).closest("form")?.action).toContain(
+    "/api/admin/users/m/role",
+  );
+  expect(
+    (adminRow.querySelector('button[aria-label="Disable user"]') as HTMLButtonElement).disabled,
+  ).toBe(false);
+  expect(managerRow.textContent).toContain("Admin Manager");
+});
+
+test("ordinary admins obey backend capabilities instead of enabling all admin actions", () => {
+  const restricted = {
+    ...data.users![1]!,
+    role: "ADMIN",
+    permissions: { canDelete: false, canChangeRole: false, canChangeStatus: false },
+  };
+  render(
+    <DashboardView
+      data={{ ...data, user: { ...data.user, isAdminManager: false }, users: [restricted] }}
+    />,
+  );
+  expect((screen.getByRole("button", { name: "Delete user" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
+  expect((screen.getByRole("button", { name: "Disable user" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
+  expect(screen.queryByRole("button", { name: "Make member" })).toBeNull();
+});
+
+test("an older Backend without management capabilities does not break the independent frontend", () => {
+  render(
+    <DashboardView
+      data={{ ...data, users: data.users!.map((user) => ({ ...user, permissions: undefined })) }}
+    />,
+  );
+  expect(screen.getByRole("alert").textContent).toContain("Update the Backend service");
+  expect((screen.getByRole("button", { name: "Add user" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
+  expect(screen.getByRole("link", { name: "Download vault" })).toBeTruthy();
+  for (const button of screen.getAllByRole("button", { name: "Delete user" }))
+    expect((button as HTMLButtonElement).disabled).toBe(true);
 });

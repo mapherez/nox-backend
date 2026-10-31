@@ -50,7 +50,7 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 			writeStorageError(w, err)
 			return
 		}
-		data.User = presentDashboardUser(user)
+		data.User = s.presentDashboardUser(user, user)
 		data.APIKey = apiKey
 		data.Vaults = presentDashboardVaults(vaults)
 		data.DeletedVaults = presentDashboardVaults(deletedVaults)
@@ -67,7 +67,7 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			for _, item := range users {
-				data.Users = append(data.Users, presentDashboardUser(item))
+				data.Users = append(data.Users, s.presentDashboardUser(user, item))
 			}
 		}
 	}
