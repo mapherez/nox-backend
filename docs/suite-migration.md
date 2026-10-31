@@ -2,7 +2,7 @@
 
 Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.11`; these point-5 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.12`; these point-6 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -23,8 +23,8 @@ Work stops after each numbered point until the owner approves the next one.
 | 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Completed; owner confirmed split deployment working and authorized point 3 |
 | 3 | Complete administration APIs and retain native frontend functionality | Completed; owner confirmed operation and authorized point 4 |
 | 4 | Implement persistent service trust and pairing | Completed; owner confirmed installed operation and authorized point 5 |
-| 5 | Implement registry and durable events | Completed and locally validated; awaiting owner approval for point 6 |
-| 6 | Implement authorization issuance | Pending |
+| 5 | Implement registry and durable events | Completed; owner confirmed installed operation and authorized point 6 |
+| 6 | Implement authorization issuance | Completed and locally validated; awaiting owner approval for point 7 |
 | 7 | Adapt Backend as a Suite product | Pending |
 | 8 | Complete administration, deployment, documentation, CI, and delivery validation | Pending |
 
@@ -344,3 +344,63 @@ performed. Point 6 has not started.
   approval. No installed deployment, real product, remote GitHub workflow, tag or
   release was changed by these validations. This does not certify later Backend
   work or integrations with products that have not yet been adapted.
+
+
+## Point 6 implementation
+
+[Authorization issuance](suite-authorization.md) implements the contract's two
+Gateway-authenticated exchange routes with actual ES256 user/probe profiles and
+SDK-compatible responses. Current local account/key/role, source credential/grants,
+registration, association, Suite capability and signing key determine authority.
+Unknown client assertions cannot select identity, audience, scopes or lifetime.
+Inspection maps to USER; ADMIN adds write and sensitive-read. No domain ownership
+rule or native/direct MCP authentication model was changed.
+
+Migration 7 preserves installed data and adds stable personal-key IDs, authorization
+revisions and transactional native user/key invalidations, plus admission blocking
+for a verified incompatible declaration update while retaining accepted membership.
+The schema guard verifies the required invalidation triggers. Existing retention
+and housekeeping handle events; no duplicate destructive cleanup trigger is added.
+Fresh verified repair restores issuance; replay of an earlier outcome cannot repair
+an unverified/incompatible endpoint. Exchanges persist no access tokens and do not
+contact Google or refetch products on each renewal. No environment changes are needed.
+
+Point 7 has not started. No version bump, commit, push, remote workflow or release
+was performed by this work; work stops after point 6 for owner approval.
+
+
+### Point 6 validation results
+
+- All 137 top-level Go tests passed with the race detector (273 passing results,
+  including subtests/fuzz seeds); full vet and Go formatting checks passed.
+- Actual Backend-signed ES256 user/probe responses verify with the released SDK.
+  Tests cover role mapping, response/claims agreement, unique request-local grants,
+  wrong issuer/audience/actor/credential/registration/association, modified signature,
+  profile separation and the five-second expiry safety margin. Readiness tokens
+  cannot acquire user scopes or invoke tool/business methods under SDK admission.
+- Issuance checks current prepared local accounts/keys without Google/product network
+  calls, even after restart and with an offline target. Spoofed request assertions,
+  query credentials, duplicate JSON, unacknowledged/wrong-purpose callers and stale
+  registration revisions are rejected. Direct/native API keys remain independent.
+- Revocation, source credential overlap/ACK, signing-key rotation/revocation, removed
+  or replaced associations, unsupported capabilities and clock rollback are covered.
+  The replaced-association case also passed its targeted race test after final review.
+- Native account/key changes invalidate actual SDK cache entries through the HTTP
+  event feed; a delayed renewal cannot repopulate invalidated authority. Injected
+  event-write failures roll back role/status/key/deletion changes and metadata.
+  Migration 6-to-7 preserves personal keys, sessions, issuer, registry and trust;
+  normal restart preserves new authority IDs. Missing required triggers fail the
+  installed-schema guard. Verified incompatible updates retain membership while
+  blocking issuance until a fresh verified repair, including across restart.
+- Both candidate Docker images built. All three Chromium/split-deployment flows
+  passed, preserving native account-manager administration, cookies/roles, vaults,
+  API/direct MCP, sync streaming, public OAuth redirects and frontend-only replacement.
+  The mandatory image HTTPS test passed authentication and forged-HTTP rejection for
+  both issuance routes, restart-persistent keys and packaged HTTPS healthchecks.
+- Frontend checks and 15 React tests passed; all 40 release-tooling tests passed.
+  Python syntax, documentation links and diff whitespace were checked. Existing CI
+  and release jobs already run the added Go tests and updated mandatory image check.
+- Point 6 is complete locally; point 7 remains unstarted. No installed deployment,
+  actual Gateway/product adaptation, remote workflow, commit, version bump, tag or
+  release was performed by these validations. Native HTTP installs can perform their
+  regression checks now; manual Suite exchanges require the later HTTPS setup.

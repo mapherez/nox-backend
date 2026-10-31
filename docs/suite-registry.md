@@ -4,7 +4,8 @@ Backend work point 5 implements the published NoX MCP 0.7.0 / Suite 1.0
 [contract references](suite-migration.md#approved-references-and-progression).
 [Persistent pairing and service trust](suite-trust.md) are prerequisites for
 membership. This work does not implement Gateway, Yard adaptations, Portal, CLI,
-user/probe issuance (point 6), or Backend's own Suite MCP path (point 7).
+or Backend's own Suite MCP path (point 7). [User/probe issuance](suite-authorization.md)
+is implemented separately in point 6.
 Any present or future conforming product can use these APIs; there is no product
 catalog encoded in the registry.
 
@@ -78,8 +79,8 @@ removal requires an explicitly proven active association and receives new IDs.
 
 The feed includes committed `product.upserted`, `product.removed`,
 `service.invalidated`, `signing-keys.changed`, `observation.updated`, and
-`producer.reassociated` events. It can deliver `authorization.invalidated`; hooking
-user/key authorization changes and issuance into that event remains point 6.
+`producer.reassociated` events. Native user/key changes also emit `authorization.invalidated` atomically as part
+of [point-6 issuance/invalidation](suite-authorization.md).
 It uses management HTTP JSON long polling, not MCP SSE.
 
 `waitMs` accepts integers 0–25000 and defaults to 25000. `limit` accepts 1–256 and

@@ -49,6 +49,8 @@ func (s *Server) registerSuiteTrust(mux *http.ServeMux) {
 		path    string
 		handler http.HandlerFunc
 	}{
+		{"/api/nox/authorizations", s.handleSuiteAuthorization},
+		{"/api/nox/service-authorizations", s.handleSuiteProbeAuthorization},
 		{"/api/nox/products", s.handleSuiteProducts},
 		{"/api/nox/products/{productId}", s.handleSuiteProducts},
 		{"/api/nox/products/{productId}/observations", s.handleSuiteObservation},

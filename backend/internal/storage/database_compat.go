@@ -132,7 +132,7 @@ func (s *Store) validateExistingSchema(ctx context.Context) error {
 }
 
 func databaseSchema(ctx context.Context, db *sql.DB) (map[string]string, error) {
-	rows, err := db.QueryContext(ctx, `SELECT type, name, sql FROM sqlite_master WHERE type IN ('table','index') AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL`)
+	rows, err := db.QueryContext(ctx, `SELECT type, name, sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}

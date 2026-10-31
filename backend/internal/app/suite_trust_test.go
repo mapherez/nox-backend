@@ -205,9 +205,9 @@ func TestSuiteHTTPSPairingRecoveryAndServiceCredentialBoundaries(t *testing.T) {
 	if status != 401 {
 		t.Fatal("service credential accepted by existing client API")
 	}
-	// Registry and delegation issuance have not been implemented by trust pairing.
+	// An ordinary product credential cannot issue user delegations.
 	status, _, raw = f.call(t, "POST", "/api/nox/authorizations", map[string]any{"contractVersion": "1.0"}, provision.ServiceCredential, nil)
-	suiteHTTPStatus(t, status, 404, raw)
+	suiteHTTPStatus(t, status, 403, raw)
 }
 
 func TestSuiteHTTPSVerificationRejectsPinRedirectIdentityAndPolicyChanges(t *testing.T) {

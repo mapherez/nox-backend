@@ -195,5 +195,6 @@ A frontend-only rollback to a compatible UI does not roll back the database.
 CI and release workflows already run all Go tests, frontend checks/tests and the
 real split-image/browser checks. The point-3 tests run through those existing
 jobs. [Pairing/trust (4)](suite-trust.md) is now implemented separately.
-Registry/events (5), issuance (6), Suite product adaptation (7) and complete delivery
+[Registry/events (5)](suite-registry.md) and [issuance (6)](suite-authorization.md)
+are now implemented separately. Suite product adaptation (7) and complete delivery
 validation (8) remain pending.

@@ -432,6 +432,7 @@ func TestSuiteMigrationFiveToSixPreservesInstalledTrust(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	rewindSuiteAuthorizationSchema(t, f.store)
 	// Reconstruct an actual point-4 schema in disposable data, with its issuer,
 	// service credential and encrypted signing material already populated.
 	for _, table := range []string{"suite_registry_state", "suite_products", "suite_product_tombstones", "suite_observation_epochs", "suite_observations"} {

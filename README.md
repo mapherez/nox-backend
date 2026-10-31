@@ -460,6 +460,7 @@ node --test scripts/release.test.mjs
 - [Administration API and initial foundation configuration](docs/administration-api.md)
 - [Suite authority, secure pairing, service credentials and recovery](docs/suite-trust.md)
 - [Suite registry, durable events and availability](docs/suite-registry.md)
+- [Suite user delegation and service probe issuance](docs/suite-authorization.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

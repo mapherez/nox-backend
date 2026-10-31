@@ -146,6 +146,13 @@ http {
                 status, headers, body = request(base, path, context)
                 assert status == 401 and json.loads(body)["error"]["code"] == "UNAUTHENTICATED"
                 assert headers["Cache-Control"] == "no-store"
+            for path in ["/api/nox/authorizations", "/api/nox/service-authorizations"]:
+                status, headers, body = request(base, path, context, {"Content-Type": "application/json"}, b"{}")
+                assert status == 401 and json.loads(body)["error"]["code"] == "UNAUTHENTICATED"
+                assert headers["Cache-Control"] == "no-store"
+                for endpoint in [frontend_base, backend_base]:
+                    status, _, body = request(endpoint, path, headers={"Content-Type": "application/json", "X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"}, data=b"{}")
+                    assert status == 403 and json.loads(body)["error"]["code"] == "FORBIDDEN"
             docker("exec", backend, "/usr/local/bin/nox-backend", "healthcheck")
             docker("restart", backend)
             # Docker may reassign an ephemeral host port on restart. The service

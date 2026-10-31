@@ -280,11 +280,12 @@ func TestFoundationConnectionConfigurationIsNotTrust(t *testing.T) {
 	update["If-Match"] = response.Header().Get("ETag")
 	administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", update), 200)
 	administrationStatus(t, administrationRequest(t, s, "DELETE", path, "", update), 412)
-	// Registry and issuance remain absent; trust pairing now requires HTTPS.
+	// All implemented Suite routes require HTTPS; the unsupported alias stays absent.
 	administrationStatus(t, administrationRequest(t, s, "POST", "/api/nox/pairings", `{}`, auth), 403)
-	for _, path := range []string{"/api/nox/authorizations", "/api/nox/registry"} {
-		administrationStatus(t, administrationRequest(t, s, "POST", path, `{}`, auth), 404)
+	for _, path := range []string{"/api/nox/authorizations", "/api/nox/service-authorizations"} {
+		administrationStatus(t, administrationRequest(t, s, "POST", path, `{}`, auth), 403)
 	}
+	administrationStatus(t, administrationRequest(t, s, "POST", "/api/nox/registry", `{}`, auth), 404)
 }
 
 func TestLegacyBrowserFormsKeepRoutesAndRejectForeignOrigin(t *testing.T) {

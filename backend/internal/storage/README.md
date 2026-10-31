@@ -77,3 +77,10 @@ log generation/floor, producer epochs and observations. Membership/idempotency/e
 and observation/events commit atomically. Normal restart preserves cursors; after a
 complete backup restore, run `nox-backend reset-suite-event-cursors` offline to force
 consumer reconciliation. See [registry operations](../../../docs/suite-registry.md).
+
+Suite migration 7 adds stable user authorization revisions and personal-key IDs
+without changing existing account/key values. Account role/status changes, removal
+and key rotation/deletion commit their invalidations atomically through schema-guarded
+triggers. It also records admission failure for a verified incompatible product
+update. JWTs are signed from the persistent secret store and never persisted as
+replay outcomes. See [authorization issuance](../../../docs/suite-authorization.md).

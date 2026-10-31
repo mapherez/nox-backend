@@ -1,6 +1,8 @@
 package app
 
 import (
+	"errors"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -74,7 +76,27 @@ func (s *Server) handleSuiteProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	declaration, err := s.fetchSuiteDeclaration(r.Context(), prepared.Origin, prepared.TLSFingerprint)
 	if err != nil {
+		var failure *storage.SuiteError
+		if errors.As(err, &failure) && ((failure.Status == 422 && failure.Code == "UNSUPPORTED_INTEGRATION") || (failure.Status == 400 && failure.Code == "INVALID_REGISTRATION")) {
+			if blocked := s.store.SuiteBlockIncompatibleRegistration(r.Context(), caller, id, req, expected, prepared); blocked != nil {
+				writeSuiteError(w, blocked)
+				return
+			}
+		}
 		writeSuiteError(w, err)
+		return
+	}
+	doc, err := noxmcp.LoadSuiteProductDeclaration(declaration)
+	if err != nil {
+		writeSuiteError(w, suiteDocumentError(err, "Invalid verified declaration."))
+		return
+	}
+	if doc.ProductID != id {
+		if err = s.store.SuiteBlockIncompatibleRegistration(r.Context(), caller, id, req, expected, prepared); err != nil {
+			writeSuiteError(w, err)
+			return
+		}
+		writeSuiteError(w, suiteHTTPError(409, "REGISTRATION_CONFLICT", "The verified product identity differs from the registered product."))
 		return
 	}
 	result, err := s.store.SuiteCommitRegistration(r.Context(), caller, id, req, expected, key, digest, prepared, declaration)

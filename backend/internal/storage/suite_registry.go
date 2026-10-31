@@ -177,6 +177,10 @@ func (s *Store) SuiteCommitRegistration(ctx context.Context, caller SuiteCaller,
 			raw, _ := json.Marshal(req.Extra)
 			record.Extra = map[string]json.RawMessage{"requestExtensions": raw}
 		}
+		// A successful fresh verification also repairs a previously blocked declaration.
+		if _, err = x.tx.ExecContext(ctx, `UPDATE suite_product_admission SET blocked=0 WHERE product_id=?`, id); err != nil {
+			return SuiteResult{}, err
+		}
 		status := 201
 		if exists {
 			status = 200
