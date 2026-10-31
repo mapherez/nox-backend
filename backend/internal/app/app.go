@@ -22,6 +22,7 @@ type Config struct {
 	GoogleClientID                                               string
 	GoogleClientSecret                                           string
 	AdminEmails                                                  []string
+	SuiteReportInterval, SuiteObservationFreshness               time.Duration
 	TLSCertFile, TLSKeyFile                                      string
 	SuiteAllowedCIDRs, SuiteAllowedPorts, SuiteTrustedProxyCIDRs []string
 }

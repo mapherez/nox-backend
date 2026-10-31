@@ -6,8 +6,10 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mapherez/nox-backend/backend/internal/app"
 	"github.com/mapherez/nox-backend/backend/internal/storage"
@@ -25,13 +27,29 @@ func Run(buildVersion string) error {
 					name = origin.Hostname()
 				}
 				return checkHealthTLS(context.Background(), getenv("NOX_SYNC_ADDR", ":8080"), getenv("NOX_SYNC_TLS_CERT_FILE", "") != "", name, getenv("NOX_SYNC_TLS_CA_FILE", ""))
+			case "reset-suite-event-cursors":
+				store, err := storage.Open(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
+				if err != nil {
+					return err
+				}
+				defer store.Close()
+				return store.ResetSuiteEventCursors(context.Background())
 			case "migrate-database":
 				return storage.MigrateDatabaseFile(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
 			}
 		}
-		return fmt.Errorf("usage: nox-backend [healthcheck|migrate-database]")
+		return fmt.Errorf("usage: nox-backend [healthcheck|migrate-database|reset-suite-event-cursors]")
+	}
+	report, err := suiteInterval("NOX_SYNC_SUITE_REPORT_INTERVAL_MS", 15000)
+	if err != nil {
+		return err
+	}
+	freshness, err := suiteInterval("NOX_SYNC_SUITE_OBSERVATION_FRESHNESS_MS", 45000)
+	if err != nil {
+		return err
 	}
 	cfg := app.Config{
+		SuiteReportInterval: report, SuiteObservationFreshness: freshness,
 		Addr:               getenv("NOX_SYNC_ADDR", ":8080"),
 		DataDir:            getenv("NOX_SYNC_DATA_DIR", "/data"),
 		Version:            runtimeVersion(buildVersion),
@@ -88,4 +106,12 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func suiteInterval(name string, fallback int64) (time.Duration, error) {
+	value, err := strconv.ParseInt(getenv(name, strconv.FormatInt(fallback, 10)), 10, 64)
+	if err != nil || value <= 0 || value > int64((1<<63-1)/int64(time.Millisecond)) {
+		return 0, fmt.Errorf("%s must be a positive millisecond interval", strings.Replace(name, "NOX_SYNC_", "NOX_BACKEND_", 1))
+	}
+	return time.Duration(value) * time.Millisecond, nil
 }

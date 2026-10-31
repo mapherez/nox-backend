@@ -188,6 +188,9 @@ func (s *Server) fetchSuiteDeclaration(ctx context.Context, origin, pin string) 
 	return raw, nil
 }
 func validateSuiteConfig(cfg Config) error {
+	if cfg.SuiteReportInterval < 0 || cfg.SuiteObservationFreshness < 0 || cfg.SuiteReportInterval%time.Millisecond != 0 || cfg.SuiteObservationFreshness%time.Millisecond != 0 {
+		return fmt.Errorf("Suite observation intervals must be positive whole milliseconds")
+	}
 	for _, values := range [][]string{cfg.SuiteAllowedCIDRs, cfg.SuiteTrustedProxyCIDRs} {
 		for _, raw := range values {
 			if _, err := netip.ParsePrefix(strings.TrimSpace(raw)); err != nil {

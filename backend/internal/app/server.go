@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mapherez/nox-backend/backend/internal/storage"
@@ -19,10 +20,15 @@ type Server struct {
 	store       *storage.Store
 	events      *statusBroker
 	suiteVerify chan struct{}
+	suitePollMu sync.Mutex
+	suitePolls  map[string]bool
 }
 
 // NewServer creates a backend server instance.
 func NewServer(cfg Config, store *storage.Store) *Server {
+	if store != nil {
+		store.ConfigureSuiteObservationTiming(cfg.SuiteReportInterval, cfg.SuiteObservationFreshness)
+	}
 	return &Server{
 		cfg:         cfg,
 		store:       store,

@@ -142,6 +142,10 @@ http {
                 assert headers["Cache-Control"] == "no-store"
             status, _, body = request(base, "/api/nox/pairings", context, {"Content-Type": "application/json"}, b"{}")
             assert status == 401 and json.loads(body)["error"]["code"] == "UNAUTHENTICATED"
+            for path in ["/api/nox/products", "/api/nox/events?after=invalid&waitMs=0"]:
+                status, headers, body = request(base, path, context)
+                assert status == 401 and json.loads(body)["error"]["code"] == "UNAUTHENTICATED"
+                assert headers["Cache-Control"] == "no-store"
             docker("exec", backend, "/usr/local/bin/nox-backend", "healthcheck")
             docker("restart", backend)
             # Docker may reassign an ephemeral host port on restart. The service

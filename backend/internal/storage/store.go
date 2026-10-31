@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -21,6 +23,10 @@ type Store struct {
 	dataDir                        string
 	dbPath                         string
 	suiteVault                     *suiteSecretVault
+	suiteEventMu                   sync.Mutex
+	suiteEventWake                 chan struct{}
+	suiteFreshness                 atomic.Int64
+	suiteReportInterval            atomic.Int64
 	suiteClock                     func() time.Time
 	suiteWallStart, suiteMonoStart time.Time
 }

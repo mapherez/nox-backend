@@ -3,6 +3,7 @@ package command
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestRuntimeVersion(t *testing.T) {
@@ -48,5 +49,29 @@ func TestEnvironmentAliases(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSuiteIntervalsValidateAndSupportAliases(t *testing.T) {
+	for _, suffix := range []string{"REPORT_INTERVAL_MS", "OBSERVATION_FRESHNESS_MS"} {
+		name := "NOX_SYNC_SUITE_" + suffix
+		canonical := "NOX_BACKEND_SUITE_" + suffix
+		t.Setenv(name, "12000")
+		t.Setenv(canonical, "")
+		duration, err := suiteInterval(name, 15000)
+		if err != nil || duration != 12*time.Second {
+			t.Fatal("legacy interval ignored", err)
+		}
+		t.Setenv(canonical, "23000")
+		duration, err = suiteInterval(name, 15000)
+		if err != nil || duration != 23*time.Second {
+			t.Fatal("canonical interval ignored", err)
+		}
+		for _, invalid := range []string{"0", "-1", "1.5", "NaN", "9223372036854775807"} {
+			t.Setenv(canonical, invalid)
+			if _, err = suiteInterval(name, 15000); err == nil {
+				t.Fatalf("invalid interval accepted: %s", invalid)
+			}
+		}
 	}
 }

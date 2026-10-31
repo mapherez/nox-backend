@@ -49,6 +49,11 @@ func (s *Server) registerSuiteTrust(mux *http.ServeMux) {
 		path    string
 		handler http.HandlerFunc
 	}{
+		{"/api/nox/products", s.handleSuiteProducts},
+		{"/api/nox/products/{productId}", s.handleSuiteProducts},
+		{"/api/nox/products/{productId}/observations", s.handleSuiteObservation},
+		{"/api/nox/products/{productId}/observation-epochs", s.handleSuiteObservationEpoch},
+		{"/api/nox/events", s.handleSuiteEvents},
 		{"/api/nox/keys", s.handleSuiteKeys},
 		{"/api/nox/keys/{keyId}", s.handleSuiteRevokeKey},
 		{"/api/nox/keys/{keyId}/activate", s.handleSuiteActivateKey},
@@ -76,11 +81,15 @@ func (s *Server) registerSuiteTrust(mux *http.ServeMux) {
 				writeSuiteError(w, err)
 				return
 			}
-			ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+			budget := 20 * time.Second
+			if r.URL.Path == "/api/nox/events" {
+				budget = 30 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), budget)
 			defer cancel()
 			r = r.WithContext(ctx)
 			controller := http.NewResponseController(w)
-			_ = controller.SetReadDeadline(time.Now().Add(20 * time.Second))
+			_ = controller.SetReadDeadline(time.Now().Add(budget))
 			defer controller.SetReadDeadline(time.Time{})
 			if err := s.store.MaintainSuiteTrust(ctx); err != nil {
 				writeSuiteError(w, err)
@@ -91,6 +100,9 @@ func (s *Server) registerSuiteTrust(mux *http.ServeMux) {
 	}
 }
 func (s *Server) suiteCaller(w http.ResponseWriter, r *http.Request, services bool) (storage.SuiteCaller, bool) {
+	return s.suiteRequestCaller(w, r, services, false)
+}
+func (s *Server) suiteRequestCaller(w http.ResponseWriter, r *http.Request, services, members bool) (storage.SuiteCaller, bool) {
 	if values, present := r.Header["Authorization"]; present {
 		if len(values) != 1 {
 			writeSuiteError(w, suiteHTTPError(401, "UNAUTHENTICATED", "Invalid authorization header."))
@@ -121,7 +133,7 @@ func (s *Server) suiteCaller(w http.ResponseWriter, r *http.Request, services bo
 			writeSuiteError(w, suiteHTTPError(status, "UNAUTHENTICATED", "A valid Backend administrator credential is required."))
 			return storage.SuiteCaller{}, false
 		}
-		if user.Role != storage.UserRoleAdmin {
+		if user.Role != storage.UserRoleAdmin && !members {
 			writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Admin access is required."))
 			return storage.SuiteCaller{}, false
 		}
@@ -136,7 +148,7 @@ func (s *Server) suiteCaller(w http.ResponseWriter, r *http.Request, services bo
 		writeSuiteError(w, suiteHTTPError(401, "UNAUTHENTICATED", "An active Backend session or service credential is required."))
 		return storage.SuiteCaller{}, false
 	}
-	if user.Role != storage.UserRoleAdmin {
+	if user.Role != storage.UserRoleAdmin && !members {
 		writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Admin access is required."))
 		return storage.SuiteCaller{}, false
 	}

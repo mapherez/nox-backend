@@ -23,7 +23,13 @@ export interface FoundationConnection {
   origin: string;
   revision: string;
   updatedAt: string;
-  status: "not_configured" | "not_paired" | "pairing_pending" | "paired" | "recovery_required";
+  status:
+    | "not_configured"
+    | "not_paired"
+    | "pairing_pending"
+    | "paired"
+    | "registered"
+    | "recovery_required";
 }
 export interface Dashboard {
   authenticated: boolean;

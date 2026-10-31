@@ -2,7 +2,7 @@
 
 Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.10`; these point-4 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.11`; these point-5 changes do not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -22,8 +22,8 @@ Work stops after each numbered point until the owner approves the next one.
 | 1 | Record the existing baseline and consume SDK `0.7.0` | Completed and approved to proceed |
 | 2 | Separate frontend/backend builds, images, containers, and business operations within the same project | Completed; owner confirmed split deployment working and authorized point 3 |
 | 3 | Complete administration APIs and retain native frontend functionality | Completed; owner confirmed operation and authorized point 4 |
-| 4 | Implement persistent service trust and pairing | Completed and locally validated; awaiting owner approval for point 5 |
-| 5 | Implement registry and durable events | Pending |
+| 4 | Implement persistent service trust and pairing | Completed; owner confirmed installed operation and authorized point 5 |
+| 5 | Implement registry and durable events | Completed and locally validated; awaiting owner approval for point 6 |
 | 6 | Implement authorization issuance | Pending |
 | 7 | Adapt Backend as a Suite product | Pending |
 | 8 | Complete administration, deployment, documentation, CI, and delivery validation | Pending |
@@ -278,3 +278,69 @@ Point 5 is not started; work stops after this point for owner approval.
   No installed deployment, real service credential, Google account, GitHub release
   or remote workflow was changed/executed by these validations. Full actual-product
   rollout remains point 8. Point 5 remains pending.
+
+
+## Point 5 implementation
+
+[Registry/events operations](suite-registry.md) implements generic verified
+registration, material/opaque revisions, current deployment authorization,
+role-filtered consistent snapshots, durable conditional/idempotent mutations,
+removal tombstones and association retirement. Every membership mutation commits
+with its outcome and events in one transaction. Replays do not refetch products or
+remove replacement registrations. No product-specific integration was introduced.
+
+The persisted event feed supports bounded/scoped pages and 25-second long polling,
+seven-day/100,000-event retention, resumable opaque cursors and explicit 410 snapshot
+reconciliation. Normal restart preserves the generation. The offline
+`reset-suite-event-cursors` operation forces reconciliation after full data restore.
+Ordered, authorized observations use SDK uint64 string comparison, producer epochs,
+clock checks and independent lifecycle/MCP freshness; they never delete membership.
+The native connection status now distinguishes registered from paired/pending.
+
+Migration 6 preserves the installed migration-5 authority, service credentials,
+private store and all legacy account/vault data. The same existing CI Go test jobs
+cover the added persistence and real HTTPS route tests; the mandatory image TLS
+check also checks authentication on the registry/feed routes. Frontend-only build
+and publication remain independent. No version bump, commit, push or release was
+performed. Point 6 has not started.
+
+
+### Point 5 validation results
+
+- All 121 top-level Go tests passed with the race detector (257 passing results
+  including subtests/fuzz seeds); full vet, formatting and native compilation passed.
+- Real HTTPS service tests verify re-fetch/pinning, route/declaration identity,
+  current authorization, role filtering, HTTP preconditions/validators, no-refetch
+  lost-response recovery, empty 204 removal/replay and SDK snapshot/event reduction.
+- Persistence tests cover competing writes, injected event-write rollback,
+  removal/re-enrollment with delayed retries, cursor scoping/paging/retention,
+  normal restart and explicit restore reconciliation. Migration 5-to-6 preserves
+  installed issuer/key material and service credentials without inventing membership.
+- Observations cover exact uint64 boundaries, duplicates/older reports/conflicting
+  content, clock bounds, stale freshness, epoch reset/restart, reporting grants,
+  deployment ownership and independent lifecycle/MCP state.
+- The real default 25-second HTTPS poll passed. It originally exposed the inherited
+  20-second socket deadline; the deadline now matches the feed's 30-second request
+  budget. A second concurrent subscription is rejected and waiting leaves SQLite
+  available to other operations. Cancellation/revocation wake and stop admission.
+- Frontend format/types/lint, 15 React tests and production build passed. All 40
+  release-tooling tests passed without invoking release creation. YAML, local
+  documentation links, Python syntax and diff whitespace checks passed.
+- The compiled native binary passed startup over actual TLS, its packaged healthcheck,
+  authenticated empty registry/policy, migration 6, offline cursor reset and restart
+  preservation of issuer/keyset/registry revision, using disposable data only.
+- Both candidate Docker images built successfully. The split deployment and all
+  three Chromium workflows passed, preserving dashboard/assets, cookies/roles,
+  admin-manager operations, public OAuth redirects, vault int64 revisions, native
+  forms, API/direct MCP, sync SSE and frontend-only image replacement. The matching
+  Playwright Chromium was installed in temporary storage for this validation.
+- The updated image-level HTTPS proxy check passed: the registry/event routes enforce
+  authentication, forged direct HTTP transport claims are rejected, issuer/key state
+  survives restart and the direct-TLS packaged healthcheck succeeds. The independent
+  frontend image startup/assets/transport guard check also passed. Both Compose
+  configurations validate with the Docker Compose CLI. Temporary networks/containers
+  were removed by the test harnesses.
+- Point 5 is complete and locally validated; work stops before point 6 for owner
+  approval. No installed deployment, real product, remote GitHub workflow, tag or
+  release was changed by these validations. This does not certify later Backend
+  work or integrations with products that have not yet been adapted.

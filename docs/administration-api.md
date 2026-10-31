@@ -113,6 +113,7 @@ contract. Each entry contains `service`, `origin`, `revision`, `updatedAt` and:
 - `not_paired`: address saved; no trust or connection success is implied.
 - `pairing_pending`: awaiting the service's completed/persisted provisioning.
 - `paired`: technical association acknowledged; registry membership remains pending.
+- `registered`: current technical association matches accepted membership; availability remains separate.
 - `recovery_required`: association retained but no usable credential generation.
 
 Origin validation reuses SDK `NormalizeSuiteOrigin`: HTTPS IP/hostname with an
@@ -131,7 +132,7 @@ silently overwrite another administrator's change. A successful save generates
 a fresh revision; removing and recreating configuration never recycles one.
 Removing the saved address does not uninstall a product or revoke a paired
 association. Use the [trust APIs](suite-trust.md) for credential/service revocation;
-registry membership remains separate work in point 5.
+registry membership is managed separately by the [registry APIs](suite-registry.md).
 
 Example creation from the same-origin browser session:
 

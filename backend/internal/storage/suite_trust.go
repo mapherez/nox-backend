@@ -51,6 +51,7 @@ func (SuiteCaller) String() string { return "SuiteCaller(credentials redacted)" 
 
 type SuiteResult struct {
 	Status       int
+	ETag         string
 	Body         json.RawMessage
 	secretHandle string
 }
@@ -85,6 +86,7 @@ type suiteTx struct {
 	ctx              context.Context
 	now              time.Time
 	created, removed []string
+	eventsWritten    bool
 }
 
 func suiteRandom() (string, error) {
@@ -199,6 +201,9 @@ func (s *Store) suiteTransaction(ctx context.Context, fn func(*suiteTx) (SuiteRe
 	if err = tx.Commit(); err != nil {
 		return SuiteResult{}, err
 	}
+	if x.eventsWritten {
+		s.notifySuiteEvents()
+	}
 	for _, file := range x.removed {
 		s.suiteVault.remove(file)
 	}
@@ -237,11 +242,18 @@ func (x *suiteTx) event(kind string, data any) error {
 	if err != nil {
 		return err
 	}
+	if len(body) > noxmcp.SuiteMaxPayloadBytes-1024 {
+		return suiteError(400, "INVALID_REGISTRATION", "The event representation exceeds the bounded management payload.")
+	}
 	if _, err := noxmcp.LoadSuiteEvent(body); err != nil {
 		return err
 	}
 	_, err = x.tx.ExecContext(x.ctx, `INSERT INTO suite_trust_events(event_id,type,event_json,occurred_at) VALUES (?,?,?,?)`, id, kind, string(body), x.now.UnixMilli())
-	return err
+	if err != nil {
+		return err
+	}
+	x.eventsWritten = true
+	return x.pruneEvents()
 }
 func (x *suiteTx) replay(principal, operation, key, digest string) (SuiteResult, bool, error) {
 	if len(key) < 1 || len(key) > 128 || strings.IndexFunc(key, func(r rune) bool { return r < 33 || r > 126 }) >= 0 {

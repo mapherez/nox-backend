@@ -93,7 +93,10 @@ func (x *suiteTx) maintain() error {
 		}
 	}
 	_, err = x.tx.ExecContext(x.ctx, `DELETE FROM suite_idempotency WHERE expires_at<=?`, x.now.UnixMilli())
-	return err
+	if err != nil {
+		return err
+	}
+	return x.pruneEvents()
 }
 
 // Expiry is enforced at admission regardless of this housekeeping cadence.

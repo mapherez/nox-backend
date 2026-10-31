@@ -8,8 +8,9 @@ management operations, not new MCP methods. They work for any conforming product
 
 Backend now persists its issuer, ES256 signing keys, verified service associations,
 credential generations, pairing recovery and conditional/idempotent outcomes.
-Registry membership/event delivery (5), user/probe token issuance (6), Backend Suite
-MCP adaptation (7) and complete UI/delivery integration (8) remain pending.
+[Registry membership/event delivery](suite-registry.md) is implemented in point 5.
+User/probe token issuance (6), Backend Suite MCP adaptation (7) and complete
+UI/delivery integration (8) remain pending.
 A paired service is not a registered product and has no integrated execution rights.
 Existing direct `/mcp`, `/v1/*`, Google login and native account/vault administration
 retain their own authentication and behavior.
@@ -251,10 +252,11 @@ roll back their state, outcome and invalidation together. Ambiguous commit failu
 preserves files for reconciliation. Startup validates references and collects only
 uncommitted file orphans under the same SQLite write reservation as secret creators.
 Persistent invalidations are in `suite_trust_events`; public event delivery and
-registry mutations are deliberately left to point 5.
+registry mutations and event delivery are implemented by the [point-5 APIs](suite-registry.md).
 
 The native frontend reports `not_configured`, `not_paired`, `pairing_pending`,
-`paired` (shown as **Service paired · Registration pending**) or `recovery_required`.
+`paired` (shown as **Service paired · Registration pending**), `registered`
+(with availability tracked separately) or `recovery_required`.
 Saving/removing an address does not itself pair/revoke/uninstall a service.
 Use the trust APIs above for pairing and revocation. Full native management
 controls are completed in the planned administration/delivery work; Portal is not

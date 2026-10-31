@@ -328,6 +328,10 @@ test("foundation trust states do not claim registry or MCP readiness", () => {
   );
   expect(screen.getByText("Service paired · Registration pending")).toBeTruthy();
   rerender(
+    <DashboardView data={{ ...data, connections: [{ ...connection, status: "registered" }] }} />,
+  );
+  expect(screen.getByText("Service registered · Availability tracked separately")).toBeTruthy();
+  rerender(
     <DashboardView
       data={{ ...data, connections: [{ ...connection, status: "recovery_required" }] }}
     />,

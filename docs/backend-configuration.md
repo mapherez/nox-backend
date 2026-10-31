@@ -325,3 +325,11 @@ must be mounted/readable by the process; they are not baked into an image.
 See the trust guide before configuring a proxy: a supplied forwarding header or
 private address is never sufficient on its own. These settings are optional for
 legacy/native operation and necessary for the corresponding Suite deployment.
+
+### Suite registry observations
+
+`NOX_BACKEND_SUITE_REPORT_INTERVAL_MS` defaults to `15000` and
+`NOX_BACKEND_SUITE_OBSERVATION_FRESHNESS_MS` defaults to `45000`. Both accept
+positive integer milliseconds and their `NOX_SYNC_*` aliases. They configure
+installation-wide reporting/freshness, not Google login or work-session duration.
+See [registry/events operations](suite-registry.md) for snapshots and restore handling.

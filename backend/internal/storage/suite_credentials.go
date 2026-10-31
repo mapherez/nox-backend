@@ -379,6 +379,13 @@ func (s *Store) SuiteFoundationStatus(ctx context.Context, purpose, origin strin
 				}
 				if count > 0 {
 					state = "paired"
+					var registered int
+					if err := x.tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM suite_products WHERE product_id=? AND association_id=?`, service.ProductID, service.AssociationID).Scan(&registered); err != nil {
+						return SuiteResult{}, err
+					}
+					if registered > 0 {
+						state = "registered"
+					}
 				} else {
 					state = "recovery_required"
 				}

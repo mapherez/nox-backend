@@ -71,3 +71,9 @@ under `/data/secrets/suite` (0700 directory, 0600 files/master key), not plainte
 in SQLite or raw idempotency outcomes. The secret-store master key is never
 silently regenerated for an existing authority. Back up SQLite/WAL and the entire
 secret store together. See [Suite trust](../../../docs/suite-trust.md).
+
+Suite migration 6 adds persistent registry state, removal tombstones, resumable event
+log generation/floor, producer epochs and observations. Membership/idempotency/events
+and observation/events commit atomically. Normal restart preserves cursors; after a
+complete backup restore, run `nox-backend reset-suite-event-cursors` offline to force
+consumer reconciliation. See [registry operations](../../../docs/suite-registry.md).

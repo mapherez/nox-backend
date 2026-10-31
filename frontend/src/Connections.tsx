@@ -17,6 +17,7 @@ function Connection({ connection }: { connection: FoundationConnection }) {
             not_paired: "Configuration saved · Awaiting pairing",
             pairing_pending: "Pairing pending · Awaiting service confirmation",
             paired: "Service paired · Registration pending",
+            registered: "Service registered · Availability tracked separately",
             recovery_required: "Service credential recovery required",
           }[connection.status]
         }
