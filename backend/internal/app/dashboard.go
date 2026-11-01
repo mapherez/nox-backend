@@ -48,15 +48,16 @@ func presentDashboardVaults(vaults []storage.Vault) []dashboardVault {
 }
 
 type dashboardPageData struct {
-	Authenticated   bool             `json:"authenticated"`
-	OAuthConfigured bool             `json:"oauthConfigured"`
-	LoginURL        string           `json:"loginUrl"`
-	ServerURL       string           `json:"serverUrl"`
-	User            dashboardUser    `json:"user"`
-	APIKey          string           `json:"apiKey"`
-	Vaults          []dashboardVault `json:"vaults"`
-	DeletedVaults   []dashboardVault `json:"deletedVaults"`
-	IsAdmin         bool             `json:"isAdmin"`
-	Users           []dashboardUser  `json:"users"`
-	Connections     []connectionView `json:"connections,omitempty"`
+	Authenticated    bool             `json:"authenticated"`
+	OAuthConfigured  bool             `json:"oauthConfigured"`
+	LoginURL         string           `json:"loginUrl"`
+	ServerURL        string           `json:"serverUrl"`
+	User             dashboardUser    `json:"user"`
+	APIKey           string           `json:"apiKey"`
+	Vaults           []dashboardVault `json:"vaults"`
+	DeletedVaults    []dashboardVault `json:"deletedVaults"`
+	IsAdmin          bool             `json:"isAdmin"`
+	Users            []dashboardUser  `json:"users"`
+	IntegrationError string           `json:"integrationError,omitempty"`
+	Connections      []connectionView `json:"connections,omitempty"`
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { MutationContext, MutationForm, requestJSON } from "./MutationForm";
 import { Connections } from "./Connections";
+import { SuiteAdministration } from "./SuiteAdministration";
 import type { Dashboard, User, Vault } from "./model";
 import { formatBytes, formatTime, messages } from "./model";
 
@@ -634,7 +635,13 @@ export function DashboardView({ data, reload }: { data: Dashboard; reload?: () =
             <div className="stack">
               <Vaults vaults={vaults} deleted={deleted} />
               {data.isAdmin && <Users users={data.users ?? []} />}
+              {data.isAdmin && data.integrationError && (
+                <p role="alert" className="error-message">
+                  {data.integrationError}
+                </p>
+              )}
               {data.isAdmin && <Connections connections={data.connections ?? []} />}
+              {data.isAdmin && <SuiteAdministration key={data.user.id} actorId={data.user.id} />}
             </div>
           </>
         ) : (

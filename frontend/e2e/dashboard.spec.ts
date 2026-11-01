@@ -148,6 +148,12 @@ test("admin manages credentials, users and vaults through authenticated JSON API
       apiKey: await page.getByLabel("API key", { exact: true }).inputValue(),
     }),
   );
+  await page.getByRole("button", { name: "Manage Suite integrations" }).click();
+  await expect(page.getByText(/Open this Backend through its trusted HTTPS address/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create pairing", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Generate new API key", exact: true }),
+  ).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("dashboard.png"), fullPage: true });
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.getByRole("link", { name: "Continue with Google" })).toBeVisible();

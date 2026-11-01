@@ -12,6 +12,7 @@ export default defineConfig({
       "/auth": backend,
       "/v1": backend,
       "/mcp": backend,
+      "/nox": backend,
       "/vault-dashboard/users": backend,
       "/vault-dashboard/vaults": backend,
       "/vault-dashboard/api-key": backend,
@@ -28,7 +29,12 @@ export default defineConfig({
       },
     },
   },
-  test: { environment: "jsdom", include: ["src/**/*.test.tsx"], clearMocks: true },
+  test: {
+    environment: "jsdom",
+    environmentOptions: { jsdom: { url: "https://backend.example.com" } },
+    include: ["src/**/*.test.tsx"],
+    clearMocks: true,
+  },
   lint: {
     options: { typeAware: true, typeCheck: true },
     ignorePatterns: ["dist/**", "playwright-report/**", "test-results/**"],

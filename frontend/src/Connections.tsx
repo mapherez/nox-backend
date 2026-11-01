@@ -70,8 +70,8 @@ export function Connections({ connections }: { connections: FoundationConnection
         dedicated hostname is supported, without an application path.
       </p>
       <p className="muted">
-        Saving an address does not contact or trust the service. Pairing uses the authenticated
-        Suite management API; registration and MCP readiness are separate.
+        Saving an address does not contact or trust the service. Use Suite integration management
+        below for pairing and verified registration. MCP readiness is reported separately.
       </p>
       {connections.map((connection) => (
         <Connection key={`${connection.service}:${connection.revision}`} connection={connection} />

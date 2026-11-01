@@ -196,5 +196,23 @@ CI and release workflows already run all Go tests, frontend checks/tests and the
 real split-image/browser checks. The point-3 tests run through those existing
 jobs. [Pairing/trust (4)](suite-trust.md) is now implemented separately.
 [Registry/events (5)](suite-registry.md) and [issuance (6)](suite-authorization.md)
-are now implemented separately. Suite product adaptation (7) and complete delivery
-validation (8) remain pending.
+are implemented separately. [Suite product adaptation (7)](suite-product.md) and
+[native integration administration (8)](suite-administration.md) are implemented.
+See the [delivery checklist](suite-delivery.md) for installed/remote verification.
+
+
+## Suite administration snapshot
+
+`GET /api/admin/suite` is a native admin-only, JSON/no-store diagnostic projection.
+It accepts a current admin personal key or browser session. Storage rechecks the
+role and supplies consistent safe pairing/service/credential/deployment/key and
+registry/observation state. It exposes no raw secret or verifier. It is available
+on native HTTP, while its configuration fields distinguish trusted HTTPS management
+from target enrollment readiness. Mutations continue to use the existing protected
+`/api/nox/*` contracts and their conditional/idempotent rules. See the
+[native integration workflow](suite-administration.md).
+
+Failure of Suite connection/status reads no longer fails the complete
+`/api/dashboard` response. Admins receive a safe `integrationError` while their
+native account/key/vault controls continue to operate. The independent Suite pane
+fails closed until its status can be refreshed.

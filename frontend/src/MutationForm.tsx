@@ -36,8 +36,9 @@ export async function requestJSON<T>(path: string, options: RequestInit = {}): P
         ? "Your session has expired. Refresh and sign in again."
         : "The administration request failed.";
     try {
-      const error = (await response.json()) as { message?: string };
-      if (response.status !== 401 && typeof error.message === "string") message = error.message;
+      const error = (await response.json()) as { message?: string; error?: { message?: string } };
+      const detail = error.error?.message ?? error.message;
+      if (response.status !== 401 && typeof detail === "string") message = detail;
     } catch {
       /* Keep the status-based diagnostic for non-JSON proxy errors. */
     }

@@ -58,7 +58,7 @@ Before using protected Suite MCP:
 3. Enroll `nox-backend` as an actual product through the existing authorized
    [pairing/ACK](suite-trust.md) and [verified registry](suite-registry.md) APIs,
    using its own real declaration, HTTPS origin and TLS key proof. The declaration
-   alone never creates trust or membership. The native setup controls are point 8.
+   alone never creates trust or membership. [Native setup controls](suite-administration.md) are available in the Backend frontend.
 4. An acknowledged Gateway service with the appropriate grant requests a
    [user delegation or service probe](suite-authorization.md) for the current
    `nox-backend` registration revision. Its audience is exactly the accepted
@@ -152,4 +152,6 @@ boundary and rejection of forged HTTP transport claims on `/mcp/suite`; its
 frontend-only mode covers the new proxy guard independently. Native frontend,
 API/direct MCP, sync streaming and frontend replacement remain covered by the
 existing Chromium/split-deployment checks. No database migration is added here.
-Native integration setup/administration and final complete delivery are point 8.
+[Native integration administration](suite-administration.md) is implemented in point 8.
+See the [delivery guide](suite-delivery.md) for publication/installed validation and
+the boundary with subsequent Gateway/product work.

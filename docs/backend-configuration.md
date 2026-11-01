@@ -347,3 +347,12 @@ public metadata; it never grants trust or registration automatically.
 See [Backend as a Suite product](suite-product.md) for enrollment, permissions,
 request controls and validation. No public Internet exposure is required; internal
 HTTPS is supported through the existing TLS/trusted-proxy configuration.
+
+
+The native **Manage Suite integrations** pane shows the deployed readiness and
+trust/registry state. `GET /api/admin/suite` is an authenticated non-secret read;
+actual Suite mutations still require trusted HTTPS. Only target enrollment and
+verified destination reads require the approved outgoing CIDRs/ports. Local key
+management and revocation remain available independently of product reachability.
+No point-8 environment variables or database migration are introduced. See the
+[native guide](suite-administration.md) and [delivery checklist](suite-delivery.md).

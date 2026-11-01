@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, realpath } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
@@ -116,7 +117,7 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
   const git = (...args) => execFileSync('git', args, {
     cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
-  if (resolve(git('rev-parse', '--show-toplevel')) !== resolve(root)) {
+  if (await realpath(git('rev-parse', '--show-toplevel')) !== await realpath(root)) {
     throw new Error('Executa o script na root do repositorio nox-backend.');
   }
   if (git('status', '--porcelain', '--untracked-files=all')) {
@@ -175,7 +176,13 @@ export async function release(root, input, { check = runReleaseChecks } = {}) {
   return tag;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+export function isMainScript(url) {
+  if (!process.argv[1]) return false;
+  try { return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(url)); }
+  catch { return false; }
+}
+
+if (isMainScript(import.meta.url)) {
   (async () => {
     const tag = await runReleaseCLI(repoRoot, process.argv.slice(2));
     console.log(`Commit e tag ${tag} publicados. O GitHub Actions vai publicar a imagem e criar a release.`);

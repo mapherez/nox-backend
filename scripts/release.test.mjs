@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
@@ -506,3 +506,12 @@ test('workflow feeds generated tags and labels to Buildx and classification to G
   assert.equal(metadata.tags,'ghcr.io/mapherez/nox-backend-frontend:v1.2.3\nghcr.io/mapherez/nox-backend-frontend:latest');
   assert.throws(()=>releaseMetadata('v1.2.3',JSON.stringify({version:'1.2.3'}),'a'.repeat(40),new Date(),'unknown'),/Componente/);
  });
+
+
+test('release recognizes a repository reached through a directory alias without publishing', async t => {
+  const fixture = await repository(t);
+  const alias = resolve(fixture.root, '..', 'repo-alias');
+  await symlink(fixture.root, alias, 'junction');
+  await assert.rejects(release(alias, '0.0.0', noChecks), /ja usa essa versao/);
+  unchanged(fixture);
+});

@@ -123,7 +123,8 @@ the installation's configuration, and update its routing deliberately.
 Use a matched candidate pair containing this separation. Validate health, login,
 existing keys and sessions, roles, vault IDs/revisions, downloads, sync, wiki/read
 integration and the product that depends on the native frontend before changing
-the installed deployment. Actual production migration/delivery remains point 8.
+the installed deployment. [Point-8 delivery](suite-delivery.md) distinguishes local
+implementation checks from the operator's published/installed rollout.
 Rollback requires restoring the previous image/topology and the same preserved
 data mount. Point 2 added no schema change. Point 3 adds the non-destructive
 connection-configuration table through migration 4. See the
@@ -139,9 +140,9 @@ npm ci --prefix frontend
 npm run check --prefix frontend
 npm test --prefix frontend
 npm run build --prefix frontend
-docker build --build-arg VERSION=step2-validation -t nox-backend:step2-validation ./backend
-docker build -t nox-backend-frontend:step2-validation ./frontend
-python3 scripts/check-split-deployment.py
+docker build --build-arg VERSION=verification -t nox-backend:verification ./backend
+docker build -t nox-backend-frontend:verification ./frontend
+python3 scripts/check-split-deployment.py --backend-image nox-backend:verification --frontend-image nox-backend-frontend:verification
 ```
 
 The integration script creates its own network, temporary data and containers,
@@ -157,3 +158,32 @@ frontend trusted-ingress CIDR allowlist. The native HTTP flows are preserved;
 Suite credential/proof traffic requires a trusted HTTPS boundary. See the
 [trust deployment guide](suite-trust.md#tls-deployment-choices). Migration 5 also
 requires backing up the complete secret store with SQLite for rollback/recovery.
+
+
+## Native Suite controls and final image checks
+
+The [Suite administration pane](suite-administration.md) consumes the safe native
+`/api/admin/suite` projection and performs protected changes through `/api/nox/*`.
+It includes explicit same-operation recovery and displays partial failure without
+blocking native account/vault management. Setup secrets stay in memory; only
+user-scoped non-secret operation/recovery metadata is retained in this tab.
+
+CI and Release invoke the shared `scripts/check-image-contracts.py` version matrix.
+Bounded startup waits now retry connection resets/early disconnects as well as
+refusals/timeouts; persistent errors and invalid application responses still fail.
+Unit tests cover the formerly failing startup case. The actual HTTPS administration
+flow is required through `check-suite-proxy.py --browser`; standalone frontend
+publication continues to use its `--frontend-only` mode without a Backend build.
+
+
+Full Suite delivery checks use the same candidate images:
+
+```sh
+python3 -m unittest discover -s scripts -p "test_*.py"
+python3 scripts/check-image-contracts.py --versioned-image nox-backend:verification --build-version verification
+python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:verification --frontend-image nox-backend-frontend:verification
+```
+
+The browser checks require the frontend's installed Chromium. Their sessions and
+protocol participant belong only to disposable data; real Google consent and the
+installed dependent application remain operator validation.

@@ -1,5 +1,9 @@
 """Validate actual TLS ingress/proxy boundaries using disposable images/data only."""
 import argparse
+import base64
+import datetime
+import hashlib
+import sqlite3
 import ipaddress
 import json
 import os
@@ -67,6 +71,7 @@ def frontend_only(image):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--browser", action="store_true")
     parser.add_argument("--backend-image")
     parser.add_argument("--frontend-only", action="store_true")
     parser.add_argument("--frontend-image", required=True)
@@ -91,6 +96,7 @@ def main():
         subprocess.run(["openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048", "-days", "1", "-config", str(openssl), "-keyout", str(proxy_dir / "key.pem"), "-out", str(proxy_dir / "cert.pem")], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         (proxy_dir / "key.pem").chmod(0o600)
         context = ssl.create_default_context(cafile=str(proxy_dir / "cert.pem"))
+        declaration = {"contractVersion": "1.0", "productId": "suite-browser-fixture", "productVersion": "test", "displayName": "HTTPS protocol fixture", "capabilities": {"suiteMcp": {"path": "/suite/mcp"}}}
         (proxy_dir / "nginx.conf").write_text("""pid /tmp/nox-proxy.pid;
 error_log /dev/stderr crit;
 events { worker_connections 64; }
@@ -101,6 +107,12 @@ http {
  fastcgi_temp_path /tmp/nox-fastcgi;
  uwsgi_temp_path /tmp/nox-uwsgi;
  scgi_temp_path /tmp/nox-scgi;
+ server {
+  listen 8444 ssl;
+  ssl_certificate /fixture/cert.pem;
+  ssl_certificate_key /fixture/key.pem;
+  location = /nox/integration { default_type application/json; return 200 'DECLARATION_FIXTURE'; }
+ }
  server {
   listen 8443 ssl;
   ssl_certificate /fixture/cert.pem;
@@ -116,21 +128,45 @@ http {
   }
  }
 }
-""")
+""".replace("DECLARATION_FIXTURE", json.dumps(declaration, separators=(",", ":"))))
         docker("network", "create", network)
         try:
             info = json.loads(docker("network", "inspect", network))[0]
             subnet = ipaddress.ip_network(info["IPAM"]["Config"][0]["Subnet"])
             frontend_ip = str(subnet.network_address + min(200, subnet.num_addresses - 3))
-            proxy = docker("run", "-d", "--rm", "--network", network, "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8443", "--mount", f"type=bind,source={proxy_dir},target=/fixture,readonly", "--entrypoint", "nginx", args.frontend_image, "-g", "daemon off;", "-c", "/fixture/nginx.conf")
+            proxy = docker("run", "-d", "--rm", "--network", network, "--network-alias", "suite-product", "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8443", "--mount", f"type=bind,source={proxy_dir},target=/fixture,readonly", "--entrypoint", "nginx", args.frontend_image, "-g", "daemon off;", "-c", "/fixture/nginx.conf")
             containers.append(proxy)
             base = "https://" + docker("port", proxy, "8443/tcp")
             ready(base, "/healthz", context)
             proxy_ip = json.loads(docker("inspect", proxy))[0]["NetworkSettings"]["Networks"][network]["IPAddress"]
-            backend = docker("run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "-e", "NOX_BACKEND_PUBLIC_URL=" + base, "-e", "NOX_BACKEND_SUITE_MCP_ENABLED=true", "-e", "NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS=" + frontend_ip + "/32", args.backend_image)
+            backend_args = ["run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "-e", "NOX_BACKEND_PUBLIC_URL=" + base, "-e", "NOX_BACKEND_SUITE_MCP_ENABLED=true", "-e", "NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid", "-e", "NOX_BACKEND_SUITE_ALLOWED_CIDRS=" + str(subnet), "-e", "NOX_BACKEND_SUITE_ALLOWED_PORTS=8444", "-e", "NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS=" + frontend_ip + "/32", args.backend_image]
+            backend = docker(*backend_args)
             containers.append(backend)
             backend_base = "http://" + docker("port", backend, "8080/tcp")
             ready(backend_base, "/v1/health")
+            browser_fixture = None
+            if args.browser:
+                # Seed only while the actual Backend is stopped. SQLite host/VM
+                # writers must never compete on this disposable bind mount.
+                docker("stop", backend)
+                containers.remove(backend)
+                db = sqlite3.connect(data / "nox-backend.db")
+                admin_id = db.execute("SELECT id FROM users WHERE email='admin@example.invalid'").fetchone()[0]
+                api_key = db.execute("SELECT key_value FROM api_keys WHERE user_id=?", (admin_id,)).fetchone()[0]
+                session = secrets.token_urlsafe(32)
+                now = datetime.datetime.now(datetime.timezone.utc)
+                stamp = lambda value: value.strftime("%Y-%m-%dT%H:%M:%SZ")
+                db.execute("INSERT INTO web_sessions VALUES (?,?,?,?,?)", ("websess_suite_browser", admin_id, hashlib.sha256(session.encode()).hexdigest(), stamp(now + datetime.timedelta(hours=1)), stamp(now)))
+                db.commit()
+                db.close()
+                backend = docker(*backend_args)
+                containers.append(backend)
+                backend_base = "http://" + docker("port", backend, "8080/tcp")
+                ready(backend_base, "/v1/health")
+                pem = subprocess.check_output(["openssl", "x509", "-in", str(proxy_dir / "cert.pem"), "-pubkey", "-noout"])
+                spki = subprocess.check_output(["openssl", "pkey", "-pubin", "-outform", "DER"], input=pem, stderr=subprocess.DEVNULL)
+                pin = base64.urlsafe_b64encode(hashlib.sha256(spki).digest()).decode().rstrip("=")
+                browser_fixture = {"base": base, "adminSession": session, "apiKey": api_key, "productOrigin": "https://suite-product:8444", "declaration": declaration, "pin": pin}
             frontend = docker("run", "-d", "--rm", "--network", network, "--network-alias", "frontend", "--ip", frontend_ip, "-p", "127.0.0.1::8080", "-e", "NOX_FRONTEND_SUITE_TRUSTED_PROXY_CIDRS=" + proxy_ip + "/32", args.frontend_image)
             containers.append(frontend)
             frontend_base = "http://" + docker("port", frontend, "8080/tcp")
@@ -168,6 +204,15 @@ http {
                 status, headers, body = request(endpoint, "/mcp/suite", headers={"X-Forwarded-Proto": "https", "X-Nox-Suite-Transport": "https"}, data=b"{}")
                 assert status == 403 and json.loads(body)["code"] == "FORBIDDEN"
                 assert headers["Cache-Control"] == "no-store"
+            if browser_fixture:
+                fixture_path = folder / "suite-browser.json"
+                fixture_path.write_text(json.dumps(browser_fixture))
+                fixture_path.chmod(0o600)
+                root = Path(__file__).resolve().parent.parent
+                subprocess.run(["npx.cmd" if os.name == "nt" else "npx", "playwright", "test", "e2e/suite.spec.ts"], cwd=root / "frontend", env={**os.environ, "NOX_SUITE_FIXTURE": str(fixture_path)}, check=True)
+                status, _, body = request(base, "/api/nox/keys", context)
+                assert status == 200
+                keys = json.loads(body) # Browser exercises intentional signing-key rotation.
             docker("exec", backend, "/usr/local/bin/nox-backend", "healthcheck")
             docker("restart", backend)
             # Docker may reassign an ephemeral host port on restart. The service

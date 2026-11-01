@@ -43,6 +43,7 @@ export interface Dashboard {
   isAdmin: boolean;
   users: User[] | null;
   connections?: FoundationConnection[];
+  integrationError?: string;
 }
 export function formatBytes(value: string | bigint) {
   const mb = Number(value) / 1048576;

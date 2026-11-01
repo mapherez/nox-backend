@@ -36,7 +36,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Test
-        run: node --test scripts/release.test.mjs
+        run: |
+          node --test scripts/release.test.mjs
+          python3 -m unittest discover -s scripts -p "test_*.py"
 
   backend:
     name: Backend
@@ -101,71 +103,7 @@ jobs:
         run: docker build --build-arg VERSION=contract-test -t nox-backend:contract-test ./backend
 
       - name: Check image version contracts
-        run: |
-          python3 - <<'PY'
-          import json
-          import subprocess
-          import time
-          import urllib.error
-          import urllib.request
-
-          def docker(*args):
-              return subprocess.check_output(["docker", *args], text=True).strip()
-
-          for image, canonical, legacy, expected in [
-              ("nox-backend:test", None, None, "dev"),
-              ("nox-backend:contract-test", None, None, "contract-test"),
-              ("nox-backend:contract-test", "", "", "contract-test"),
-              ("nox-backend:contract-test", None, "runtime-test", "runtime-test"),
-              ("nox-backend:contract-test", "canonical", None, "canonical"),
-              ("nox-backend:contract-test", "canonical", "legacy", "canonical"),
-              ("nox-backend:contract-test", "", "legacy", "legacy"),
-          ]:
-              args = ["run", "--detach", "--rm", "--publish", "127.0.0.1::8080",
-                      "--tmpfs", "/data:uid=10001,gid=10001,mode=0700"]
-              for name, value in [("NOX_BACKEND_VERSION", canonical), ("NOX_SYNC_VERSION", legacy)]:
-                  if value is not None:
-                      args += ["--env", name + "=" + value]
-              container = docker(*args, image)
-              try:
-                  base = "http://" + docker("port", container, "8080/tcp")
-                  for attempt in range(60):
-                      try:
-                          with urllib.request.urlopen(base + "/v1/health", timeout=2) as response:
-                              assert response.status == 200
-                              health = json.load(response)
-                          break
-                      except (urllib.error.URLError, TimeoutError):
-                          time.sleep(0.5)
-                  else:
-                      raise AssertionError("Backend did not become ready")
-                  docker("exec", container, "/usr/local/bin/nox-backend", "healthcheck")
-                  for attempt in range(60):
-                      status = docker("inspect", "--format", "{{.State.Health.Status}}", container)
-                      if status == "healthy":
-                          break
-                      if status == "unhealthy":
-                          raise AssertionError("Docker healthcheck failed")
-                      time.sleep(0.5)
-                  else:
-                      raise AssertionError("Docker did not mark the container healthy")
-                  with urllib.request.urlopen(base + "/v1/info", timeout=2) as response:
-                      assert response.status == 200
-                      assert response.headers["Content-Type"] == "application/json"
-                      info = json.load(response)
-                  assert health == {"status": "ready", "version": expected,
-                                    "dataDirInitialized": True, "databasePath": "/data/nox-backend.db"}, health
-                  required_info = {"service": "nox-backend", "version": expected, "apiVersion": "v1",
-                                   "capabilities": ["auth", "vaults", "files", "vault-status"]}
-                  for field, value in required_info.items():
-                      assert field in info and type(info[field]) is type(value) and info[field] == value, (field, info)
-                  print(f"{image}: canonical={canonical!r}, legacy={legacy!r}, health/info version={expected}")
-              except Exception:
-                  subprocess.run(["docker", "logs", container], check=False)
-                  raise
-              finally:
-                  subprocess.run(["docker", "rm", "--force", container], check=False)
-          PY
+        run: python3 scripts/check-image-contracts.py --default-image nox-backend:test --versioned-image nox-backend:contract-test --build-version contract-test
 
       - name: Build independent frontend image
         run: docker build -t nox-backend-frontend:test ./frontend
@@ -187,4 +125,4 @@ jobs:
         run: python3 scripts/check-split-deployment.py --backend-image nox-backend:contract-test --frontend-image nox-backend-frontend:test --browser
 
       - name: Verify Suite TLS trust boundary
-        run: python3 scripts/check-suite-proxy.py --backend-image nox-backend:contract-test --frontend-image nox-backend-frontend:test
+        run: python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:contract-test --frontend-image nox-backend-frontend:test

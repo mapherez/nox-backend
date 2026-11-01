@@ -82,7 +82,9 @@ Do not include an application path. This configuration survives restart and need
 no additional environment variables for address storage alone. It initially shows
 **Awaiting pairing**. [Suite trust](suite-trust.md) provides the authenticated pairing
 APIs and requires approved HTTPS/network configuration. An acknowledged service
-shows **Service paired · Registration pending**; registration is point 5.
+shows **Service paired · Registration pending** until verified registration.
+Open **Manage Suite integrations** for the [native pairing/registration and recovery
+workflow](suite-administration.md). It works without Gateway or Portal.
 Saving does not contact the service or establish a working connection. If another
 administrator changes the configuration, refresh/review before saving again.
 See the [administration API](administration-api.md) for equivalent API operations.

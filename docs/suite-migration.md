@@ -1,8 +1,9 @@
 # NoX Suite migration status and compatibility baseline
 
-Updated **October 31, 2026**. Backend baseline: commit `a2382ec` (`v1.0.7`).
+Updated for **point 8**. Original Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.13`; these point-7 changes do not create a release. Suite wire compatibility remains `1.0`.
+current application package version is `1.0.14`; point-8 implementation starts from
+`b9f2793` and does not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression
 
@@ -25,8 +26,8 @@ Work stops after each numbered point until the owner approves the next one.
 | 4 | Implement persistent service trust and pairing | Completed; owner confirmed installed operation and authorized point 5 |
 | 5 | Implement registry and durable events | Completed; owner confirmed installed operation and authorized point 6 |
 | 6 | Implement authorization issuance | Completed; owner confirmed installed operation and authorized point 7 |
-| 7 | Adapt Backend as a Suite product | Completed and locally validated; awaiting owner review/approval for point 8 |
-| 8 | Complete administration, deployment, documentation, CI, and delivery validation | Pending |
+| 7 | Adapt Backend as a Suite product | Completed; owner confirmed installed operation and authorized point 8 |
+| 8 | Complete administration, deployment, documentation, CI, and delivery validation | Implementation and local delivery validation complete; owner publication/installed checks follow the delivery guide |
 
 The Backend retains its native frontend and all current management functions,
 plus initial service connection configuration required by the plan. Frontend
@@ -92,8 +93,8 @@ mkdir -p /private/tmp/nox-backend-release-tests
 TMPDIR=/private/tmp/nox-backend-release-tests node --test scripts/release.test.mjs
 ```
 
-Release script portability remains recorded for point 8; no release script or
-workflow was changed in point 1. These local results do not claim GitHub CI
+Release script portability was recorded for point 8 and is resolved there; no
+release script or workflow was changed in point 1. These local results do not claim GitHub CI
 approval, multi-architecture image validation, or completed Suite service flows.
 At the end of point 1, pairing, registry, issuance, Suite MCP and frontend
 separation were still pending. The point 2 record below describes subsequent
@@ -466,3 +467,88 @@ performed by this work.
   products, remote workflows, Git history, package version, tags and releases
   were not changed. Local validation is not a claim that the remaining Backend
   administration/delivery work or future Suite product adaptations are complete.
+
+
+## Point 8 implementation
+
+The [native Suite administration pane](suite-administration.md) completes the
+initial foundation/product integration controls: generic pairing/proof handoff,
+ACK by service-credential possession, conditional verified registration/update/
+removal, credential generation rotation/revocation, installer deployment grants,
+and issuer signing-key lifecycle. It uses the existing protected Suite routes and
+their original SDK payloads; no approved wire rule, role mapping or product catalog
+was changed. Gateway/Portal are not dependencies for local administration.
+
+`GET /api/admin/suite` adds a current admin-only, bounded and consistently read
+projection with no raw secret/verifier/private handle. Its transport/configuration
+readiness distinguishes local trust management from approved outgoing enrollment.
+Native account/vault controls survive a failed Suite status read. Lifecycle/MCP
+observations, membership, pairing and credential recovery remain separate states.
+
+Browser operations retain user-scoped non-secret operation/recovery metadata, so
+an uncertain response can be reconciled or explicitly retried with the original
+key/body/preconditions after reload. Proofs/credentials and setup responses stay in
+memory; sensitive request fields must be supplied again to recover. Confirmed setup
+responses also retain only their non-secret recovery receipt until forgotten.
+ACK/expiry/revocation authority remains in Backend. There is no automatic mutation
+retry, force update or fabricated successful integration.
+
+CI's Docker readiness wait now handles connection resets in its bounded startup
+loop. The shared packaged version check runs in both CI and Release, with tests
+for transient reset, persistent failure and malformed response. The required HTTPS
+check now includes a real Chromium administration flow using the actual images
+and an explicit TLS protocol participant. Independent frontend publication retains
+its standalone validation/build lifecycle. Release scripts resolve canonical paths
+and symlink entry points, closing the recorded macOS portability issue.
+
+The current database schema remains migration 7; no additional migration/env
+variable is required for point 8. Docs now include the native operator workflow,
+publication/installed checklist and the separate subsequent Gateway/product/CLI/
+Portal work. No commit, version bump, push or release is performed by these changes.
+
+
+### Point 8 validation results and completion
+
+- All 148 top-level Go tests passed with `-race` (294 passing results including
+  subtests/fuzz seeds). Full vet and Go formatting checks passed. New storage/HTTP
+  tests cover current admin authority, safe consistent projections, live credential
+  generations/deployment grants, restart preservation, transport readiness and
+  native account/vault availability during an injected Suite dependency failure.
+- Frontend format/type/lint and production build passed; all 26 React tests passed.
+  They cover missing HTTPS, target-policy-independent local management, malformed/
+  failed snapshots, stale revisions, unknown/204 responses, exact-operation replay
+  after reload, user partitions and recovery without browser-stored secrets.
+- Both final component images and the default-version Backend image built. All
+  seven packaged version/alias/healthcheck scenarios passed using the shared CI/
+  Release check, including its Docker health status and `/v1/info` assertions.
+- All three native Chromium flows passed with the final images: anonymous/mobile
+  entry, admin account/key/vault operations and non-admin isolation. Split image
+  checks preserved public origin/OAuth redirects, cookies, legacy forms, exact
+  revisions, API/direct MCP, sync SSE and frontend-only replacement.
+- The additional actual HTTPS Chromium flow passed lost-response commit/reload/
+  same-key recovery, SDK-compatible HMAC proof, pinned declaration completion,
+  saved-provisioning ACK, verified registration, credential rotation/old-key denial,
+  signing-key preparation/activation and 204 registry removal. Its small-screen
+  check exposed long-label overflow; the corrected layout passed. A simulated Suite
+  refresh failure kept native controls available. The participant is an explicit
+  protocol fixture, not a claim that another real Suite product is adapted.
+- The final TLS/proxy check passed rejected forged HTTP claims on both hops,
+  persistent key state after intentional browser rotation and Backend restart,
+  direct TLS and packaged healthchecks. The independent frontend-only startup/
+  assets/proxy guard check passed without building/running Backend.
+- All 41 release-tooling tests passed with the normal macOS temporary directory;
+  canonical/symlink path handling no longer needs the earlier TMPDIR workaround.
+  All three readiness unit tests passed, including the connection reset that broke
+  the earlier GitHub run, bounded persistent failure and malformed application data.
+- Both Compose configurations, workflow YAML, Python syntax, local documentation
+  links and diff whitespace passed. Required CI and Release now run the packaged
+  version matrix and native HTTPS browser administration; independent frontend
+  publication remains separate. No dependencies or approved wire contracts changed.
+
+All eight approved Backend implementation points are complete and locally
+validated. The next actions are the [delivery checklist](suite-delivery.md): owner
+commit/push, CI for the exact source, publication and installed verification.
+Those remote/installed actions were not performed here. No real Google session,
+other product, installed deployment/volume, Git history, package version or release
+was modified by these local checks. Gateway, installer/product adaptations, CLI and
+Portal remain their own subsequent implementations under the original contracts.

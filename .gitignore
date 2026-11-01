@@ -25,3 +25,6 @@ frontend/.vite/
 frontend/.vite-plus/
 frontend/test-results/
 frontend/playwright-report/
+
+# Python validation caches
+__pycache__/

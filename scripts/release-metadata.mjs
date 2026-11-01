@@ -1,8 +1,6 @@
 import { appendFile, readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { validateReleaseTag } from './release.mjs';
+import { isMainScript, validateReleaseTag } from './release.mjs';
 
 
 
@@ -25,7 +23,7 @@ export function releaseMetadata(tag, contents, revision, created = new Date(), c
   };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMainScript(import.meta.url)) {
   (async () => {
     if (process.argv.length !== 3 && process.argv.length !== 4) throw new Error('Uso: node scripts/release-metadata.mjs vX.Y.Z [backend|frontend]');
     const metadata = releaseMetadata(process.argv[2],

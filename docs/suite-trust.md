@@ -11,7 +11,8 @@ credential generations, pairing recovery and conditional/idempotent outcomes.
 [Registry membership/event delivery](suite-registry.md) is implemented in point 5.
 [User/probe token issuance](suite-authorization.md) is implemented in point 6.
 [Backend Suite MCP adaptation](suite-product.md) is implemented in point 7.
-Complete native integration setup and delivery validation remain point 8.
+[Native integration setup](suite-administration.md) is implemented in point 8;
+[delivery and installed validation](suite-delivery.md) have an explicit checklist.
 A paired service is not a registered product and has no integrated execution rights.
 Existing direct `/mcp`, `/v1/*`, Google login and native account/vault administration
 retain their own authentication and behavior.
@@ -259,9 +260,9 @@ The native frontend reports `not_configured`, `not_paired`, `pairing_pending`,
 `paired` (shown as **Service paired · Registration pending**), `registered`
 (with availability tracked separately) or `recovery_required`.
 Saving/removing an address does not itself pair/revoke/uninstall a service.
-Use the trust APIs above for pairing and revocation. Full native management
-controls are completed in the planned administration/delivery work; Portal is not
-required for these APIs and does not replace the Backend frontend.
+Use the trust APIs above or the [native Suite controls](suite-administration.md)
+for pairing, registration, key/credential rotation, revocation and recovery. Portal
+is not required and does not replace the Backend frontend.
 
 ## Errors and verification
 

@@ -50,7 +50,9 @@ jobs:
             }
 
       - name: Test release tooling
-        run: node --test scripts/release.test.mjs
+        run: |
+          node --test scripts/release.test.mjs
+          python3 -m unittest discover -s scripts -p "test_*.py"
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -72,13 +74,14 @@ jobs:
         run: |
           docker build --build-arg VERSION="$RELEASE_TAG" -t nox-backend:release-check ./backend
           docker build -t nox-backend-frontend:release-check ./frontend
+          python3 scripts/check-image-contracts.py --versioned-image nox-backend:release-check --build-version "$RELEASE_TAG"
           cd frontend
           npx playwright install --with-deps chromium
           cd ..
           python3 scripts/check-split-deployment.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check --browser
 
       - name: Verify Suite TLS trust boundary
-        run: python3 scripts/check-suite-proxy.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
+        run: python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4

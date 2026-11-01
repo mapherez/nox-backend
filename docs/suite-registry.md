@@ -174,5 +174,6 @@ open the newer schema; rollback requires its matching full data backup.
 
 Native connection statuses include `registered` once current pairing and registry
 association match. The label explicitly leaves availability separate. Complete
-native pairing/registration controls remain point 8; the APIs already operate
-without Portal or Gateway. A saved random HTTPS address remains configuration only.
+[native pairing/registration controls](suite-administration.md) are implemented
+in point 8 and work without Portal or Gateway. A saved random HTTPS address remains
+configuration only.

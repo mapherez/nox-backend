@@ -453,6 +453,7 @@ Test release tooling without publishing anything:
 
 ```bash
 node --test scripts/release.test.mjs
+python3 -m unittest discover -s scripts -p "test_*.py"
 ```
 
 ## Documentation
@@ -464,6 +465,8 @@ node --test scripts/release.test.mjs
 - [Suite registry, durable events and availability](docs/suite-registry.md)
 - [Suite user delegation and service probe issuance](docs/suite-authorization.md)
 - [Backend as a Suite product: enrollment, permissions and MCP access paths](docs/suite-product.md)
+- [Native Suite administration and recovery](docs/suite-administration.md)
+- [Backend delivery checklist and subsequent product work](docs/suite-delivery.md)
 - [Setup and client connection](docs/user-setup.md)
 - [Backend configuration](docs/backend-configuration.md)
 - [Repository separation and updates](docs/backend-separation.md)

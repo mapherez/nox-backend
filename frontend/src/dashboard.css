@@ -627,3 +627,68 @@ fieldset {
 .connection-card input {
   inline-size: 100%;
 }
+
+.suite-console {
+  margin-block-start: 1.5rem;
+}
+.suite-card,
+.suite-notice {
+  border: 1px solid var(--border, #334155);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.suite-notice {
+  background: var(--surface-raised, #172033);
+}
+.suite-card summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.suite-console form {
+  margin-block: 0.75rem;
+}
+.suite-console .form-row {
+  flex-wrap: wrap;
+  align-items: end;
+}
+.suite-console .field {
+  min-inline-size: min(100%, 14rem);
+  flex-basis: 14rem;
+}
+.suite-console textarea {
+  display: block;
+  inline-size: 100%;
+  min-block-size: 6rem;
+  box-sizing: border-box;
+  font: inherit;
+  background: var(--surface, #101827);
+  color: inherit;
+  border: 1px solid var(--border, #334155);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.suite-console label:has(textarea) {
+  flex-basis: 100%;
+}
+.suite-console .mono {
+  overflow-wrap: anywhere;
+}
+.suite-row {
+  border-block-start: 1px solid var(--border, #334155);
+  padding-block: 0.5rem;
+}
+
+.suite-console button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-inline-size: 100%;
+}
+.suite-console .section-heading {
+  flex-wrap: wrap;
+}
+.suite-console .section-heading > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}

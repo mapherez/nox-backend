@@ -63,8 +63,7 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 			}
 			data.Connections, err = s.foundationConnectionViews(r.Context())
 			if err != nil {
-				writeManagementError(w, err)
-				return
+				data.IntegrationError = "Suite connection status is unavailable. Your native account and vault controls remain available."
 			}
 			for _, item := range users {
 				data.Users = append(data.Users, s.presentDashboardUser(user, item))
