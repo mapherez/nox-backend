@@ -465,6 +465,7 @@ python3 -m unittest discover -s scripts -p "test_*.py"
 - [Suite registry, durable events and availability](docs/suite-registry.md)
 - [Suite user delegation and service probe issuance](docs/suite-authorization.md)
 - [Backend as a Suite product: enrollment, permissions and MCP access paths](docs/suite-product.md)
+- [Same-host Suite integration and automatic foundation setup](docs/suite-local.md)
 - [Native Suite administration and recovery](docs/suite-administration.md)
 - [Backend delivery checklist and subsequent product work](docs/suite-delivery.md)
 - [Setup and client connection](docs/user-setup.md)

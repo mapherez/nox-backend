@@ -61,10 +61,13 @@ async function open() {
 }
 async function fillPairing(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Product ID", { exact: true }), "future-product");
-  await user.type(screen.getByLabelText("Product HTTPS address"), "https://future.example.com");
+  await user.type(
+    screen.getByLabelText("Product local Suite origin"),
+    "https://future.example.com",
+  );
 }
 
-test("HTTP installations can inspect state while Suite changes require trusted HTTPS", async () => {
+test("a missing local channel disables Suite changes without disabling state inspection", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(
@@ -73,7 +76,7 @@ test("HTTP installations can inspect state while Suite changes require trusted H
         configuration: {
           ...state.configuration,
           canManage: false,
-          reason: "Open the trusted HTTPS address.",
+          reason: "The local Suite channel is unavailable.",
         },
       }),
     ),
@@ -81,7 +84,7 @@ test("HTTP installations can inspect state while Suite changes require trusted H
   render(<SuiteAdministration actorId="admin" />);
   await open();
   expect(screen.getByRole("button", { name: "Create pairing" }).matches(":disabled")).toBe(true);
-  expect(screen.getByText("Open the trusted HTTPS address.")).toBeTruthy();
+  expect(screen.getByText("The local Suite channel is unavailable.")).toBeTruthy();
   expect(
     (screen.getByRole("button", { name: "Refresh Suite state" }) as HTMLButtonElement).disabled,
   ).toBe(false);
@@ -351,4 +354,41 @@ test("a malformed successful snapshot fails only the Suite pane", async () => {
   await screen.findByRole("alert");
   expect(screen.getByRole("alert").textContent).toContain("Invalid Suite administration response");
   expect(screen.queryByRole("button", { name: "Create pairing" })).toBeNull();
+});
+
+test("operation recovery works without secure-context WebCrypto APIs", async () => {
+  vi.stubGlobal("crypto", { getRandomValues: webcrypto.getRandomValues.bind(webcrypto) });
+  const request = { path: "/api/nox/keys", method: "POST" as const, message: "Prepared" };
+  const pending = await preparePending("admin", request);
+  expect(pending.key).toMatch(
+    /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/,
+  );
+  expect(pending.fingerprint).toHaveLength(64);
+  expect(await requestFingerprint(request)).toBe(pending.fingerprint);
+  const fetcher = vi.fn().mockResolvedValue(response({ ok: true }));
+  vi.stubGlobal("fetch", fetcher);
+  await sendSuiteRequest(request, pending.key);
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/admin/suite/operations/keys",
+    expect.objectContaining({
+      headers: expect.objectContaining({ "Idempotency-Key": pending.key, "X-Nox-Request": "1" }),
+    }),
+  );
+});
+
+test("browser administration never forwards a participant service credential", async () => {
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  await expect(
+    sendSuiteRequest(
+      {
+        path: "/api/nox/pairings/p/ack",
+        method: "POST",
+        credential: "noxsvc_secret",
+        message: "Done",
+      },
+      "key",
+    ),
+  ).rejects.toMatchObject({ uncertain: false });
+  expect(fetcher).not.toHaveBeenCalled();
 });

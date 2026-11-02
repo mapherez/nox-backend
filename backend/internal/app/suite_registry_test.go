@@ -30,7 +30,7 @@ func (f *suiteHTTPFixture) paired(t *testing.T, id, purpose string) (noxmcp.Suit
 	suiteHTTPStatus(t, status, 200, raw)
 	return p, product.URL
 }
-func TestSuiteHTTPSRegistryVerificationReplayValidatorsAndMemberViews(t *testing.T) {
+func TestSuiteLocalRegistryVerificationReplayValidatorsAndMemberViews(t *testing.T) {
 	f := suiteHTTPServer(t)
 	var reads atomic.Int64
 	var current atomic.Value
@@ -97,7 +97,7 @@ func TestSuiteHTTPSRegistryVerificationReplayValidatorsAndMemberViews(t *testing
 	}
 	status, _, raw = f.call(t, "PUT", path, body, memberKey, headers)
 	suiteHTTPStatus(t, status, 403, raw)
-	// A changed identity cannot replace membership, even on the same approved TLS key.
+	// A changed identity cannot replace membership, even on the same local channel.
 	current.Store(bytes.Replace(decl, []byte(`"http-catalog"`), []byte(`"impostor"`), 1))
 	status, _, raw = f.call(t, "PUT", path, body, f.adminKey, map[string]string{"If-Match": `"` + record.Revision + `"`})
 	suiteHTTPStatus(t, status, 409, raw)
@@ -128,7 +128,7 @@ func TestSuiteHTTPSRegistryVerificationReplayValidatorsAndMemberViews(t *testing
 	status, _, raw = f.call(t, "GET", path, nil, f.adminKey, nil)
 	suiteHTTPStatus(t, status, 404, raw)
 }
-func TestSuiteHTTPSRegistrySnapshotsEventsAndOrderedReports(t *testing.T) {
+func TestSuiteLocalRegistrySnapshotsEventsAndOrderedReports(t *testing.T) {
 	f := suiteHTTPServer(t)
 	gateway, _ := f.paired(t, "http-router", "gateway")
 	participant, origin := f.paired(t, "reported-catalog", "product")

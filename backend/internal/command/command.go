@@ -58,6 +58,7 @@ func Run(buildVersion string) error {
 	}
 	cfg := app.Config{
 		DirectMCPDisabled: !direct, SuiteMCPEnabled: suite,
+		SuiteSocketDir:      getenv("NOX_SYNC_SUITE_SOCKET_DIR", ""),
 		SuiteReportInterval: report, SuiteObservationFreshness: freshness,
 		Addr:               getenv("NOX_SYNC_ADDR", ":8080"),
 		DataDir:            getenv("NOX_SYNC_DATA_DIR", "/data"),

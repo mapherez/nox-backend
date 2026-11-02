@@ -13,8 +13,11 @@ RUN go build -ldflags "-X main.buildVersion=${VERSION}" -o /out/nox-backend ./cm
 FROM alpine:3.23
 
 RUN adduser -D -H -u 10001 noxbackend \
-  && mkdir -p /data \
-  && chown -R noxbackend:noxbackend /data
+  && mkdir -p /data /run/nox-suite \
+  && chown -R noxbackend:noxbackend /data /run/nox-suite \
+  && chmod 3770 /run/nox-suite
+
+ENV NOX_BACKEND_SUITE_SOCKET_DIR=/run/nox-suite
 
 EXPOSE 8080
 

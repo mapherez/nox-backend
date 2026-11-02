@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -40,11 +38,8 @@ func backendSuiteServer(t *testing.T) *backendSuiteFixture {
 	if err != nil || decl.ProductID != serviceName || decl.Capabilities.SuiteMcp.Path != backendSuiteMCPPath {
 		t.Fatal("Backend declaration incompatible", err)
 	}
-	u, _ := url.Parse(f.backend.URL)
-	f.s.cfg.SuiteAllowedPorts = append(f.s.cfg.SuiteAllowedPorts, u.Port())
 	intent := f.create(t, serviceName, "product", f.backend.URL)
-	pin := sha256.Sum256(f.backend.Certificate().RawSubjectPublicKeyInfo)
-	proof := suiteHTTPProof(t, intent, raw, base64.RawURLEncoding.EncodeToString(pin[:]))
+	proof := suiteHTTPProof(t, intent, raw, "")
 	status, _, raw = f.call(t, "POST", "/api/nox/pairings/"+intent.PairingID+"/complete", proof, "", nil)
 	suiteHTTPStatus(t, status, 200, raw)
 	provision, err := noxmcp.LoadSuiteProvisioning(raw)

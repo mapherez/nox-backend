@@ -20,6 +20,18 @@ export interface Vault {
 }
 export interface FoundationConnection {
   service: "yard" | "gateway";
+  setup?: {
+    attemptId: string;
+    state: string;
+    productId: string;
+    displayName: string;
+    productVersion: string;
+    errorCode?: string;
+    message?: string;
+    canResume: boolean;
+    canVerify: boolean;
+    canCancel: boolean;
+  };
   origin: string;
   revision: string;
   updatedAt: string;

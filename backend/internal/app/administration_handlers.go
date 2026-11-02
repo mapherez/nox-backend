@@ -39,6 +39,8 @@ func (s *Server) registerAdministration(mux *http.ServeMux) {
 		{"/api/vaults/{vaultId}/purge", false, s.handleManagementVaultPurge},
 		{"/api/vaults/{vaultId}/download", false, s.handleManagementVaultDownload},
 		{"/api/admin/suite", true, s.handleSuiteAdministration},
+		{"/api/admin/suite/operations/{operation...}", true, s.handleSuiteAdminOperation},
+		{"/api/admin/connections/{service}/{action}", true, s.handleConnectionSetup},
 		{"/api/admin/connections", true, s.handleConnections},
 		{"/api/admin/connections/{service}", true, s.handleConnection},
 	}
@@ -268,7 +270,8 @@ func (s *Server) handleAdminUserStatus(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	var input struct {
-		Status string `json:"status"`
+		Status string               `json:"status"`
+		Setup  *connectionSetupView `json:"setup,omitempty"`
 	}
 	if !decodeManagementJSON(w, r, &input) {
 		return
@@ -325,7 +328,8 @@ func (s *Server) handleManagementVaultDownload(w http.ResponseWriter, r *http.Re
 
 type connectionView struct {
 	storage.FoundationConnection
-	Status string `json:"status"`
+	Status string               `json:"status"`
+	Setup  *connectionSetupView `json:"setup,omitempty"`
 }
 
 func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request, _ storage.User) {
@@ -353,11 +357,19 @@ func (s *Server) foundationConnectionViews(ctx context.Context) ([]connectionVie
 				if item.Service == "yard" {
 					purpose = "installer"
 				}
-				state, err := s.store.SuiteFoundationStatus(ctx, purpose, item.Origin)
+				productID, _ := foundationIdentity(item.Service)
+				state, err := s.store.SuiteFoundationStatus(ctx, purpose, suiteProductOrigin(productID))
 				if err != nil {
 					return nil, err
 				}
-				result[i] = connectionView{item, state}
+				result[i] = connectionView{FoundationConnection: item, Status: state}
+				attempt, err := s.store.SuiteConnectionAttempt(ctx, item.Service)
+				if err != nil {
+					return nil, err
+				}
+				if attempt.ConfigurationRevision == item.Revision {
+					result[i].Setup = setupView(attempt)
+				}
 			}
 		}
 	}
@@ -403,7 +415,7 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request, actor 
 		return
 	}
 	w.Header().Set("ETag", `"`+item.Revision+`"`)
-	writeJSON(w, 200, connectionView{item, "not_paired"})
+	writeJSON(w, 200, connectionView{FoundationConnection: item, Status: "not_paired"})
 }
 
 func originHost(origin *url.URL) string {

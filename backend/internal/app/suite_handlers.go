@@ -76,7 +76,7 @@ func (s *Server) registerSuiteTrust(mux *http.ServeMux) {
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			if !s.suiteSecureTransport(r) {
-				writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Suite trust requires HTTPS or an explicitly configured trusted TLS proxy boundary."))
+				writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Suite service communication requires the same-host local channel."))
 				return
 			}
 			if _, err := s.suiteOrigin(); err != nil {
@@ -328,6 +328,10 @@ func (s *Server) handleSuiteCreatePairing(w http.ResponseWriter, r *http.Request
 		writeSuiteError(w, suiteDocumentError(err, "Invalid pairing request."))
 		return
 	}
+	if request.BaseUrl != suiteProductOrigin(request.ProductID) {
+		writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Pairing origin must identify this product's local channel."))
+		return
+	}
 	if err := s.suiteIntentTarget(request.BaseUrl); err != nil {
 		writeSuiteError(w, err)
 		return
@@ -408,7 +412,7 @@ func (s *Server) handleSuiteCompletePairing(w http.ResponseWriter, r *http.Reque
 			writeSuiteError(w, suiteHTTPError(503, "INTEGRATION_UNAVAILABLE", "Suite verification concurrency is full. Retry the same operation later."))
 			return
 		}
-		declaration, err = s.fetchSuiteDeclaration(r.Context(), request.BaseUrl, proof.Binding.TlsPublicKeyFingerprint)
+		declaration, err = s.fetchSuiteDeclaration(r.Context(), request.BaseUrl, suiteFingerprintValue(proof.Binding.TlsPublicKeyFingerprint))
 		if err != nil {
 			writeSuiteError(w, err)
 			return
@@ -610,4 +614,11 @@ func suiteDocumentError(err error, message string) error {
 		return suiteHTTPError(422, "UNSUPPORTED_INTEGRATION", "Unsupported integration contract or required feature.")
 	}
 	return suiteHTTPError(400, "INVALID_REGISTRATION", message)
+}
+
+func suiteFingerprintValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

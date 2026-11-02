@@ -1,3 +1,5 @@
+import { sha256 } from "@noble/hashes/sha2.js";
+
 // Only request metadata/non-secret payloads survive a reload. Pairing proofs,
 // provisioning responses and Bearer credentials are never stored in the browser.
 export interface SuiteRequest {
@@ -44,16 +46,14 @@ export async function requestFingerprint(request: SuiteRequest): Promise<string>
       request.credential ?? null,
     ]),
   );
-  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
+  return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 export async function preparePending(
   actorId: string,
   request: SuiteRequest,
 ): Promise<PendingSuiteRequest> {
   const pending = {
-    key: crypto.randomUUID(),
+    key: operationID(),
     fingerprint: await requestFingerprint(request),
     request: {
       ...request,
@@ -75,23 +75,32 @@ export class SuiteRequestFailure extends Error {
   }
 }
 export async function sendSuiteRequest(request: SuiteRequest, key: string): Promise<unknown> {
+  if (!request.path.startsWith("/api/nox/"))
+    throw new SuiteRequestFailure("Invalid Suite operation path.", false);
+  if (request.credential)
+    throw new SuiteRequestFailure(
+      "Service credentials must be used by the local participant, not through browser administration.",
+      false,
+    );
   let response: Response;
   try {
-    response = await fetch(request.path, {
-      method: request.method,
-      credentials: "same-origin",
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(25000),
-      headers: {
-        "X-Nox-Request": "1",
-        "Idempotency-Key": key,
-        ...(request.body ? { "Content-Type": "application/json" } : {}),
-        ...request.headers,
-        ...(request.credential ? { Authorization: `Bearer ${request.credential}` } : {}),
+    response = await fetch(
+      `/api/admin/suite/operations/${request.path.slice("/api/nox/".length)}`,
+      {
+        method: request.method,
+        credentials: "same-origin",
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(25000),
+        headers: {
+          "X-Nox-Request": "1",
+          "Idempotency-Key": key,
+          ...(request.body ? { "Content-Type": "application/json" } : {}),
+          ...request.headers,
+        },
+        ...(request.body ? { body: request.body } : {}),
       },
-      ...(request.body ? { body: request.body } : {}),
-    });
+    );
   } catch {
     throw new SuiteRequestFailure(
       "The outcome could not be confirmed. Reconcile state or retry this exact request with its saved operation key.",
@@ -116,4 +125,13 @@ export async function sendSuiteRequest(request: SuiteRequest, key: string): Prom
     );
   }
   return value;
+}
+
+// getRandomValues is available in HTTP browsers; randomUUID requires a secure context.
+function operationID(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 15) | 64;
+  bytes[8] = (bytes[8]! & 63) | 128;
+  const h = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

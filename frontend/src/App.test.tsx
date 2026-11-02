@@ -241,7 +241,7 @@ test("connection configuration uses revision preconditions and never claims to b
     />,
   );
   expect(screen.getByText("Configuration saved · Awaiting pairing")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Yard HTTPS address"), {
+  fireEvent.change(screen.getByLabelText("Yard address"), {
     target: { value: "https://yard-new.example.com" },
   });
   fireEvent.submit(
@@ -256,7 +256,7 @@ test("connection configuration uses revision preconditions and never claims to b
       body: JSON.stringify({ origin: "https://yard-new.example.com" }),
     }),
   );
-  expect((screen.getByLabelText("Yard HTTPS address") as HTMLInputElement).value).toBe(
+  expect((screen.getByLabelText("Yard address") as HTMLInputElement).value).toBe(
     "https://yard-new.example.com",
   );
 });

@@ -1,7 +1,7 @@
 # Backend as a NoX Suite product
 
 Backend point 7 implements the protected product adapter using the published
-NoX MCP Go SDK `v0.7.0` and Suite contract `1.0`. It shares the ten existing MCP
+NoX MCP Go SDK `v0.7.2` and Suite contract `1.0`. It shares the ten existing MCP
 operations and storage with [direct MCP](mcp.md) and the Stable Client API.
 Gateway, CLI and Portal are separate products; this work does not implement them.
 The native frontend remains part of this Backend project.
@@ -11,14 +11,10 @@ The native frontend remains part of this Backend project.
 | Path | Policy |
 | --- | --- |
 | `GET /nox/integration` | Public, SDK-validated product declaration; no credentials, tool definitions or automatic membership |
-| `POST /mcp/suite` | Opt-in, trusted HTTPS, current Backend-issued product-bound user delegation or service probe |
+| `POST /mcp/suite` | Opt-in, same-host Unix socket, current Backend-issued product-bound user delegation or service probe |
 | `POST /mcp` | Existing direct personal-key/public-tool policy, enabled by default |
 
-Both MCP paths run on the same listener/port as the Backend APIs and are forwarded
-by the separate frontend. They are different authentication adapters over the same
-operations. No additional listener, Gateway implementation or public Internet
-exposure is required. Suite origins use a hostname or IP plus optional port;
-reverse-proxy application prefixes are outside the approved Suite contract.
+The direct/native APIs keep their TCP listener and frontend routing. Protected Suite MCP is available only on the local Unix listener; the native listener/frontend refuse network access to it. These remain distinct authentication adapters over the same domain operations. See [same-host transport](suite-local.md).
 
 | Environment variable | Default | Effect |
 | --- | --- | --- |
@@ -51,14 +47,9 @@ availability means integration capability, not successful pairing or registratio
 
 Before using protected Suite MCP:
 
-1. Configure the actual HTTPS `NOX_BACKEND_PUBLIC_URL` and
-   [TLS/trusted-proxy policy](suite-trust.md). Internal CA certificates and private
-   LAN/Twingate origins are suitable; HTTP remains rejected for Suite authority.
-2. Enable `NOX_BACKEND_SUITE_MCP_ENABLED=true` and deploy both updated images.
-3. Enroll `nox-backend` as an actual product through the existing authorized
-   [pairing/ACK](suite-trust.md) and [verified registry](suite-registry.md) APIs,
-   using its own real declaration, HTTPS origin and TLS key proof. The declaration
-   alone never creates trust or membership. [Native setup controls](suite-administration.md) are available in the Backend frontend.
+1. Deploy the image/Compose with its local Suite volume. Native web/OAuth URLs keep their existing function and do not establish service locality.
+2. Enable `NOX_BACKEND_SUITE_MCP_ENABLED=true` when the Backend product is to expose tools through Suite.
+3. The product association and registry entry must be established through the authorized local pairing/ACK and verified registry APIs, using its actual declaration and logical `http://nox-backend` origin. The declaration alone does not create membership. Foundation setup and participant adapter responsibilities are documented in [local integration](suite-local.md); no certificates or manual provisioning transfer are prerequisites.
 4. An acknowledged Gateway service with the appropriate grant requests a
    [user delegation or service probe](suite-authorization.md) for the current
    `nox-backend` registration revision. Its audience is exactly the accepted
@@ -75,8 +66,7 @@ Signature, issuer, canonical resource, profile, current Gateway/head/credential
 revision, own registration/association/admission, signing key, active user,
 personal key ID, authorization revision and role-derived scopes are checked from
 current local state. Unknown/revoked state fails closed. Invalid authority returns
-HTTP 401; local authority/configuration failure returns a safe 503. Plain HTTP or
-forged transport claims return 403, including through the frontend proxy.
+HTTP 401; local authority/configuration failure returns a safe 503. TCP access or forged transport claims return 403, including through the frontend proxy.
 
 Verification snapshots and native user projections belong to the request. They
 are never a shared mutable current-user field. The HTTP factory uses `NewSuite`,

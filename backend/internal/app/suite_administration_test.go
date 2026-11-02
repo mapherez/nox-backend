@@ -40,7 +40,7 @@ func TestSuiteNativeAdministrationAccessAndTransportProjection(t *testing.T) {
 	f.s.cfg.SuiteAllowedCIDRs = nil
 	status, _, policyRaw := f.call(t, "GET", "/api/admin/suite", nil, f.adminKey, nil)
 	suiteHTTPStatus(t, status, 200, policyRaw)
-	if err := json.Unmarshal(policyRaw, &state); err != nil || !state.Configuration.CanManage || state.Configuration.CanEnroll {
+	if err := json.Unmarshal(policyRaw, &state); err != nil || !state.Configuration.CanManage || !state.Configuration.CanEnroll {
 		t.Fatal("target policy blocked local key/revocation management", err)
 	}
 	if strings.Contains(string(raw), f.gateway.ServiceCredential) || strings.Contains(string(raw), f.adminKey) {
@@ -67,8 +67,8 @@ func TestSuiteNativeAdministrationAccessAndTransportProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if err = json.NewDecoder(res.Body).Decode(&state); err != nil || state.Configuration.CanManage {
-		t.Fatal("forged transport enabled Suite administration", err)
+	if err = json.NewDecoder(res.Body).Decode(&state); err != nil || !state.Configuration.CanManage {
+		t.Fatal("native administrator could not manage local integration", err)
 	}
 	status, _, raw = f.call(t, "POST", "/api/admin/suite", nil, f.adminKey, nil)
 	suiteHTTPStatus(t, status, 405, raw)

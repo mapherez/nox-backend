@@ -52,9 +52,9 @@ def main():
         folder=Path(temporary).resolve(); data=folder/'data';data.mkdir()
         docker('network','create',network)
         try:
-            backend=docker('run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image)
+            backend=docker('run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','--group-add','10001','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image)
             containers.append(backend);backend_base='http://'+docker('port',backend,'8080/tcp');ready(backend_base,'/v1/health')
-            backend_args=['run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image]
+            backend_args=['run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','--group-add','10001','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image]
             # Seed only while Backend is stopped: host and Docker VM SQLite must not write concurrently.
             docker('stop',backend);containers.remove(backend)
             connection=sqlite3.connect(data/'nox-backend.db',timeout=10)
@@ -87,7 +87,7 @@ def main():
             for asset in ['dashboard.js','dashboard.css','favicon.svg']:
                 status,_,body=request(base,'/vault-dashboard/assets/'+asset);assert status==200 and body,asset
             assert request(backend_base,'/vault-dashboard/assets/dashboard.js')[0]==404
-            # Neither public HTTP nor forged forwarding headers establish Suite TLS trust.
+            # Native TCP/proxy routes never provide the inter-product local channel.
             for endpoint in [base,backend_base]:
                 status,headers,body=request(endpoint,'/api/nox/keys',headers={'X-Forwarded-Proto':'https','X-Nox-Suite-Transport':'https'})
                 assert status==403 and json.loads(body)['error']['code']=='FORBIDDEN'

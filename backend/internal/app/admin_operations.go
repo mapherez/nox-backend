@@ -104,7 +104,7 @@ func (s *Server) saveFoundationConnection(ctx context.Context, actor storage.Use
 	}
 	origin, err := noxmcp.NormalizeSuiteOrigin(strings.TrimSpace(origin))
 	if err != nil {
-		return storage.FoundationConnection{}, fmt.Errorf("%w: origin must be an HTTPS IP/hostname with optional port, without a base path, credentials, query or fragment", storage.ErrBadRequest)
+		return storage.FoundationConnection{}, fmt.Errorf("%w: origin must be an HTTP or HTTPS IP/hostname with optional port, without a base path, credentials, query or fragment", storage.ErrBadRequest)
 	}
 	return s.store.SaveFoundationConnection(ctx, service, origin, revision)
 }

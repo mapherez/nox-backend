@@ -105,11 +105,11 @@ test("admin manages credentials, users and vaults through authenticated JSON API
   await page.getByRole("button", { name: "Restore deleted vaults", exact: true }).click();
   await page.getByRole("button", { name: "Restore vault", exact: true }).click();
   await expect(page.getByText("r9007199254740993")).toBeVisible();
-  await page.getByLabel("Yard HTTPS address").fill("https://yard.example.invalid");
+  await page.getByLabel("Yard address").fill("https://yard.example.invalid");
   await page.getByRole("button", { name: "Save Yard configuration" }).click();
   await expect(page.getByText("Configuration saved · Awaiting pairing")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue("https://yard.example.invalid");
+  await expect(page.getByLabel("Yard address")).toHaveValue("https://yard.example.invalid");
   // Another administrator changes the persisted revision while this tab is stale.
   const connections = (await (
     await page.request.get(fixture.base + "/api/admin/connections")
@@ -120,20 +120,20 @@ test("admin manages credentials, users and vaults through authenticated JSON API
     data: { origin: "https://yard-new.example.invalid:8443" },
   });
   expect(concurrent.status()).toBe(200);
-  await page.getByLabel("Yard HTTPS address").fill("https://stale.example.invalid");
+  await page.getByLabel("Yard address").fill("https://stale.example.invalid");
   await page.getByRole("button", { name: "Save Yard configuration" }).click();
   await expect(page.getByRole("alert")).toContainText("Configuration changed");
-  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue("https://stale.example.invalid");
+  await expect(page.getByLabel("Yard address")).toHaveValue("https://stale.example.invalid");
   await page.reload();
-  await expect(page.getByLabel("Yard HTTPS address")).toHaveValue(
+  await expect(page.getByLabel("Yard address")).toHaveValue(
     "https://yard-new.example.invalid:8443",
   );
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Remove Yard configuration" }).click();
   await expect(page.getByRole("button", { name: "Remove Yard configuration" })).toHaveCount(0);
-  await page.getByLabel("Gateway HTTPS address").fill("https://192.168.10.10:8443");
+  await page.getByLabel("Gateway address").fill("https://192.168.10.10:8443");
   await page.getByRole("button", { name: "Save Gateway configuration" }).click();
-  await expect(page.getByLabel("Gateway HTTPS address")).toHaveValue("https://192.168.10.10:8443");
+  await expect(page.getByLabel("Gateway address")).toHaveValue("https://192.168.10.10:8443");
   await expect(page.getByText("Configuration saved · Awaiting pairing")).toBeVisible();
   expect(browserMutations.some((path) => path.startsWith("/vault-dashboard/"))).toBe(false);
   expect(browserMutations).toContain("/api/admin/users");
@@ -149,8 +149,8 @@ test("admin manages credentials, users and vaults through authenticated JSON API
     }),
   );
   await page.getByRole("button", { name: "Manage Suite integrations" }).click();
-  await expect(page.getByText(/Open this Backend through its trusted HTTPS address/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create pairing", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Create pairing", exact: true })).toBeEnabled();
+  expect(await page.evaluate(async () => (await fetch("/api/nox/keys")).status)).toBe(403);
   await expect(
     page.getByRole("button", { name: "Generate new API key", exact: true }),
   ).toBeEnabled();

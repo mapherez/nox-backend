@@ -1,6 +1,6 @@
 # Suite authority, pairing and service trust
 
-This implements Backend work point 4 against the published NoX MCP `0.7.0`
+This implements Backend work point 4 against the published NoX MCP `0.7.2`
 contracts, wire version `1.0`. The [approved work sequence](suite-migration.md)
 links the authoritative Gateway/integration documents. These APIs are HTTP
 management operations, not new MCP methods. They work for any conforming product;
@@ -19,72 +19,13 @@ retain their own authentication and behavior.
 
 ## Transport and target policy
 
-Suite trust routes require a configured HTTPS `NOX_BACKEND_PUBLIC_URL` and either
-actual TLS at Backend or an explicitly trusted TLS proxy boundary. A private IP or
-caller-supplied forwarding header does not establish HTTPS trust. HTTP native
-administration remains available under its existing policy; it cannot provision
-Suite secrets through these routes.
+The [same-host channel](suite-local.md) carries service calls over Unix sockets in a shared local Docker volume. Suite services on another machine cannot join through LAN/private IPs, Internet connections or HTTPS. The native TCP listener refuses `/api/nox/*` and `/mcp/suite`; current human administrator operations use `/api/admin/*` with existing role/session/key/CSRF checks. All service credentials, signatures, capabilities and domain checks remain required.
 
-The existing Compose files pass these optional Backend settings, including the
-usual `NOX_SYNC_*` fallbacks:
-
-| Setting | Meaning |
-| --- | --- |
-| `NOX_BACKEND_SUITE_ALLOWED_CIDRS` | Explicit approved target networks; no implicit LAN/loopback trust and no outbound verification if empty |
-| `NOX_BACKEND_SUITE_ALLOWED_PORTS` | Approved destination ports, comma-separated; default `443` |
-| `NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS` | Exact trusted Backend-facing proxy addresses/networks; empty by default |
-| `NOX_BACKEND_TLS_CERT_FILE` / `NOX_BACKEND_TLS_KEY_FILE` | Optional direct HTTPS certificate/key paths; configure both together |
-| `NOX_BACKEND_TLS_CA_FILE` | Optional extra trusted CA file for the packaged HTTPS healthcheck |
-
-For example, an administrator can explicitly approve `192.168.10.0/24` and ports
-`443,8443`. This permits conforming products in that deployment without hardcoded
-product names. Use the actual deployment's approved ranges/ports.
-
-Pairing intent creation validates origin syntax/port/policy without requiring a
-not-yet-started product's DNS to resolve. Completion resolves and validates **all**
-target IPs before fetching, repeats that validation for every connection, and
-connects directly to an approved IP. HTTP proxy environment variables are ignored.
-The Backend never forwards an administrator's cookie/key, a service credential or
-the pairing secret to the product declaration endpoint. Redirects are rejected.
-
-Verification uses a TLS leaf **SPKI SHA-256 pin authenticated by the pairing HMAC**,
-checks certificate validity time and rejects a different key. This is the approved
-explicit pin trust mode, including for private-CA/self-signed deployments; it is
-not trust-on-first-use or unchecked TLS. A renewed certificate with the same proven
-public key can retain the association; a changed public key requires authorized
-re-pairing. Public keys come from the configured Backend, never token-header URLs.
-
-Each operation has a 20-second budget. Product verification additionally bounds
-DNS (2 seconds), connect/TLS/header waits (3 seconds each), total HTTP time
-(10 seconds), response size (2 MiB) and concurrent verifications (8). SDK parsing
-rejects duplicate keys, invalid Unicode, excessive nesting, incompatible versions
-and unsupported required features. Unknown optional data is preserved and inert.
+The supplied images and Compose prepare the local mount and permissions. Backend/Gateway need no Docker socket or certificate authority. Canonical logical origins are mapped to product sockets with no DNS, network proxy, redirects or TCP fallback. Native web URLs remain separate. See the local-channel guide for naming and deployment migration.
 
 ### TLS deployment choices
 
-**Direct Backend TLS:** mount readable certificate/key files into Backend and set
-both TLS file settings. Use `https://...` for the frontend's internal
-`NOX_FRONTEND_BACKEND_URL`; the certificate must match that hostname. For a private
-CA, mount an appropriate trusted CA bundle at the frontend's existing
-`/etc/ssl/certs/ca-certificates.crt`. Backend healthcheck connects locally with TLS,
-verifies the configured public hostname and uses the optional CA file. No extra
-application port is required. TLS files are deployment secrets, never image assets.
-
-**Trusted reverse proxy:** the external proxy must terminate actual HTTPS and
-replace incoming forwarding claims with its verified scheme. Configure
-`NOX_FRONTEND_SUITE_TRUSTED_PROXY_CIDRS` with its actual frontend-facing source
-addresses. Frontend sets `X-Nox-Suite-Transport: https` only for that verified ingress
-and overwrites a client's version of that header. Configure Backend's trusted-proxy
-CIDRs with the actual frontend-facing addresses. Backend requires both the trusted
-peer and the sanitized transport/scheme claims. Keep these plaintext internal hops
-within the explicitly trusted boundary; prefer exact proxy IPs over broad networks.
-The native frontend's public HTTP port rejects Suite requests even if a caller
-spoofs `X-Forwarded-Proto` or `X-Nox-Suite-Transport`.
-
-These settings do not automatically install certificates, configure an external
-proxy, or make an unchanged product support pairing. Existing installations need
-no new variables to keep using the native UI/client APIs. Suite operation requires
-the approved HTTPS/target configuration above.
+TLS remains an independent option for the existing native web/client listener or reverse proxy. Existing certificate/key options and packaged TLS healthcheck support remain available. They are not prerequisites for same-host Suite pairing, and trusted TLS/proxy headers never grant a local service connection.
 
 ## Caller authority and service grants
 
@@ -138,13 +79,13 @@ bound to the newly provisioned credential rather than an administrator assertion
 
 | Operation | Method and route | Access/precondition |
 | --- | --- | --- |
-| Read issuer/public keys | `GET /api/nox/keys` | Trusted HTTPS origin; public JSON and key-set ETag |
+| Read issuer/public keys | `GET /api/nox/keys` | Local Unix listener; public JSON and key-set ETag |
 | Prepare signing key | `POST /api/nox/keys` | Admin; If-Match key-set revision; returns prepared key ID and new revision |
 | Activate prepared key | `POST /api/nox/keys/{keyId}/activate` | Admin; If-Match current key-set revision |
 | Revoke signing key | `DELETE /api/nox/keys/{keyId}` | Admin; If-Match key-set revision |
 | Create intent | `POST /api/nox/pairings` | Admin or scoped installer; initial/replacement association condition |
 | Read safe pairing state | `GET /api/nox/pairings/{pairingId}` | Admin or its authorized creating installer; no secret |
-| Complete/recover proof | `POST /api/nox/pairings/{pairingId}/complete` | Bound HMAC proof over trusted HTTPS |
+| Complete/recover proof | `POST /api/nox/pairings/{pairingId}/complete` | Bound HMAC proof over the local channel |
 | Acknowledge persisted provisioning | `POST /api/nox/pairings/{pairingId}/ack` | Newly issued service credential |
 | Cancel pending intent | `DELETE /api/nox/pairings/{pairingId}` | Authorized admin/installer; If-Match pairing revision |
 | Read services / one service | `GET /api/nox/services`, `GET /api/nox/services/{serviceId}` | Admin list; admin or service for one record |
@@ -163,7 +104,7 @@ Service reads expose `revision` for the association and nested `service` contain
 the current credential's ID/revision/grants, without its bearer secret.
 
 Deployment authorization input is `{ "productId": "<actual-product-id>",
-"baseUrl": "https://approved-origin" }`. It authorizes that installer/deployment;
+"baseUrl": "http://example-product" }`. It authorizes that installer/deployment;
 it is not registry membership, a Docker schema or permission to enroll other targets.
 
 ## Pairing and recovery flow
@@ -176,16 +117,16 @@ it is not registry membership, a Docker schema or permission to enroll other tar
    an extra opaque `revision` for conditional cancellation. Maximum lifetime is
    ten minutes. Only one unresolved intent exists for that product at a time.
    Deliver it and trusted Backend connection information through a protected
-   file/secret mount or equivalent explicit manual configuration.
+   local participant receiver described in [automatic setup](suite-local.md#participant-receiver-for-gatewayyard-adaptation).
 3. The participant computes the fingerprint of its actual complete declaration
-   using SDK JCS/SHA-256, and the base64url SHA-256 of its TLS leaf's DER SPKI.
+   using SDK JCS/SHA-256. The local HTTP logical origin omits the TLS fingerprint.
    Decode the intent secret from base64url into raw bytes before calling
    `CreateSuitePairingProof` / the equivalent native SDK helper. The binding
    includes contract version, pairing ID, nonce, product ID, declaration fingerprint,
-   approved origin and TLS fingerprint; none may be substituted.
+   approved logical origin; none may be substituted.
 4. POST the SDK proof to `/complete` with a durable idempotency key. Backend checks
-   proof/current creator authority before network access, verifies the product
-   over its proven TLS key and approved target, then checks everything again in
+   proof/current creator authority before local contact, verifies the product
+   through its bound socket, then checks everything again in
    the commit transaction. HTTP 200 returns `SuiteProvisioning`: scoped service
    identity/credential, issuer, configured Backend origin and fixed keys URI.
 5. Persist the credential before POST `/ack` using **that credential**, not the
@@ -202,7 +143,7 @@ expired attempt requires a fresh authorized reconciliation and intent.
 During authorized replacement, the old association remains usable until the new
 participant persists its credential and acknowledges. Acknowledgment atomically
 retires all old generations, changes the head association and records invalidation.
-Changing a TLS key or address never silently resets trust on reconnect.
+Changing a native web address never silently resets local association trust.
 
 ## Rotation, signing keys and time
 
@@ -274,14 +215,4 @@ Examples: 400 `INVALID_REGISTRATION`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 40
 never HTML/login redirects. Missing local resources and wrong methods use explicit
 404/405 errors without revealing private details before authorization.
 
-Go tests exercise real HTTP/TLS plus SDK proof/token verification, restart/lost
-responses, clock/expiry boundaries, wrong pins/origins/declarations, denied targets,
-credential separation, concurrent completions, revocation, scoped deployments and
-transactional failure rollback. Existing split-image/Chromium tests retain login,
-roles, vaults, sync/MCP and frontend-only replacement, and now reject forged Suite
-TLS forwarding claims. `scripts/check-suite-proxy.py` additionally tests actual
-trusted TLS ingress, direct HTTP spoof rejection, issuer persistence after container
-restart and the packaged direct-TLS healthcheck. CI and release checks run these
-image tests and Go race tests; CI also runs vet.
-These protocol fixtures do not claim that Gateway, Portal, CLI or adapted products
-already exist, or replace later installed-product delivery validation.
+Go tests exercise real Unix service transport plus HTTP/TLS native boundary rejection, SDK proof/token verification, restart/lost responses, expiry, wrong identities/origins/declarations, credential separation, concurrency, revocation and rollback. Split-image/browser tests retain native login, roles, data operations and independent frontend replacement. The packaged local/browser flow is checked by `scripts/check-suite-proxy.py`; CI/release retain race tests and CI also runs vet. See [same-host validation and delivery](suite-local.md#validation-and-delivery-boundary) for the limits of this evidence.

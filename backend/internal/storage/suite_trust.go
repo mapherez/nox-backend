@@ -305,6 +305,9 @@ func (s *Store) suiteMutation(ctx context.Context, caller SuiteCaller, operation
 		if err := authorize(x, actor); err != nil {
 			return SuiteResult{}, err
 		}
+		if err := x.checkConnectionGuard(); err != nil {
+			return SuiteResult{}, err
+		}
 		if result, ok, err := x.replay(actor.principal, operation, key, digest); ok || err != nil {
 			return result, err
 		}

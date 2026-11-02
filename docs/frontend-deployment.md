@@ -9,9 +9,8 @@ The future Portal is a separate application; it does not replace this frontend.
 
 The public port remains 5710 by default. The frontend serves `/vault-dashboard`
 and its assets. It forwards `/auth/*`, `/api/*`, `/v1/*`, native dashboard form
-and ZIP-download routes, `/mcp`, `/mcp/suite`, `/nox/integration`, and other
-existing backend routes. The protected [Suite MCP path](suite-product.md) uses the
-explicit trusted HTTPS boundary, independently of direct MCP. It preserves
+and ZIP-download routes, `/mcp`, `/nox/integration`, and other
+existing backend routes. Inter-product `/mcp/suite` and `/api/nox/*` are refused by the frontend; they use the [same-host local channel](suite-local.md). It preserves
 the public Host, forwarded protocol, cookies, authorization headers, request
 bodies, redirects and streaming responses. HTTPS Backend targets use certificate verification with the image CA bundle;
 install the deployment CA bundle when using a private CA. Forwarded requests
@@ -104,6 +103,9 @@ No workflow publication is performed by local validation of point 2.
 
 ## Existing installations
 
+For the current Suite correction, also apply the [local-volume deployment update](suite-local.md#runtime-and-deployment). It preserves the existing data volume and native URL/ports. Updating images alone does not add mounts.
+
+
 This is a deployment topology change, not a database migration. First preserve
 the actual Compose project name, public URL, ports, environment, data mount and
 image references. Follow the [storage/update guide](backend-separation.md) for
@@ -153,17 +155,12 @@ real Chromium flows, install it with `npm exec --prefix frontend -- playwright
 install chromium` and pass `--browser` to the integration script.
 
 
-Suite trust deployment adds optional HTTPS/approved-network settings and a
-frontend trusted-ingress CIDR allowlist. The native HTTP flows are preserved;
-Suite credential/proof traffic requires a trusted HTTPS boundary. See the
-[trust deployment guide](suite-trust.md#tls-deployment-choices). Migration 5 also
-requires backing up the complete secret store with SQLite for rollback/recovery.
-
+Suite integration uses the shared local volume described in [local deployment](suite-local.md). The native HTTP flows remain available; no frontend trusted-ingress CIDR allowlist or certificate setup is required for local service traffic. Back up the complete secret store with SQLite before upgrading.
 
 ## Native Suite controls and final image checks
 
 The [Suite administration pane](suite-administration.md) consumes the safe native
-`/api/admin/suite` projection and performs protected changes through `/api/nox/*`.
+`/api/admin/suite` projection and performs administrator changes through `/api/admin/suite/operations/*`. Service calls to `/api/nox/*` stay on the local Unix channel.
 It includes explicit same-operation recovery and displays partial failure without
 blocking native account/vault management. Setup secrets stay in memory; only
 user-scoped non-secret operation/recovery metadata is retained in this tab.
@@ -171,7 +168,7 @@ user-scoped non-secret operation/recovery metadata is retained in this tab.
 CI and Release invoke the shared `scripts/check-image-contracts.py` version matrix.
 Bounded startup waits now retry connection resets/early disconnects as well as
 refusals/timeouts; persistent errors and invalid application responses still fail.
-Unit tests cover the formerly failing startup case. The actual HTTPS administration
+Unit tests cover the formerly failing startup case. The actual HTTP/local-channel administration
 flow is required through `check-suite-proxy.py --browser`; standalone frontend
 publication continues to use its `--frontend-only` mode without a Backend build.
 

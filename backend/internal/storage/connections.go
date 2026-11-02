@@ -57,6 +57,9 @@ func (s *Store) SaveFoundationConnection(ctx context.Context, service, origin, e
 	if current != expectedRevision {
 		return FoundationConnection{}, ErrPreconditionFailed
 	}
+	if err := foundationSetupPending(ctx, tx, service); err != nil {
+		return FoundationConnection{}, err
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err = tx.ExecContext(ctx, `INSERT INTO foundation_connections (service, origin, revision, updated_at) VALUES (?, ?, ?, ?)`, service, origin, revision, item.UpdatedAt)
 	} else {
@@ -75,7 +78,15 @@ func (s *Store) DeleteFoundationConnection(ctx context.Context, service, revisio
 	if (service != "yard" && service != "gateway") || revision == "" {
 		return ErrBadRequest
 	}
-	result, err := s.db.ExecContext(ctx, `DELETE FROM foundation_connections WHERE service = ? AND revision = ?`, service, revision)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	if err = foundationSetupPending(ctx, tx, service); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM foundation_connections WHERE service=? AND revision=?`, service, revision)
 	if err != nil {
 		return err
 	}
@@ -85,6 +96,24 @@ func (s *Store) DeleteFoundationConnection(ctx context.Context, service, revisio
 	}
 	if n != 1 {
 		return ErrPreconditionFailed
+	}
+	return tx.Commit()
+}
+func foundationSetupPending(ctx context.Context, tx *sql.Tx, service string) error {
+	var raw string
+	err := tx.QueryRowContext(ctx, `SELECT record_json FROM suite_connection_attempts WHERE service=?`, service).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var a SuiteConnectionAttempt
+	if err = suiteDecode(raw, &a); err != nil {
+		return err
+	}
+	if a.State != "completed" && a.State != "cancelled" && (a.PairingID != "" || a.LeaseUntil > time.Now().UnixMilli()) {
+		return fmt.Errorf("%w: resume or cancel the pending Suite connection before changing its address", ErrBadRequest)
 	}
 	return nil
 }

@@ -17,6 +17,12 @@ import (
 // actual historical schema; production migrations never remove these objects.
 func rewindSuiteAuthorizationSchema(t *testing.T, s *Store) {
 	t.Helper()
+	// Reconstruct version 6 in disposable data, including removal of the
+	// later setup journal. Production migration history remains strict.
+	if _, err := s.db.Exec(`DROP TABLE suite_connection_attempts;
+DELETE FROM schema_migrations WHERE version=8`); err != nil {
+		t.Fatal(err)
+	}
 	body, err := migrationFiles.ReadFile("migrations/007_suite_authorization.sql")
 	if err != nil {
 		t.Fatal(err)

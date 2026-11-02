@@ -257,7 +257,7 @@ func TestFoundationConnectionConfigurationIsNotTrust(t *testing.T) {
 	path := "/api/admin/connections/gateway"
 	administrationStatus(t, administrationRequest(t, s, "PUT", path, `{"origin":"https://gateway.example.com"}`, auth), 428)
 	create := map[string]string{"Authorization": auth["Authorization"], "If-None-Match": "*"}
-	for _, origin := range []string{"http://gateway.example.com", "https://gateway.example.com/apps/gw", "https://gateway.example.com?api_key=secret", "https://user:password@gateway.example.com", "https://gateway.example.com#fragment", "https://gateway.example.com:0", "https://gateway.example.com/%2e%2e"} {
+	for _, origin := range []string{"ftp://gateway.example.com", "https://gateway.example.com/apps/gw", "https://gateway.example.com?api_key=secret", "https://user:password@gateway.example.com", "https://gateway.example.com#fragment", "https://gateway.example.com:0", "https://gateway.example.com/%2e%2e"} {
 		administrationStatus(t, administrationRequest(t, s, "PUT", path, fmt.Sprintf(`{"origin":%q}`, origin), create), 400)
 	}
 	memberCreate := map[string]string{"Authorization": memberAuth["Authorization"], "If-None-Match": "*"}

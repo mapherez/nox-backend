@@ -80,7 +80,7 @@ jobs:
           cd ..
           python3 scripts/check-split-deployment.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check --browser
 
-      - name: Verify Suite TLS trust boundary
+      - name: Verify local Suite channel and browser setup
         run: python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
 
       - name: Set up QEMU

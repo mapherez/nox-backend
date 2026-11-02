@@ -92,7 +92,7 @@ func trustProof(t *testing.T, intent noxmcp.SuitePairingIntent) (noxmcp.SuitePai
 		t.Fatal(err)
 	}
 	pin := sha256.Sum256([]byte("explicit fixture TLS public key"))
-	binding := noxmcp.SuitePairingBinding{ContractVersion: "1.0", PairingID: intent.PairingID, Nonce: intent.Nonce, ProductID: intent.ProductID, DeclarationFingerprint: fingerprint, BaseUrl: intent.BaseUrl, TlsPublicKeyFingerprint: base64.RawURLEncoding.EncodeToString(pin[:])}
+	binding := noxmcp.SuitePairingBinding{ContractVersion: "1.0", PairingID: intent.PairingID, Nonce: intent.Nonce, ProductID: intent.ProductID, DeclarationFingerprint: fingerprint, BaseUrl: intent.BaseUrl, TlsPublicKeyFingerprint: suiteTestStringPointer(base64.RawURLEncoding.EncodeToString(pin[:]))}
 	secret, err := base64.RawURLEncoding.DecodeString(intent.Secret)
 	if err != nil {
 		t.Fatal(err)
@@ -248,7 +248,7 @@ func TestSuiteProofBindingExpiryCancellationAndCurrentAuthorization(t *testing.T
 			case "declaration":
 				proof.Binding.DeclarationFingerprint = strings.Repeat("a", 43)
 			case "tls":
-				proof.Binding.TlsPublicKeyFingerprint = strings.Repeat("a", 43)
+				proof.Binding.TlsPublicKeyFingerprint = suiteTestStringPointer(strings.Repeat("a", 43))
 			}
 			_, _, err := f.store.SuiteCheckPairingProof(context.Background(), intent.PairingID, proof)
 			trustExpectedError(t, err, 403)
@@ -563,7 +563,7 @@ func TestSuiteCompetingProofsCannotProvisionDifferentCredentials(t *testing.T) {
 	first, decl := trustProof(t, intent)
 	second := first
 	hash := sha256.Sum256([]byte("other TLS key"))
-	second.Binding.TlsPublicKeyFingerprint = base64.RawURLEncoding.EncodeToString(hash[:])
+	second.Binding.TlsPublicKeyFingerprint = suiteTestStringPointer(base64.RawURLEncoding.EncodeToString(hash[:]))
 	secret, _ := base64.RawURLEncoding.DecodeString(intent.Secret)
 	var err error
 	second.Proof, err = noxmcp.CreateSuitePairingProof(secret, second.Binding)
@@ -694,3 +694,5 @@ func TestSuiteServiceRevocationRetiresEveryCredentialGeneration(t *testing.T) {
 	_, err = f.store.SuiteAuthenticateService(ctx, provision.ServiceCredential)
 	trustExpectedError(t, err, 401)
 }
+
+func suiteTestStringPointer(value string) *string { return &value }

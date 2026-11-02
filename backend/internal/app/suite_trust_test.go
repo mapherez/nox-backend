@@ -3,14 +3,12 @@ package app
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,8 +45,13 @@ func suiteHTTPServer(t *testing.T, suiteEnabled ...bool) *suiteHTTPFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := NewServer(Config{Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
-	backend := httptest.NewTLSServer(s.Routes())
+	socketDir, err := os.MkdirTemp("/private/tmp", "nox-suite-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(socketDir) })
+	s := NewServer(Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
+	backend := suiteTestBackend(t, s)
 	s.cfg.PublicURL = backend.URL
 	f := &suiteHTTPFixture{s: s, store: store, backend: backend, client: backend.Client(), adminKey: key, dir: dir}
 	t.Cleanup(func() { f.backend.Close(); _ = f.store.Close() })
@@ -113,7 +116,7 @@ func suiteHTTPStatus(t *testing.T, status, want int, raw []byte) {
 func (f *suiteHTTPFixture) product(t *testing.T, product string, handler http.HandlerFunc) (*httptest.Server, json.RawMessage, string) {
 	t.Helper()
 	decl := json.RawMessage(fmt.Sprintf(`{"contractVersion":"1.0","productId":%q,"productVersion":"fixture","displayName":"TLS protocol fixture","capabilities":{},"optionalExtension":{"n":1}}`, product))
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := suiteTestUnixServer(t, f.s.cfg.SuiteSocketDir, product, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 			t.Error("Backend forwarded client credentials to product")
 		}
@@ -128,10 +131,7 @@ func (f *suiteHTTPFixture) product(t *testing.T, product string, handler http.Ha
 		_, _ = w.Write(decl)
 	}))
 	t.Cleanup(server.Close)
-	parsed, _ := url.Parse(server.URL)
-	f.s.cfg.SuiteAllowedPorts = append(f.s.cfg.SuiteAllowedPorts, parsed.Port())
-	fingerprint := sha256.Sum256(server.Certificate().RawSubjectPublicKeyInfo)
-	return server, decl, base64.RawURLEncoding.EncodeToString(fingerprint[:])
+	return server, decl, ""
 }
 func suiteHTTPProof(t *testing.T, intent noxmcp.SuitePairingIntent, decl []byte, pin string) noxmcp.SuitePairingProof {
 	t.Helper()
@@ -143,7 +143,10 @@ func suiteHTTPProof(t *testing.T, intent noxmcp.SuitePairingIntent, decl []byte,
 	if err != nil {
 		t.Fatal(err)
 	}
-	binding := noxmcp.SuitePairingBinding{ContractVersion: "1.0", PairingID: intent.PairingID, Nonce: intent.Nonce, ProductID: intent.ProductID, DeclarationFingerprint: fp, BaseUrl: intent.BaseUrl, TlsPublicKeyFingerprint: pin}
+	binding := noxmcp.SuitePairingBinding{ContractVersion: "1.0", PairingID: intent.PairingID, Nonce: intent.Nonce, ProductID: intent.ProductID, DeclarationFingerprint: fp, BaseUrl: intent.BaseUrl, TlsPublicKeyFingerprint: nil}
+	if pin != "" {
+		binding.TlsPublicKeyFingerprint = suiteTestStringPointer(pin)
+	}
 	secret, err := base64.RawURLEncoding.DecodeString(intent.Secret)
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +168,7 @@ func (f *suiteHTTPFixture) create(t *testing.T, product, purpose, origin string)
 	return intent
 }
 
-func TestSuiteHTTPSPairingRecoveryAndServiceCredentialBoundaries(t *testing.T) {
+func TestSuiteLocalPairingRecoveryAndServiceCredentialBoundaries(t *testing.T) {
 	f := suiteHTTPServer(t)
 	product, decl, pin := f.product(t, "future-product", nil)
 	intent := f.create(t, "future-product", "product", product.URL)
@@ -210,7 +213,7 @@ func TestSuiteHTTPSPairingRecoveryAndServiceCredentialBoundaries(t *testing.T) {
 	suiteHTTPStatus(t, status, 403, raw)
 }
 
-func TestSuiteHTTPSVerificationRejectsPinRedirectIdentityAndPolicyChanges(t *testing.T) {
+func TestSuiteLocalVerificationRejectsIdentityProofRedirectAndTargetChanges(t *testing.T) {
 	cases := []string{"wrong-pin", "redirect", "wrong-declaration", "denied-address", "denied-port", "bad-proof", "duplicate-json", "unsupported-version"}
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -226,9 +229,7 @@ func TestSuiteHTTPSVerificationRejectsPinRedirectIdentityAndPolicyChanges(t *tes
 			}
 			product, decl, pin := f.product(t, "verified-product", handler)
 			intent := f.create(t, "verified-product", "product", product.URL)
-			if name == "wrong-pin" {
-				pin = strings.Repeat("a", 43)
-			}
+
 			if name == "wrong-declaration" {
 				decl = []byte(`{"contractVersion":"1.0","productId":"different-product","productVersion":"1","displayName":"other","capabilities":{}}`)
 			}
@@ -237,16 +238,19 @@ func TestSuiteHTTPSVerificationRejectsPinRedirectIdentityAndPolicyChanges(t *tes
 			want := 503
 			switch name {
 			case "wrong-pin":
-				want = 409
+				proof.Binding.TlsPublicKeyFingerprint = suiteTestStringPointer(strings.Repeat("a", 43))
+				body = proof
+				want = 400
 			case "redirect":
 				want = 403
 			case "wrong-declaration":
 				want = 409
 			case "denied-address":
-				f.s.cfg.SuiteAllowedCIDRs = []string{"192.0.2.0/24"}
-				want = 403
+				f.s.cfg.SuiteSocketDir = t.TempDir()
+				want = 503
 			case "denied-port":
-				f.s.cfg.SuiteAllowedPorts = []string{"443"}
+				proof.Binding.BaseUrl = "http://verified-product:8095"
+				body = proof
 				want = 403
 			case "bad-proof":
 				proof.Proof = strings.Repeat("a", 43)
@@ -288,7 +292,7 @@ func TestSuiteTransportCannotBeSpoofedByForwardedHeaders(t *testing.T) {
 	f.s.cfg.SuiteTrustedProxyCIDRs = []string{"192.0.2.10/32"}
 	response := httptest.NewRecorder()
 	f.s.Routes().ServeHTTP(response, request)
-	suiteHTTPStatus(t, response.Code, 200, response.Body.Bytes())
+	suiteHTTPStatus(t, response.Code, 403, response.Body.Bytes())
 	request.Header.Del("X-Nox-Suite-Transport")
 	response = httptest.NewRecorder()
 	f.s.Routes().ServeHTTP(response, request)
@@ -330,7 +334,7 @@ func TestSuiteKeyManagementUsesJSONPreconditionsAndCurrentAdmin(t *testing.T) {
 
 func TestSuiteCertificateAndConfigFailureAreExplicit(t *testing.T) {
 	f := suiteHTTPServer(t)
-	f.s.cfg.PublicURL = "http://backend.example.com"
+	f.s.cfg.SuiteSocketDir = ""
 	status, _, raw := f.call(t, "GET", "/api/nox/keys", nil, "", nil)
 	suiteHTTPStatus(t, status, 503, raw)
 	if err := validateSuiteConfig(Config{TLSCertFile: "only-cert"}); err == nil {
@@ -370,7 +374,7 @@ func TestSuiteHTTPRecoverySurvivesBackendProcessRestart(t *testing.T) {
 	f.store = reopened
 	f.s = NewServer(config, reopened)
 	f.s.cfg.PublicURL = origin
-	f.backend = httptest.NewTLSServer(f.s.Routes())
+	f.backend = suiteTestBackend(t, f.s)
 	f.client = f.backend.Client()
 	status, _, again := f.call(t, "POST", path, proof, "", map[string]string{"Idempotency-Key": "recover"})
 	suiteHTTPStatus(t, status, 200, again)
@@ -382,3 +386,5 @@ func TestSuiteHTTPRecoverySurvivesBackendProcessRestart(t *testing.T) {
 		t.Fatal("missing persisted secret-store key", err)
 	}
 }
+
+func suiteTestStringPointer(value string) *string { return &value }

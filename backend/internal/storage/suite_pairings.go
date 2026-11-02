@@ -204,11 +204,17 @@ func (s *Store) SuiteCreatePairing(ctx context.Context, caller SuiteCaller, req 
 			p.CreatorServiceID = a.service.ID
 			p.CreatorCredentialID = a.credential.ID
 		}
-		return result, x.putPairing(p)
+		if err := x.putPairing(p); err != nil {
+			return SuiteResult{}, err
+		}
+		return result, x.bindConnectionPairing(p.ID)
 	})
 }
 func (x *suiteTx) checkProof(id string, proof noxmcp.SuitePairingProof) (suitePairing, error) {
 	p, err := x.pairing(id)
+	if err == nil {
+		err = x.checkConnectionPairing(id)
+	}
 	if err != nil {
 		return p, err
 	}
@@ -317,7 +323,7 @@ func (s *Store) SuiteCompletePairing(ctx context.Context, id string, proof noxmc
 		if err != nil {
 			return SuiteResult{}, err
 		}
-		service := suiteService{ID: serviceID, ProductID: p.Request.ProductID, AssociationID: associationID, Purpose: p.Request.Purpose, Origin: p.Request.BaseUrl, TLSFingerprint: proof.Binding.TlsPublicKeyFingerprint, DeclarationFingerprint: fingerprint, Declaration: declaration, ManagedBy: p.Request.ManagedBy, Grants: suiteGrants(p.Request.Purpose), State: "provisioned", Revision: revision}
+		service := suiteService{ID: serviceID, ProductID: p.Request.ProductID, AssociationID: associationID, Purpose: p.Request.Purpose, Origin: p.Request.BaseUrl, TLSFingerprint: suiteFingerprintValue(proof.Binding.TlsPublicKeyFingerprint), DeclarationFingerprint: fingerprint, Declaration: declaration, ManagedBy: p.Request.ManagedBy, Grants: suiteGrants(p.Request.Purpose), State: "provisioned", Revision: revision}
 		if err := x.putService(service); err != nil {
 			return SuiteResult{}, err
 		}
@@ -362,6 +368,9 @@ func (s *Store) SuiteCompletePairing(ctx context.Context, id string, proof noxmc
 }
 func (s *Store) SuiteAcknowledgePairing(ctx context.Context, caller SuiteCaller, id, key, digest string) (SuiteResult, error) {
 	authorize := func(x *suiteTx, a suiteActor) error {
+		if err := x.checkConnectionPairing(id); err != nil {
+			return err
+		}
 		p, err := x.pairing(id)
 		if err != nil {
 			return err
@@ -519,4 +528,11 @@ func suiteProofHash(raw []byte) string {
 		return ""
 	}
 	return hash
+}
+
+func suiteFingerprintValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

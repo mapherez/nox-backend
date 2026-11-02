@@ -17,6 +17,7 @@ import (
 type Config struct {
 	DirectMCPDisabled, SuiteMCPEnabled                           bool
 	Addr                                                         string
+	SuiteSocketDir                                               string
 	DataDir                                                      string
 	Version                                                      string
 	PublicURL                                                    string
@@ -65,6 +66,19 @@ func Run(ctx context.Context, cfg Config) error {
 	defer stopServer()
 	go server.monitorStaleLocks(serverCtx)
 	go func() {
+		server.reconcileConnections(serverCtx)
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-serverCtx.Done():
+				return
+			case <-ticker.C:
+				server.reconcileConnections(serverCtx)
+			}
+		}
+	}()
+	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -85,7 +99,19 @@ func Run(ctx context.Context, cfg Config) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
+	var localServer *http.Server
+	if cfg.SuiteSocketDir != "" {
+		listener, cleanup, err := server.listenSuiteLocal()
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		localServer = &http.Server{Handler: server.suiteLocalHandler(), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 64 << 10}
+		defer localServer.Close()
+		go func() { errCh <- localServer.Serve(listener) }()
+	}
+	defer httpServer.Close()
 	go func() {
 		log.Printf("nox-backend listening on %s data_dir=%s", cfg.Addr, cfg.DataDir)
 		if cfg.TLSCertFile != "" {
@@ -99,6 +125,9 @@ func Run(ctx context.Context, cfg Config) error {
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		if localServer != nil {
+			_ = localServer.Shutdown(shutdownCtx)
+		}
 		return httpServer.Shutdown(shutdownCtx)
 	case err := <-errCh:
 		if errors.Is(err, http.ErrServerClosed) {

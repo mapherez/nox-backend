@@ -23,17 +23,10 @@ func (s *Server) handleSuiteAdministration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	origin, originErr := s.suiteOrigin()
-	ready := s.suiteSecureTransport(r) && originErr == nil
+	ready := originErr == nil && validateSuiteSocketDirectory(s.cfg.SuiteSocketDir) == nil
 	reason := ""
-	if !s.suiteSecureTransport(r) {
-		reason = "Open this Backend through its trusted HTTPS address to manage Suite integration."
-	} else if originErr != nil {
-		reason = "Configure NOX_BACKEND_PUBLIC_URL with the trusted HTTPS Backend origin."
-
+	if !ready {
+		reason = "The local Suite channel is unavailable. Use the deployment with its shared local volume."
 	}
-	enrollmentReason := ""
-	if len(s.cfg.SuiteAllowedCIDRs) == 0 {
-		enrollmentReason = "Configure NOX_BACKEND_SUITE_ALLOWED_CIDRS and the approved target ports before pairing or verifying products."
-	}
-	writeJSON(w, 200, map[string]any{"state": state, "configuration": map[string]any{"backendOrigin": origin, "canManage": ready, "canEnroll": ready && len(s.cfg.SuiteAllowedCIDRs) > 0, "enrollmentReason": enrollmentReason, "reason": reason, "directMcpEnabled": !s.cfg.DirectMCPDisabled, "suiteMcpEnabled": s.cfg.SuiteMCPEnabled, "allowedCidrs": s.cfg.SuiteAllowedCIDRs, "allowedPorts": s.cfg.SuiteAllowedPorts}})
+	writeJSON(w, 200, map[string]any{"state": state, "configuration": map[string]any{"backendOrigin": origin, "canManage": ready, "canEnroll": ready, "enrollmentReason": reason, "reason": reason, "transport": "unix", "directMcpEnabled": !s.cfg.DirectMCPDisabled, "suiteMcpEnabled": s.cfg.SuiteMCPEnabled, "allowedCidrs": []string{}, "allowedPorts": []string{}}})
 }

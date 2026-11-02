@@ -1,5 +1,8 @@
 # NoX Suite migration status and compatibility baseline
 
+**Current correction:** [same-host integration and automatic setup](suite-local.md) records the current Backend work against SDK `0.7.2`, including migration 8 and the local volume. The numbered eight-point implementation history below is retained as historical evidence; it is distinct from the fixed 12-point correction sequence and does not override the owner's subsequent same-host clarification.
+
+
 Updated for **point 8**. Original Backend baseline: commit `a2382ec` (`v1.0.7`).
 The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
 current application package version is `1.0.14`; point-8 implementation starts from

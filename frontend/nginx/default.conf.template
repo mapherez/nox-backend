@@ -4,15 +4,6 @@ map $http_x_forwarded_proto $public_scheme {
  https https;
  http http;
 }
-geo $nox_suite_ingress_trusted {
- default 0;
- include /tmp/nox-suite-ingress.conf;
-}
-map "$scheme:$nox_suite_ingress_trusted:$http_x_forwarded_proto" $nox_suite_transport {
- default "";
- ~^https: https;
- "http:1:https" https;
-}
 server {
  access_log /dev/stdout nox;
  error_log /dev/stderr crit;
@@ -37,7 +28,7 @@ server {
   proxy_read_timeout 86400s;
   proxy_send_timeout 86400s;
   proxy_redirect off;
- proxy_set_header X-Nox-Suite-Transport $nox_suite_transport;
+ proxy_set_header X-Nox-Suite-Transport "";
  location = /healthz { access_log off; default_type application/json; return 200 '{"status":"ready"}'; }
  location = /vault-dashboard {
   if ($request_method != GET) { return 405; }
@@ -52,17 +43,13 @@ server {
  }
  location = /mcp/suite {
   default_type application/json;
-  proxy_hide_header Cache-Control;
   add_header Cache-Control "no-store" always;
-  if ($nox_suite_transport = "") { return 403 '{"code":"FORBIDDEN","message":"Suite MCP requires a trusted HTTPS ingress."}'; }
-  proxy_pass $backend_origin;
+  return 403 '{"code":"FORBIDDEN","message":"Suite service communication requires the same-host local channel."}';
  }
  location /api/nox/ {
   default_type application/json;
-  proxy_hide_header Cache-Control;
   add_header Cache-Control "no-store" always;
-  if ($nox_suite_transport = "") { return 403 '{"error":{"code":"FORBIDDEN","message":"Suite trust requires a trusted HTTPS ingress.","retryable":false}}'; }
-  proxy_pass $backend_origin;
+  return 403 '{"error":{"code":"FORBIDDEN","message":"Suite service communication requires the same-host local channel.","retryable":false}}';
  }
  location / {
   proxy_pass $backend_origin;

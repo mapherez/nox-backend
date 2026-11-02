@@ -58,7 +58,7 @@ func (s *Server) suiteMCPHandler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if !s.suiteSecureTransport(r) {
-			writeJSONError(w, 403, "FORBIDDEN", "Suite MCP requires trusted HTTPS.")
+			writeJSONError(w, 403, "FORBIDDEN", "Suite MCP requires the same-host local channel.")
 			return
 		}
 		if !s.requireMethod(w, r, http.MethodPost) {
@@ -89,7 +89,7 @@ func (s *Server) suiteMCPHandler() http.Handler {
 		defer cancel()
 		origin, err := s.suiteOrigin()
 		if err != nil {
-			writeJSONError(w, 503, "INTEGRATION_UNAVAILABLE", "The trusted Backend HTTPS origin is not configured.")
+			writeJSONError(w, 503, "INTEGRATION_UNAVAILABLE", "The local Suite channel is not configured.")
 			return
 		}
 		admission, err := s.store.SuiteAcceptBackendToken(ctx, fields[1], origin, backendSuiteMCPPath)

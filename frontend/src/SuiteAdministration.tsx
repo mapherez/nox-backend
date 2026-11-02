@@ -197,18 +197,9 @@ function Service({ service }: { service: SuiteService }) {
           {credential.current &&
             credential.state === "provisioned" &&
             service.state === "active" && (
-              <SuiteForm
-                label={`Acknowledge replacement for ${service.productId}`}
-                confirm="Confirm that the product has securely saved this replacement credential. Acknowledgment revokes its predecessor and closes recovery."
-                build={(data) => ({
-                  path: `${base}/credentials/${encoded(credential.credentialId)}/ack`,
-                  method: "POST",
-                  credential: text(data, "credential"),
-                  message: "Replacement acknowledged; predecessor revoked.",
-                })}
-              >
-                <Field label="Saved replacement credential" name="credential" type="password" />
-              </SuiteForm>
+              <p className="muted">
+                The local participant acknowledges this replacement after persisting it.
+              </p>
             )}
           {credential.state !== "revoked" && service.state === "active" && (
             <SuiteForm
@@ -261,7 +252,7 @@ function Service({ service }: { service: SuiteService }) {
           >
             <Field label="Deployment ID" name="deployment" />
             <Field label="Deployment product ID" name="product" />
-            <Field label="Deployment HTTPS address" name="origin" type="url" />
+            <Field label="Deployment local Suite origin" name="origin" type="url" />
           </SuiteForm>
         </>
       )}
@@ -337,7 +328,7 @@ function Product({
         })}
       >
         <Field
-          label={`HTTPS address for ${product.productId}`}
+          label={`Local Suite origin for ${product.productId}`}
           name="origin"
           type="url"
           value={product.connection.baseUrl}
@@ -374,21 +365,7 @@ function SuitePanel({ actorId }: { actorId: string }) {
       const value = parseSuiteAdministration(
         await requestJSON<unknown>("/api/admin/suite", { signal }),
       );
-      // A TLS upstream does not make an HTTP browser connection secure.
-      setData(
-        window.location.protocol === "https:"
-          ? value
-          : {
-              ...value,
-              configuration: {
-                ...value.configuration,
-                canManage: false,
-                canEnroll: false,
-                reason:
-                  "Open this Backend through its trusted HTTPS address to manage Suite integration.",
-              },
-            },
-      );
+      setData(value);
       setError("");
       setRefreshNeeded(false);
     } catch (failure) {
@@ -653,9 +630,9 @@ function SuitePanel({ actorId }: { actorId: string }) {
             </p>
             <h4>Start product pairing</h4>
             <p>
-              Choose any product ID. Gateway and installer are technical service purposes. Transfer
-              the setup information to the product; it confirms possession and saves its credential
-              before acknowledgment.
+              Use Service connections above for normal foundation setup; Yard registers the products
+              it installs. The controls here are for advanced recovery. Pairing completion and
+              credential acknowledgement are performed by the local participant.
             </p>
             <SuiteForm
               enrollment
@@ -698,7 +675,7 @@ function SuitePanel({ actorId }: { actorId: string }) {
               }}
             >
               <Field label="Product ID" name="productId" />
-              <Field label="Product HTTPS address" name="baseUrl" type="url" />
+              <Field label="Product local Suite origin" name="baseUrl" type="url" />
               <Field label="Service purpose" name="purpose" value="product">
                 <option value="product">Product</option>
                 <option value="gateway">Gateway</option>
@@ -753,23 +730,9 @@ function SuitePanel({ actorId }: { actorId: string }) {
                       </label>
                     </SuiteForm>
                     {pairing.state === "provisioned" && (
-                      <SuiteForm
-                        label={`Acknowledge saved provisioning for ${pairing.productId}`}
-                        confirm="Confirm that the intended product has securely saved its provisioning. This closes secret recovery."
-                        build={(fields) => ({
-                          path: `/api/nox/pairings/${encoded(pairing.pairingId)}/ack`,
-                          method: "POST",
-                          credential: text(fields, "credential"),
-                          message:
-                            "Service acknowledged. Verify and register its product separately.",
-                        })}
-                      >
-                        <Field
-                          label="Saved product service credential"
-                          name="credential"
-                          type="password"
-                        />
-                      </SuiteForm>
+                      <p className="muted">
+                        Waiting for the local participant to persist and acknowledge provisioning.
+                      </p>
                     )}
                     <SuiteForm
                       label={`Cancel pairing for ${pairing.productId}`}
@@ -827,7 +790,7 @@ function SuitePanel({ actorId }: { actorId: string }) {
               }}
             >
               <Field label="Paired product ID" name="product" />
-              <Field label="Paired product HTTPS address" name="origin" type="url" />
+              <Field label="Paired product local Suite origin" name="origin" type="url" />
               <Field
                 label="Registration installer product ID (optional)"
                 name="installer"
