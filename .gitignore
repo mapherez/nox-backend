@@ -28,3 +28,8 @@ frontend/playwright-report/
 
 # Python validation caches
 __pycache__/
+
+# Local deployment credentials; keep the documented example tracked.
+.env
+.env.*
+!.env.example

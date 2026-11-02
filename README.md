@@ -108,7 +108,7 @@ For a new installation:
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
 ```
 
-Create a `.env` file beside it:
+Copy [`.env.example`](.env.example) to `.env` beside it and fill in your settings:
 
 ```env
 NOX_BACKEND_PUBLIC_URL=https://backend.example.com
