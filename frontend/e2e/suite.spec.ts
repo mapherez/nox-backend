@@ -65,7 +65,9 @@ test("HTTP dashboard connects the local participant automatically and recovers a
   expect(await page.locator("textarea").count()).toBe(0);
   // Human management stays usable in this actual insecure browser context.
   await page.getByRole("button", { name: "Manage Suite integrations" }).click();
-  await expect(page.getByRole("button", { name: "Create pairing", exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Prepare signing key", exact: true }),
+  ).toBeEnabled();
   await expect(page.getByText("nox-yard", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Prepare signing key", exact: true }).click();
   await expect(

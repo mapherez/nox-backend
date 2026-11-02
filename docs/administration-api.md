@@ -207,9 +207,10 @@ See the [delivery checklist](suite-delivery.md) for installed/remote verificatio
 It accepts a current admin personal key or browser session. Storage rechecks the
 role and supplies consistent safe pairing/service/credential/deployment/key and
 registry/observation state. It exposes no raw secret or verifier. It is available
-on native HTTP, while its configuration fields distinguish trusted HTTPS management
-from target enrollment readiness. Mutations continue to use the existing protected
-`/api/nox/*` contracts and their conditional/idempotent rules. See the
+on native HTTP; its configuration describes the same-host local channel.
+Non-secret administration uses `/api/admin/suite/operations/*` with the existing
+conditional/idempotent rules. Pairing and credential delivery use the local
+participant protocol, not the browser adapter. See the
 [native integration workflow](suite-administration.md).
 
 Failure of Suite connection/status reads no longer fails the complete

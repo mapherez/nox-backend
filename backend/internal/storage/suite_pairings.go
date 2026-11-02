@@ -256,7 +256,7 @@ func (x *suiteTx) checkProof(id string, proof noxmcp.SuitePairingProof) (suitePa
 }
 
 // Check first, before any network access. Completion repeats this check in the
-// commit transaction, after the verified HTTPS declaration has been fetched.
+// commit transaction, after the verified declaration has been fetched.
 func (s *Store) SuiteCheckPairingProof(ctx context.Context, id string, proof noxmcp.SuitePairingProof) (noxmcp.SuitePairingRequest, bool, error) {
 	var req noxmcp.SuitePairingRequest
 	var completed bool
@@ -271,7 +271,7 @@ func (s *Store) SuiteCheckPairingProof(ctx context.Context, id string, proof nox
 func (s *Store) SuiteCompletePairing(ctx context.Context, id string, proof noxmcp.SuitePairingProof, declaration json.RawMessage, backendOrigin, key, digest string) (SuiteResult, error) {
 	origin, err := noxmcp.NormalizeSuiteOrigin(backendOrigin)
 	if err != nil {
-		return SuiteResult{}, suiteError(503, "INTEGRATION_UNAVAILABLE", "Configure a trusted HTTPS Backend public origin before provisioning services.")
+		return SuiteResult{}, suiteError(503, "INTEGRATION_UNAVAILABLE", "The Backend Suite protocol origin is invalid.")
 	}
 	return s.suiteTransaction(ctx, func(x *suiteTx) (SuiteResult, error) {
 		p, err := x.checkProof(id, proof)

@@ -1,8 +1,8 @@
 # Direct MCP API
 
 NoX Backend exposes **POST `/mcp`** (enabled by default) through the official
-[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.0/go), using
-the published `github.com/mapherez/nox-mcp v0.7.0` module. It runs in the same
+[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.2/go), using
+the published `github.com/mapherez/nox-mcp v0.7.2` module. It runs in the same
 Go process, HTTP server, bind address and port as the existing backend APIs.
 The separate React frontend forwards `/mcp` unchanged on the public origin; it
 does not implement MCP or hold user/service authority. Configure a Streamable HTTP MCP client with

@@ -107,7 +107,7 @@ func (f *backendSuiteFixture) connect(t *testing.T, token string) *mcp.ClientSes
 	t.Cleanup(func() { _ = session.Close() })
 	return session
 }
-func TestBackendSuiteActualHTTPSCatalogCapabilitiesAndOwnership(t *testing.T) {
+func TestBackendSuiteLocalCatalogCapabilitiesAndOwnership(t *testing.T) {
 	f := backendSuiteServer(t)
 	ctx := context.Background()
 	reader := f.connect(t, f.token(t, f.memberKey, false))

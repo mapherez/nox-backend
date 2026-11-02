@@ -1,71 +1,22 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 
-// Only request metadata/non-secret payloads survive a reload. Pairing proofs,
-// provisioning responses and Bearer credentials are never stored in the browser.
+// Browser operations contain only non-secret administration data. Pairing and
+// service credentials are delivered and persisted by local participants.
 export interface SuiteRequest {
   path: string;
   method: "POST" | "PUT" | "DELETE";
   headers?: Record<string, string>;
   body?: string;
-  credential?: string;
-  privateBody?: boolean;
-  secretResult?: boolean;
   message: string;
 }
 export interface PendingSuiteRequest {
   key: string;
   fingerprint: string;
   request: SuiteRequest;
-  needsBody: boolean;
-  needsCredential: boolean;
 }
 export const journalKey = (actorId: string) => `nox-suite-operation:${actorId}`;
+// Read/clear old records, never replay their manual secret-transfer operations.
 export const recoveryKey = (actorId: string) => `nox-suite-recovery:${actorId}`;
-export function readPending(actorId: string, recovery = false): PendingSuiteRequest | null {
-  const value = sessionStorage.getItem(recovery ? recoveryKey(actorId) : journalKey(actorId));
-  if (!value) return null;
-  const pending = JSON.parse(value) as PendingSuiteRequest;
-  if (
-    !pending.key ||
-    !pending.fingerprint ||
-    !pending.request.path.startsWith("/api/nox/") ||
-    !["POST", "PUT", "DELETE"].includes(pending.request.method)
-  )
-    throw Error(
-      "The saved Suite operation cannot be read. Reconcile its state before clearing this tab's operation record.",
-    );
-  return pending;
-}
-export async function requestFingerprint(request: SuiteRequest): Promise<string> {
-  const bytes = new TextEncoder().encode(
-    JSON.stringify([
-      request.method,
-      request.path,
-      request.headers ?? {},
-      request.body ?? null,
-      request.credential ?? null,
-    ]),
-  );
-  return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-export async function preparePending(
-  actorId: string,
-  request: SuiteRequest,
-): Promise<PendingSuiteRequest> {
-  const pending = {
-    key: operationID(),
-    fingerprint: await requestFingerprint(request),
-    request: {
-      ...request,
-      body: request.privateBody ? undefined : request.body,
-      credential: undefined,
-    },
-    needsBody: Boolean(request.privateBody && request.body),
-    needsCredential: Boolean(request.credential),
-  };
-  sessionStorage.setItem(journalKey(actorId), JSON.stringify(pending));
-  return pending;
-}
 export class SuiteRequestFailure extends Error {
   constructor(
     message: string,
@@ -74,14 +25,73 @@ export class SuiteRequestFailure extends Error {
     super(message);
   }
 }
-export async function sendSuiteRequest(request: SuiteRequest, key: string): Promise<unknown> {
-  if (!request.path.startsWith("/api/nox/"))
-    throw new SuiteRequestFailure("Invalid Suite operation path.", false);
-  if (request.credential)
+function validateRequest(request: SuiteRequest): void {
+  const allowed =
+    (request.method === "POST" &&
+      /^\/api\/nox\/keys(?:\/[^/?#]+\/activate)?$/.test(request.path)) ||
+    (request.method === "DELETE" &&
+      /^\/api\/nox\/(?:keys|products|pairings|services)\/[^/?#]+$/.test(request.path)) ||
+    (["PUT", "DELETE"].includes(request.method) &&
+      /^\/api\/nox\/services\/[^/?#]+\/deployments\/[^/?#]+$/.test(request.path)) ||
+    (request.method === "DELETE" &&
+      /^\/api\/nox\/services\/[^/?#]+\/credentials\/[^/?#]+$/.test(request.path)) ||
+    (request.method === "PUT" && /^\/api\/nox\/products\/[^/?#]+$/.test(request.path));
+  const fields = ["path", "method", "headers", "body", "message"];
+  if (!allowed || Object.keys(request).some((field) => !fields.includes(field)))
     throw new SuiteRequestFailure(
-      "Service credentials must be used by the local participant, not through browser administration.",
+      "This operation is not available through browser administration. Use Service connections or the local installer to manage pairing and service credentials.",
       false,
     );
+}
+export function readPending(actorId: string): PendingSuiteRequest | null {
+  if (sessionStorage.getItem(recoveryKey(actorId)))
+    throw Error(
+      "A previous manual setup record exists. Reconcile the current state; resume setup through Service connections or the local installer.",
+    );
+  const value = sessionStorage.getItem(journalKey(actorId));
+  if (!value) return null;
+  const pending = JSON.parse(value) as PendingSuiteRequest & {
+    needsBody?: boolean;
+    needsCredential?: boolean;
+  };
+  if (
+    !pending.key ||
+    !pending.fingerprint ||
+    !pending.request ||
+    pending.needsBody ||
+    pending.needsCredential
+  )
+    throw Error(
+      "The saved Suite operation cannot be retried. Reconcile the current state before clearing its record.",
+    );
+  validateRequest(pending.request);
+  return { key: pending.key, fingerprint: pending.fingerprint, request: pending.request };
+}
+export async function requestFingerprint(request: SuiteRequest): Promise<string> {
+  validateRequest(request);
+  const bytes = new TextEncoder().encode(
+    JSON.stringify([
+      request.method,
+      request.path,
+      request.headers ?? {},
+      request.body ?? null,
+      // Preserve fingerprints of non-secret operations already saved in a tab.
+      null,
+    ]),
+  );
+  return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+export async function preparePending(
+  actorId: string,
+  request: SuiteRequest,
+): Promise<PendingSuiteRequest> {
+  validateRequest(request);
+  const pending = { key: operationID(), fingerprint: await requestFingerprint(request), request };
+  sessionStorage.setItem(journalKey(actorId), JSON.stringify(pending));
+  return pending;
+}
+export async function sendSuiteRequest(request: SuiteRequest, key: string): Promise<unknown> {
+  validateRequest(request);
   let response: Response;
   try {
     response = await fetch(

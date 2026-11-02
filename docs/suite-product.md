@@ -129,7 +129,7 @@ them. The product adapter does not prompt for Google login every five minutes.
 
 ## Validation and delivery boundary
 
-Tests enroll the actual disposable HTTPS Backend through the public management
+Tests enroll the disposable Backend through the local service management
 flow and invoke it through the official MCP Go client. They cover role-filtered
 catalogs, user isolation, vault lifecycle/ownership, profile separation, revoked
 accounts/keys/Gateway/signing keys/membership, incompatible admission, payload and
@@ -137,7 +137,7 @@ request controls, concurrent identities, and retained capacity after timeout.
 A storage test covers expiry after admission, current revocation before a write,
 and clock rollback. Existing CI/release `go test -race ./...` includes these tests.
 
-The required image-level HTTPS check now validates the declaration, Suite token
+The required image-level local-channel check validates the declaration, Suite token
 boundary and rejection of forged HTTP transport claims on `/mcp/suite`; its
 frontend-only mode covers the new proxy guard independently. Native frontend,
 API/direct MCP, sync streaming and frontend replacement remain covered by the

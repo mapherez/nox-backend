@@ -298,61 +298,42 @@ forwarded protocol. Read the [deployment guide](frontend-deployment.md).
 
 ## Initial foundation-service configuration
 
-The native frontend's **Service connections** section and the
-[administration APIs](administration-api.md) store approved Yard/Gateway HTTPS
-origins in SQLite. These are administrator-managed settings, not additional
-environment variables. Saved entries remain explicitly awaiting pairing until the
-trust work is implemented. No service is contacted by saving its address.
-Migration 4 adds the configuration table without resetting existing data. Retain
-a pre-upgrade backup for rollback to a binary that predates migration 4.
+The native frontend's **Service connections** section stores Yard/Gateway HTTP
+or HTTPS web addresses in SQLite. Use **Verify**, **Connect**, **Resume connection**
+and **Cancel connection** to operate the local participant setup. Saving an address
+alone does not establish trust. See [same-host setup](suite-local.md).
 
+## Suite local channel
 
-## Suite trust configuration
+The supported Docker deployment mounts its local `nox-suite-local` volume at
+`/run/nox-suite`. `NOX_BACKEND_SUITE_SOCKET_DIR` selects that directory; it is set
+by the image and Compose. Bare binary execution leaves it disabled unless set
+explicitly. Only participating services on that host share this channel. Native
+URLs, OAuth and existing external-client APIs retain their own configuration.
 
-[Suite trust and pairing](suite-trust.md) uses the same database/volume, plus
-private encrypted files under `/data/secrets/suite`. Configure explicit approved
-`NOX_BACKEND_SUITE_ALLOWED_CIDRS` and `NOX_BACKEND_SUITE_ALLOWED_PORTS` for product
-verification. The default port is 443; an empty network policy permits no fetch.
-These are deployment-wide policies for any product, not a fixed product list.
-
-Suite management requires HTTPS `NOX_BACKEND_PUBLIC_URL`, with direct Backend TLS
-(`NOX_BACKEND_TLS_CERT_FILE`, `NOX_BACKEND_TLS_KEY_FILE`, optional healthcheck
-`NOX_BACKEND_TLS_CA_FILE`) or a trusted proxy boundary
-(`NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS` and
-`NOX_FRONTEND_SUITE_TRUSTED_PROXY_CIDRS`). Proxy CIDRs default to empty. Existing
-`NOX_SYNC_*` fallback rules apply to the new Backend variables. Certificate paths
-must be mounted/readable by the process; they are not baked into an image.
-See the trust guide before configuring a proxy: a supplied forwarding header or
-private address is never sufficient on its own. These settings are optional for
-legacy/native operation and necessary for the corresponding Suite deployment.
+The removed `NOX_BACKEND_SUITE_ALLOWED_CIDRS`, `NOX_BACKEND_SUITE_ALLOWED_PORTS`,
+`NOX_BACKEND_SUITE_TRUSTED_PROXY_CIDRS` and frontend trusted-proxy variable are not
+used. Their old aliases do not enable service networking. No certificate or proxy
+allowlist setup is needed for the local channel. Existing native TLS certificate,
+key and healthcheck CA options remain available for the web/client listener.
 
 ### Suite registry observations
 
 `NOX_BACKEND_SUITE_REPORT_INTERVAL_MS` defaults to `15000` and
 `NOX_BACKEND_SUITE_OBSERVATION_FRESHNESS_MS` defaults to `45000`. Both accept
-positive integer milliseconds and their `NOX_SYNC_*` aliases. They configure
-installation-wide reporting/freshness, not Google login or work-session duration.
-See [registry/events operations](suite-registry.md) for snapshots and restore handling.
+positive integer milliseconds and their existing environment aliases. They
+configure reporting/freshness, not Google login or work-session duration.
+See [registry/events operations](suite-registry.md).
 
 ## Independent MCP access paths
 
-`NOX_BACKEND_DIRECT_MCP_ENABLED=true` (default) preserves the existing direct
-`/mcp` personal-key/public-tool policy. `NOX_BACKEND_SUITE_MCP_ENABLED=false`
-(default) keeps protected Suite MCP off until HTTPS/trust/registration is ready.
-Set it to `true` to mount `/mcp/suite` and advertise it in `GET /nox/integration`.
-These flags are independent, accept only `true`/`false`, support the corresponding
-`NOX_SYNC_*` aliases, and are forwarded by both Compose files. The declaration is
-public metadata; it never grants trust or registration automatically.
+`NOX_BACKEND_DIRECT_MCP_ENABLED=true` preserves direct `/mcp` access under its
+existing public/personal-key policy. `NOX_BACKEND_SUITE_MCP_ENABLED=false` keeps
+Suite MCP opt-in. When enabled, `/mcp/suite` accepts Suite grants only through the
+local channel. HTTPS and forwarded headers do not enable that path over TCP.
+Both flags accept only `true`/`false` and retain their existing environment aliases.
 
-See [Backend as a Suite product](suite-product.md) for enrollment, permissions,
-request controls and validation. No public Internet exposure is required; internal
-HTTPS is supported through the existing TLS/trusted-proxy configuration.
-
-
-The native **Manage Suite integrations** pane shows the deployed readiness and
-trust/registry state. `GET /api/admin/suite` is an authenticated non-secret read;
-actual Suite mutations still require trusted HTTPS. Only target enrollment and
-verified destination reads require the approved outgoing CIDRs/ports. Local key
-management and revocation remain available independently of product reachability.
-No point-8 environment variables or database migration are introduced. See the
-[native guide](suite-administration.md) and [delivery checklist](suite-delivery.md).
+**Manage Suite integrations** provides inspection and non-secret administration
+through `/api/admin/suite` and `/api/admin/suite/operations/*`. Pairing, provisioning
+and credential delivery are handled by local participants; the browser does not
+copy or request service secrets. See [native administration](suite-administration.md).

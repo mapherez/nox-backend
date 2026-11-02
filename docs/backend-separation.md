@@ -12,7 +12,9 @@ The nox-wiki-codex read integration keeps its conditional downloads and original
 Use `NOX_BACKEND_*` for new configuration. All matching `NOX_SYNC_*` runtime
 variables remain accepted: non-empty canonical value, then non-empty legacy
 value, then the existing default. Compose resolves both names using the same rule.
-The legacy executable `nox-sync` remains available. Container UID/GID stay 10001.
+The server executable is `nox-backend`. The obsolete `nox-sync` executable alias
+is removed; Docker startup and healthchecks already use `nox-backend`. Update any
+external script that explicitly invokes the old executable. Container UID/GID stay 10001.
 
 New databases use `/data/nox-backend.db`. An existing `/data/nox-sync.db` is used
 in place, without automatic renaming. If both active files exist, startup fails

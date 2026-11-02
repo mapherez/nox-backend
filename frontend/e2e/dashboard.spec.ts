@@ -149,7 +149,9 @@ test("admin manages credentials, users and vaults through authenticated JSON API
     }),
   );
   await page.getByRole("button", { name: "Manage Suite integrations" }).click();
-  await expect(page.getByRole("button", { name: "Create pairing", exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Prepare signing key", exact: true }),
+  ).toBeEnabled();
   expect(await page.evaluate(async () => (await fetch("/api/nox/keys")).status)).toBe(403);
   await expect(
     page.getByRole("button", { name: "Generate new API key", exact: true }),

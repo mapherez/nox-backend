@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { webcrypto } from "node:crypto";
 import { SuiteAdministration } from "./SuiteAdministration";
@@ -16,14 +16,12 @@ import {
 
 const state: Administration = {
   configuration: {
-    backendOrigin: "https://backend.example.com",
+    backendOrigin: "http://nox-backend",
     canManage: true,
     canEnroll: true,
     reason: "",
     directMcpEnabled: true,
     suiteMcpEnabled: true,
-    allowedCidrs: ["127.0.0.0/8"],
-    allowedPorts: ["443"],
   },
   state: {
     issuer: "urn:nox:test",
@@ -56,14 +54,14 @@ afterEach(() => {
 async function open() {
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Manage Suite integrations" }));
-  await screen.findByRole("button", { name: "Create pairing" });
+  await screen.findByRole("button", { name: "Prepare signing key" });
   return user;
 }
-async function fillPairing(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText("Product ID", { exact: true }), "future-product");
+async function fillProduct(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Paired product ID", { exact: true }), "future-product");
   await user.type(
-    screen.getByLabelText("Product local Suite origin"),
-    "https://future.example.com",
+    screen.getByLabelText("Paired product local Suite origin"),
+    "http://future-product",
   );
 }
 
@@ -83,7 +81,9 @@ test("a missing local channel disables Suite changes without disabling state ins
   );
   render(<SuiteAdministration actorId="admin" />);
   await open();
-  expect(screen.getByRole("button", { name: "Create pairing" }).matches(":disabled")).toBe(true);
+  expect(
+    screen.getByRole("button", { name: "Verify and register product" }).matches(":disabled"),
+  ).toBe(true);
   expect(screen.getByText("The local Suite channel is unavailable.")).toBeTruthy();
   expect(
     (screen.getByRole("button", { name: "Refresh Suite state" }) as HTMLButtonElement).disabled,
@@ -100,24 +100,15 @@ test("a lost response survives reload and explicit retry uses the original key a
         lose = false;
         return Promise.reject(Error("connection lost"));
       }
-      return Promise.resolve(
-        response(
-          {
-            pairingId: "pairing-one",
-            secret: "secret-result-only-in-memory",
-            expiresAt: "2026-10-31T10:10:00.000Z",
-          },
-          201,
-        ),
-      );
+      return Promise.resolve(response({ contractVersion: "1.0" }, 201));
     }
     return Promise.resolve(response(state));
   });
   vi.stubGlobal("fetch", fetcher);
   const view = render(<SuiteAdministration actorId="admin" />);
   let user = await open();
-  await fillPairing(user);
-  await user.click(screen.getByRole("button", { name: "Create pairing" }));
+  await fillProduct(user);
+  await user.click(screen.getByRole("button", { name: "Verify and register product" }));
   await screen.findByText("Operation awaiting confirmation");
   expect(writes).toHaveLength(1);
   const saved = sessionStorage.getItem(journalKey("admin"));
@@ -126,41 +117,29 @@ test("a lost response survives reload and explicit retry uses the original key a
   render(<SuiteAdministration actorId="admin" />);
   user = await open();
   await user.click(screen.getByRole("button", { name: "Retry same Suite request" }));
-  await screen.findByLabelText("Setup information");
+  await screen.findByText("Product verified and registered. Availability is reported separately.");
   expect(writes).toHaveLength(2);
   expect(writes[1].headers).toEqual(writes[0].headers);
   expect(writes[1].body).toEqual(writes[0].body);
   expect(sessionStorage.getItem(journalKey("admin"))).toBeNull();
-  expect(sessionStorage.getItem(recoveryKey("admin"))).not.toContain(
-    "secret-result-only-in-memory",
-  );
-  expect((screen.getByLabelText("Setup information") as HTMLTextAreaElement).value).toContain(
-    "secret-result-only-in-memory",
-  );
-  await user.click(screen.getByRole("button", { name: "Clear setup information" }));
   expect(screen.queryByLabelText("Setup information")).toBeNull();
 });
 
-test("sensitive proofs and service credentials never enter the recovery journal", async () => {
+test("manual secret operations cannot be journaled or sent", async () => {
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
   const request = {
     path: "/api/nox/pairings/p/complete",
     method: "POST" as const,
     body: '{"proof":"private-hmac"}',
-    privateBody: true,
     credential: "noxsvc_private",
     message: "Done",
   };
-  const pending = await preparePending("admin", request);
-  const stored = sessionStorage.getItem(journalKey("admin"))!;
-  expect(stored).not.toContain("private-hmac");
-  expect(stored).not.toContain("noxsvc_private");
-  expect(pending.needsBody).toBe(true);
-  expect(pending.needsCredential).toBe(true);
+  await expect(preparePending("admin", request)).rejects.toMatchObject({ uncertain: false });
+  await expect(sendSuiteRequest(request, "old-key")).rejects.toMatchObject({ uncertain: false });
+  expect(sessionStorage.getItem(journalKey("admin"))).toBeNull();
   expect(readPending("another-user")).toBeNull();
-  expect(await requestFingerprint(request)).toBe(pending.fingerprint);
-  expect(await requestFingerprint({ ...request, credential: "changed" })).not.toBe(
-    pending.fingerprint,
-  );
+  expect(fetcher).not.toHaveBeenCalled();
 });
 
 test("a stale revision displays the actual Suite diagnostic and preserves form inputs", async () => {
@@ -182,13 +161,13 @@ test("a stale revision displays the actual Suite diagnostic and preserves form i
   vi.stubGlobal("fetch", fetcher);
   render(<SuiteAdministration actorId="admin" />);
   const user = await open();
-  await fillPairing(user);
-  await user.click(screen.getByRole("button", { name: "Create pairing" }));
+  await fillProduct(user);
+  await user.click(screen.getByRole("button", { name: "Verify and register product" }));
   await screen.findByRole("alert");
   expect(screen.getByRole("alert").textContent).toContain("Trust configuration changed");
-  expect((screen.getByLabelText("Product ID", { exact: true }) as HTMLInputElement).value).toBe(
-    "future-product",
-  );
+  expect(
+    (screen.getByLabelText("Paired product ID", { exact: true }) as HTMLInputElement).value,
+  ).toBe("future-product");
   expect(sessionStorage.getItem(journalKey("admin"))).toBeNull();
   expect(fetcher.mock.calls.filter(([, options]) => options?.method)).toHaveLength(1);
 });
@@ -203,7 +182,7 @@ test("stale readiness becomes unknown without inventing membership or backend pr
       productVersion: "1",
       capabilities: { suiteMcp: { path: "/suite/mcp" } },
     },
-    connection: { baseUrl: "https://future.example.com" },
+    connection: { baseUrl: "http://future-product" },
   };
   vi.stubGlobal(
     "fetch",
@@ -239,7 +218,7 @@ test("Suite state failure leaves refresh available and does not expose mutation 
   await user.click(screen.getByRole("button", { name: "Manage Suite integrations" }));
   await screen.findByRole("alert");
   expect(screen.getByRole("alert").textContent).toContain("Integration is unavailable");
-  expect(screen.queryByRole("button", { name: "Create pairing" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Verify and register product" })).toBeNull();
   expect(
     (screen.getByRole("button", { name: "Refresh Suite state" }) as HTMLButtonElement).disabled,
   ).toBe(false);
@@ -269,81 +248,110 @@ test("confirmed 204 removal is handled and non-JSON success stays uncertain", as
   expect(new SuiteRequestFailure("lost", true).uncertain).toBe(true);
 });
 
-test("saved private requests need the exact original secret to retry", async () => {
-  const request = {
-    path: "/api/nox/pairings/p/ack",
-    method: "POST" as const,
-    credential: "original-credential",
-    message: "Acknowledged",
-  };
-  await preparePending("admin", request);
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(state)));
-  render(<SuiteAdministration actorId="admin" />);
-  const user = await open();
-  await user.type(screen.getByLabelText("Original service credential"), "wrong-credential");
-  await user.click(screen.getByRole("button", { name: "Retry same Suite request" }));
-  await screen.findByText(/This is not the original request/);
-  expect(readPending("admin")).not.toBeNull();
-  expect(screen.getByRole("button", { name: "Create pairing" }).matches(":disabled")).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Refresh Suite state" }));
-});
-
-test("a confirmed setup response can be recovered after reload without storing its secret", async () => {
-  const request = {
-    path: "/api/nox/pairings",
-    method: "POST" as const,
-    headers: { "If-None-Match": "*" },
-    body: JSON.stringify({
-      contractVersion: "1.0",
-      productId: "future-product",
-      purpose: "product",
-      baseUrl: "https://future.example.com",
-    }),
-    secretResult: true,
-    message: "Pairing recovered.",
-  };
-  const original = await preparePending("admin", request);
-  sessionStorage.setItem(recoveryKey("admin"), JSON.stringify(original));
-  sessionStorage.removeItem(journalKey("admin"));
-  const writes: RequestInit[] = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((_path: string, options?: RequestInit) => {
-      if (options?.method) {
-        writes.push(options);
-        return Promise.resolve(response({ secret: "recovered-secret" }));
-      }
-      return Promise.resolve(response(state));
+test("an old private operation requires reconciliation without credential inputs", async () => {
+  sessionStorage.setItem(
+    journalKey("admin"),
+    JSON.stringify({
+      key: "old-key",
+      fingerprint: "old-fingerprint",
+      needsCredential: true,
+      request: { path: "/api/nox/pairings/p/ack", method: "POST", message: "Done" },
     }),
   );
+  const fetcher = vi.fn((_path: string, _options?: RequestInit) =>
+    Promise.resolve(response(state)),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
   render(<SuiteAdministration actorId="admin" />);
   const user = await open();
-  await user.click(screen.getByRole("button", { name: "Recover last setup response" }));
-  await screen.findByLabelText("Setup information");
-  expect((writes[0].headers as Record<string, string>)["Idempotency-Key"]).toBe(original.key);
-  expect(sessionStorage.getItem(recoveryKey("admin"))).not.toContain("recovered-secret");
+  await screen.findByRole("alert");
+  expect(screen.queryByLabelText("Original service credential")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry same Suite request" })).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Reconcile and clear unreadable operation" }),
+  );
+  await screen.findByText("State reconciled. The saved operation record was closed.");
+  expect(sessionStorage.getItem(journalKey("admin"))).toBeNull();
+  expect(fetcher.mock.calls.every(([, options]) => !options?.method)).toBe(true);
 });
 
-test("local trust management remains available without a target network policy", async () => {
+test("old manual setup recovery is never replayed", async () => {
+  sessionStorage.setItem(recoveryKey("admin"), JSON.stringify({ key: "old-pairing-key" }));
+  const fetcher = vi.fn((_path: string, _options?: RequestInit) =>
+    Promise.resolve(response(state)),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<SuiteAdministration actorId="admin" />);
+  const user = await open();
+  await screen.findByText(/A previous manual setup record exists/);
+  expect(screen.queryByRole("button", { name: "Recover last setup response" })).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Reconcile and clear unreadable operation" }),
+  );
+  await screen.findByText("State reconciled. The saved operation record was closed.");
+  expect(sessionStorage.getItem(recoveryKey("admin"))).toBeNull();
+  expect(fetcher.mock.calls.every(([, options]) => !options?.method)).toBe(true);
+});
+
+test("local administration needs no obsolete network fields and exposes no manual setup", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(
       response({
         ...state,
-        configuration: {
-          ...state.configuration,
-          canEnroll: false,
-          enrollmentReason: "Configure approved target networks before enrollment.",
+        state: {
+          ...state.state,
+          services: [
+            {
+              serviceId: "local-service",
+              productId: "test-product",
+              associationId: "association",
+              baseUrl: "http://test-product",
+              purpose: "product",
+              state: "active",
+              revision: "service-rev",
+              headRevision: "head-rev",
+              current: true,
+              deployments: [],
+              credentials: [
+                {
+                  credentialId: "credential",
+                  revision: "credential-rev",
+                  state: "active",
+                  current: true,
+                },
+              ],
+            },
+          ],
+          pairings: [
+            {
+              pairingId: "pending",
+              productId: "test-product",
+              baseUrl: "http://test-product",
+              purpose: "product",
+              state: "provisioned",
+              revision: "pairing-rev",
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+          ],
         },
       }),
     ),
   );
   render(<SuiteAdministration actorId="admin" />);
   await open();
-  expect(screen.getByRole("button", { name: "Create pairing" }).matches(":disabled")).toBe(true);
   expect(screen.getByRole("button", { name: "Prepare signing key" }).matches(":disabled")).toBe(
     false,
   );
+  expect(screen.queryByRole("button", { name: "Create pairing" })).toBeNull();
+  expect(screen.queryByLabelText("Product pairing proof JSON")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Rotate credential for test-product" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Revoke service test-product" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Cancel pairing for test-product" })).toBeTruthy();
+
+  expect(screen.queryByLabelText("Setup information")).toBeNull();
 });
 
 test("a malformed successful snapshot fails only the Suite pane", async () => {
@@ -353,7 +361,7 @@ test("a malformed successful snapshot fails only the Suite pane", async () => {
   await user.click(screen.getByRole("button", { name: "Manage Suite integrations" }));
   await screen.findByRole("alert");
   expect(screen.getByRole("alert").textContent).toContain("Invalid Suite administration response");
-  expect(screen.queryByRole("button", { name: "Create pairing" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Verify and register product" })).toBeNull();
 });
 
 test("operation recovery works without secure-context WebCrypto APIs", async () => {
@@ -379,16 +387,12 @@ test("operation recovery works without secure-context WebCrypto APIs", async () 
 test("browser administration never forwards a participant service credential", async () => {
   const fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
-  await expect(
-    sendSuiteRequest(
-      {
-        path: "/api/nox/pairings/p/ack",
-        method: "POST",
-        credential: "noxsvc_secret",
-        message: "Done",
-      },
-      "key",
-    ),
-  ).rejects.toMatchObject({ uncertain: false });
+  const oldRequest = {
+    path: "/api/nox/pairings/p/ack",
+    method: "POST" as const,
+    credential: "noxsvc_secret",
+    message: "Done",
+  };
+  await expect(sendSuiteRequest(oldRequest, "key")).rejects.toMatchObject({ uncertain: false });
   expect(fetcher).not.toHaveBeenCalled();
 });

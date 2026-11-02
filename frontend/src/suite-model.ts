@@ -49,8 +49,6 @@ export interface SuiteAdministration {
     reason: string;
     directMcpEnabled: boolean;
     suiteMcpEnabled: boolean;
-    allowedCidrs: string[] | null;
-    allowedPorts: string[] | null;
   };
   state: {
     issuer: string;

@@ -1,11 +1,14 @@
 # NoX Suite migration status and compatibility baseline
 
-**Current correction:** [same-host integration and automatic setup](suite-local.md) records the current Backend work against SDK `0.7.2`, including migration 8 and the local volume. The numbered eight-point implementation history below is retained as historical evidence; it is distinct from the fixed 12-point correction sequence and does not override the owner's subsequent same-host clarification.
+**Current implementation:** SDK `0.7.2`, local-only service transport and automatic foundation setup are described in [the current guide](suite-local.md). The obsolete `nox-sync` executable and manual browser secret-transfer controls have been removed.
+
+**Correction history:** [same-host integration and automatic setup](suite-local.md) records the current Backend work against SDK `0.7.2`, including migration 8 and the local volume. The numbered eight-point implementation history below is retained as historical evidence; it is distinct from the fixed 12-point correction sequence and does not override the owner's subsequent same-host clarification.
 
 
-Updated for **point 8**. Original Backend baseline: commit `a2382ec` (`v1.0.7`).
-The SDK dependency is now `github.com/mapherez/nox-mcp v0.7.0`; the Backend
-current application package version is `1.0.14`; point-8 implementation starts from
+**Historical record of the earlier eight-point implementation.** These point numbers
+are not the later 12-point correction sequence. Original Backend baseline: commit `a2382ec` (`v1.0.7`).
+At that historical checkpoint the SDK was `github.com/mapherez/nox-mcp v0.7.0`
+and the application package version was `1.0.14`; that point-8 implementation starts from
 `b9f2793` and does not create a release. Suite wire compatibility remains `1.0`.
 
 ## Approved references and progression

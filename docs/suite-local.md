@@ -1,6 +1,6 @@
 # Same-host Suite integration and automatic foundation setup
 
-This implements the Backend part of **4. Completar a configuração inicial no Backend**, including its remaining work under **2. Corrigir o transporte e a configuração dos endereços**. It consumes NoX MCP `v0.7.2`, wire contract `1.0`, and follows the [same-host integration record](https://github.com/mapherez/nox-mcp/blob/v0.7.2/Documents/SUITE_SAME_HOST_INTEGRATION.md). The original Suite implementation plan is not rewritten.
+This implements the Backend part of **4. Completar a configuração inicial no Backend**, including its remaining work under **2. Corrigir o transporte e a configuração dos endereços**. It consumes NoX MCP `v0.7.2`, wire contract `1.0`, and follows the [same-host integration record](https://github.com/mapherez/nox-mcp/blob/v0.7.2/Documents/SUITE_SAME_HOST_INTEGRATION.md). The original Suite implementation plan is not rewritten. The subsequent cleanup removes the obsolete server executable alias, unused network-policy configuration and manual secret-transfer browser controls; the local participant protocol remains available.
 
 ## Runtime and deployment
 
@@ -12,7 +12,7 @@ The image prepares the directory as UID/GID `10001`, mode `3770`. Participant im
 
 Backend serves `/run/nox-suite/nox-backend.sock`. It exposes `/nox/integration`, the existing `/api/nox/*` service protocol, and opt-in `/mcp/suite` there. The native TCP listener and frontend refuse service calls to `/api/nox/*` and `/mcp/suite`, including through TLS proxies. Human administrator operations use authenticated `/api/admin/*` routes with the existing active-role, personal-key/session and CSRF checks. Service credentials cannot use that adapter.
 
-`NOX_BACKEND_SUITE_SOCKET_DIR` selects the channel directory. Docker images/Compose set `/run/nox-suite` automatically. Bare binary execution leaves it disabled by default, preserving native startup; an explicit directory enables it. Legacy target CIDR/port/proxy variables no longer authorize Suite networking. A malformed legacy value is still rejected by the existing configuration parser; remove those obsolete variables from deployments.
+`NOX_BACKEND_SUITE_SOCKET_DIR` selects the channel directory. Docker images/Compose set `/run/nox-suite` automatically. Bare binary execution leaves it disabled by default, preserving native startup; an explicit directory enables it. The obsolete Suite target CIDR/port/proxy variables and their validation have been removed. Delete them from deployment configuration; they have no effect on the local channel. Native TLS options remain independent.
 
 ## Product identity and web URLs
 
@@ -74,7 +74,7 @@ existing products do not need Suite membership to keep using those contracts.
 | External HTTP clients | `/v1/*` routes, Bearer and legacy query-key authentication, key rotation, disabled users, file/download responses and synchronization are retained. The new service transport does not restrict these clients to the Backend host. |
 | Direct MCP | `/mcp`, its catalog/CLI metadata, personal-key authentication, ownership, structured results and integer revisions retain their native behavior. `/mcp/suite` has the separately approved local-only policy. |
 | Installed data | Migration 8 adds only the local setup journal. A dedicated version-7 upgrade/restart regression preserves personal keys, browser sessions, committed file revisions/blobs, saved native URLs/revisions, existing service credentials/identities, issuer/signing keys, secret-store master key and migration history. Existing associations are retained as data, not silently converted into working local associations. |
-| Deployment | Existing native port, public/OAuth origin, `/data`, data volume, legacy executable and environment-variable fallback remain. The new Suite volume is additional and is not mounted into the frontend. |
+| Deployment | Existing native port, public/OAuth origin, `/data`, data volume, `nox-backend` executable and environment-variable fallback remain. The new Suite volume is additional and is not mounted into the frontend. |
 
 Read-only inspection of available sibling sources confirmed the existing sync
 client's `/v1/sync/*` usage and the wiki importer’s auth/vault/file/download

@@ -15,7 +15,7 @@ import (
 	"github.com/mapherez/nox-backend/backend/internal/storage"
 )
 
-// Run is shared by the canonical command and the legacy entrypoint.
+// Run starts NoX Backend or executes its maintenance commands.
 func Run(buildVersion string) error {
 	if len(os.Args) > 1 {
 		if len(os.Args) == 2 {
@@ -68,9 +68,6 @@ func Run(buildVersion string) error {
 		GoogleClientSecret: getenv("NOX_SYNC_GOOGLE_CLIENT_SECRET", ""),
 		AdminEmails:        splitCSV(getenv("NOX_SYNC_ADMIN_EMAILS", "")),
 		TLSCertFile:        getenv("NOX_SYNC_TLS_CERT_FILE", ""), TLSKeyFile: getenv("NOX_SYNC_TLS_KEY_FILE", ""),
-		SuiteAllowedCIDRs:      splitCSV(getenv("NOX_SYNC_SUITE_ALLOWED_CIDRS", "")),
-		SuiteAllowedPorts:      splitCSV(getenv("NOX_SYNC_SUITE_ALLOWED_PORTS", "443")),
-		SuiteTrustedProxyCIDRs: splitCSV(getenv("NOX_SYNC_SUITE_TRUSTED_PROXY_CIDRS", "")),
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

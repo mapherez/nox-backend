@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mapherez/nox-backend/backend/internal/storage"
@@ -45,12 +46,39 @@ func foundationIdentity(service string) (string, string) {
 func (s *Server) handleSuiteAdminOperation(w http.ResponseWriter, r *http.Request, _ storage.User) {
 	// managementActor has already rejected service Bearer credentials and checked
 	// active administrator/session/CSRF. This is not a proxy to another service.
+	operation := r.PathValue("operation")
+	if !suiteAdminOperationAllowed(r.Method, operation) {
+		writeSuiteError(w, suiteHTTPError(403, "FORBIDDEN", "Pairing and service credential delivery use the local participant channel. Use Service connections or the local installer."))
+		return
+	}
 	clone := r.Clone(r.Context())
 	u := *r.URL
-	u.Path = "/api/nox/" + r.PathValue("operation")
+	u.Path = "/api/nox/" + operation
 	u.RawPath = ""
 	clone.URL = &u
 	s.suiteLocalRoutes().ServeHTTP(w, suiteLocalRequest(clone))
+}
+
+// The human adapter exposes inspection and non-secret recovery only. Service
+// protocol endpoints remain available on the local listener, not via this adapter.
+func suiteAdminOperationAllowed(method, operation string) bool {
+	parts := strings.Split(operation, "/")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." || strings.ContainsAny(part, "%\\") {
+			return false
+		}
+	}
+	switch parts[0] {
+	case "keys":
+		return len(parts) == 1 && (method == "GET" || method == "POST") || len(parts) == 2 && method == "DELETE" || len(parts) == 3 && parts[2] == "activate" && method == "POST"
+	case "products":
+		return len(parts) == 1 && method == "GET" || len(parts) == 2 && (method == "GET" || method == "PUT" || method == "DELETE")
+	case "pairings":
+		return len(parts) == 2 && method == "DELETE"
+	case "services":
+		return (len(parts) == 1 || len(parts) == 2) && method == "GET" || len(parts) == 2 && method == "DELETE" || len(parts) == 3 && parts[2] == "deployments" && method == "GET" || len(parts) == 4 && parts[2] == "deployments" && (method == "PUT" || method == "DELETE") || len(parts) == 4 && parts[2] == "credentials" && method == "DELETE"
+	}
+	return false
 }
 func (s *Server) handleConnectionSetup(w http.ResponseWriter, r *http.Request, actor storage.User) {
 	if !managementMethod(w, r, "POST") {

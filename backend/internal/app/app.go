@@ -15,18 +15,17 @@ import (
 
 // Config contains the minimal backend runtime configuration.
 type Config struct {
-	DirectMCPDisabled, SuiteMCPEnabled                           bool
-	Addr                                                         string
-	SuiteSocketDir                                               string
-	DataDir                                                      string
-	Version                                                      string
-	PublicURL                                                    string
-	GoogleClientID                                               string
-	GoogleClientSecret                                           string
-	AdminEmails                                                  []string
-	SuiteReportInterval, SuiteObservationFreshness               time.Duration
-	TLSCertFile, TLSKeyFile                                      string
-	SuiteAllowedCIDRs, SuiteAllowedPorts, SuiteTrustedProxyCIDRs []string
+	DirectMCPDisabled, SuiteMCPEnabled             bool
+	Addr                                           string
+	SuiteSocketDir                                 string
+	DataDir                                        string
+	Version                                        string
+	PublicURL                                      string
+	GoogleClientID                                 string
+	GoogleClientSecret                             string
+	AdminEmails                                    []string
+	SuiteReportInterval, SuiteObservationFreshness time.Duration
+	TLSCertFile, TLSKeyFile                        string
 }
 
 // Run starts the backend HTTP server.

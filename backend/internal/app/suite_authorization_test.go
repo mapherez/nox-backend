@@ -127,7 +127,7 @@ func (f *issuanceHTTPFixture) exchange(t *testing.T, path string, body any) ([]b
 	}
 	return raw, identity
 }
-func TestSuiteHTTPSIssuanceSDKProfilesAndNoRepeatedProductOrGoogleContact(t *testing.T) {
+func TestSuiteLocalIssuanceSDKProfilesAndNoRepeatedProductOrGoogleContact(t *testing.T) {
 	f := issuanceHTTPServer(t)
 	// Accepted target metadata/trust is local authority; exchange never re-fetches
 	// product declarations or contacts Google, even when the product is offline.
@@ -160,7 +160,7 @@ func TestSuiteHTTPSIssuanceSDKProfilesAndNoRepeatedProductOrGoogleContact(t *tes
 		}
 	}
 }
-func TestSuiteHTTPSIssuanceRequiresCurrentGatewayAndProtectedBody(t *testing.T) {
+func TestSuiteLocalIssuanceRequiresCurrentGatewayAndProtectedBody(t *testing.T) {
 	f := issuanceHTTPServer(t)
 	body := f.body()
 	for _, credential := range []string{"", f.adminKey, f.memberKey} {
@@ -294,7 +294,7 @@ func TestSuiteHTTPNativeRoleChangeInvalidatesSDKCacheAndLateRenewal(t *testing.T
 		t.Fatal("demotion retained administrator scopes")
 	}
 }
-func TestSuiteHTTPSIncompatibleUpdatePreservesMembershipAndDeniesIssuance(t *testing.T) {
+func TestSuiteLocalIncompatibleUpdatePreservesMembershipAndDeniesIssuance(t *testing.T) {
 	f := issuanceHTTPServer(t)
 	f.current.Store(bytes.Replace(f.declaration, []byte(`"contractVersion":"1.0"`), []byte(`"contractVersion":"2.0"`), 1))
 	body := map[string]string{"contractVersion": "1.0", "baseUrl": f.product.URL}

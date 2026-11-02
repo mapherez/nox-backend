@@ -119,41 +119,8 @@ const text = (data: FormData, name: string) => {
   const value = data.get(name);
   return typeof value === "string" ? value : "";
 };
-function SecretResult({ value, onClose }: { value: unknown; onClose: () => void }) {
-  const id = useId();
-  const [error, setError] = useState("");
-  const raw = JSON.stringify(value, null, 2);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(raw);
-    } catch {
-      setError("Clipboard unavailable. Select the information and copy it manually.");
-    }
-  }
-  return (
-    <aside className="suite-notice" role="region" aria-label="Sensitive setup information">
-      <h3>Save this setup information</h3>
-      <p>
-        Transfer it securely to the intended product. The product must save its credential before
-        acknowledgment. Recovery closes after acknowledgment or expiry.
-      </p>
-      <label htmlFor={id}>Setup information</label>
-      <textarea id={id} rows={10} readOnly value={raw} autoComplete="off" spellCheck={false} />
-      <div className="form-row">
-        <button type="button" onClick={() => void copy()}>
-          Copy setup information
-        </button>
-        <button type="button" className="secondary" onClick={onClose}>
-          Clear setup information
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-    </aside>
-  );
-}
 function Service({ service }: { service: SuiteService }) {
   const base = `/api/nox/services/${encoded(service.serviceId)}`;
-  const current = service.credentials.find((credential) => credential.current);
   return (
     <details className="suite-card">
       <summary>
@@ -170,19 +137,6 @@ function Service({ service }: { service: SuiteService }) {
             method: "DELETE",
             headers: condition(service.revision),
             message: "Service revoked. Its registry membership is retained.",
-          })}
-        />
-      )}
-      {service.state === "active" && current && current.state !== "provisioned" && (
-        <SuiteForm
-          label={`Rotate credential for ${service.productId}`}
-          build={() => ({
-            path: `${base}/credentials`,
-            method: "POST",
-            headers: condition(current.revision),
-            body: body({ contractVersion: "1.0", credentialRevision: current.revision }),
-            secretResult: true,
-            message: "Replacement credential created. Save it in the product, then acknowledge it.",
           })}
         />
       )}
@@ -353,9 +307,7 @@ function SuitePanel({ actorId }: { actorId: string }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshNeeded, setRefreshNeeded] = useState(false);
-  const [secret, setSecret] = useState<unknown>(null);
   const [pending, setPending] = useState<PendingSuiteRequest | null>(null);
-  const [recovery, setRecovery] = useState<PendingSuiteRequest | null>(null);
   const [journalError, setJournalError] = useState("");
   const [now, setNow] = useState(Date.now());
   const inFlight = useRef(false);
@@ -380,7 +332,6 @@ function SuitePanel({ actorId }: { actorId: string }) {
     const controller = new AbortController();
     try {
       setPending(readPending(actorId));
-      setRecovery(readPending(actorId, true));
     } catch (failure) {
       setJournalError(String(failure));
     }
@@ -405,27 +356,21 @@ function SuitePanel({ actorId }: { actorId: string }) {
     inFlight.current = true;
     setBusy(true);
     setMessage("");
-    setSecret(null);
     try {
       if (retry && (await requestFingerprint(request)) !== retry.fingerprint)
         throw Error(
-          "This is not the original request. Supply the exact original proof or credential, or reconcile the saved operation.",
+          "This is not the original request. Reconcile the saved operation before changing it.",
         );
       const operation = retry ?? (await preparePending(actorId, request));
       setPending(operation);
       sessionStorage.setItem(journalKey(actorId), JSON.stringify(operation));
       try {
-        const result = await sendSuiteRequest(request, operation.key);
+        await sendSuiteRequest(request, operation.key);
         if (!mounted.current)
           throw new SuiteRequestFailure(
             "The response arrived after this view closed. Recover the saved operation.",
             true,
           );
-        if (request.secretResult) {
-          sessionStorage.setItem(recoveryKey(actorId), JSON.stringify(operation));
-          setRecovery(operation);
-          setSecret(result);
-        }
         clearPending();
         setMessage(request.message);
       } catch (failure) {
@@ -443,19 +388,11 @@ function SuitePanel({ actorId }: { actorId: string }) {
       setBusy(false);
     }
   }
-  async function retry(event: SubmitEvent<HTMLFormElement>, saved = pending) {
+  async function retry(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!saved) return;
-    const fields = new FormData(event.currentTarget);
+    if (!pending) return;
     try {
-      await execute(
-        {
-          ...saved.request,
-          ...(saved.needsBody ? { body: text(fields, "originalBody") } : {}),
-          ...(saved.needsCredential ? { credential: text(fields, "originalCredential") } : {}),
-        },
-        saved,
-      );
+      await execute(pending.request, pending);
     } catch (failure) {
       setMessage(failure instanceof Error ? failure.message : "The saved request failed.");
     }
@@ -463,7 +400,7 @@ function SuitePanel({ actorId }: { actorId: string }) {
   async function reconcile() {
     if (
       !window.confirm(
-        "Read the actual state and close this saved operation? If setup information was lost, retry the same operation to recover it before closing.",
+        "Read the actual state and close this saved operation? Interrupted setup must be resumed through Service connections or the local installer.",
       )
     )
       return;
@@ -472,7 +409,6 @@ function SuitePanel({ actorId }: { actorId: string }) {
       clearPending();
       if (journalError) {
         sessionStorage.removeItem(recoveryKey(actorId));
-        setRecovery(null);
       }
       setJournalError("");
       setMessage("State reconciled. The saved operation record was closed.");
@@ -531,25 +467,6 @@ function SuitePanel({ actorId }: { actorId: string }) {
             </p>
             <form onSubmit={(event) => void retry(event)}>
               <fieldset disabled={busy || refreshNeeded || !data?.configuration.canManage}>
-                {pending.needsBody && (
-                  <label>
-                    Original request JSON
-                    <textarea
-                      name="originalBody"
-                      rows={5}
-                      required
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
-                )}
-                {pending.needsCredential && (
-                  <Field
-                    label="Original service credential"
-                    name="originalCredential"
-                    type="password"
-                  />
-                )}
                 <button type="submit">Retry same Suite request</button>
               </fieldset>
             </form>
@@ -563,51 +480,6 @@ function SuitePanel({ actorId }: { actorId: string }) {
             </button>
           </aside>
         )}
-        {recovery && !pending && secret === null && (
-          <aside className="suite-notice">
-            <h4>Last setup response</h4>
-            <p>
-              Recover the last setup response using its original operation key. Recovery is
-              available only until acknowledgment or expiry; no secret is stored in this tab.
-            </p>
-            <form onSubmit={(event) => void retry(event, recovery)}>
-              <fieldset disabled={blocked}>
-                {recovery.needsBody && (
-                  <label>
-                    Original setup request JSON
-                    <textarea
-                      name="originalBody"
-                      rows={4}
-                      required
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </label>
-                )}
-                {recovery.needsCredential && (
-                  <Field
-                    label="Original setup credential"
-                    name="originalCredential"
-                    type="password"
-                  />
-                )}
-                <button type="submit">Recover last setup response</button>
-              </fieldset>
-            </form>
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => {
-                sessionStorage.removeItem(recoveryKey(actorId));
-                setRecovery(null);
-              }}
-            >
-              Forget setup recovery
-            </button>
-          </aside>
-        )}
-        {secret !== null && <SecretResult value={secret} onClose={() => setSecret(null)} />}
         {data && (
           <>
             <p className="muted">
@@ -628,66 +500,11 @@ function SuitePanel({ actorId }: { actorId: string }) {
               Direct MCP: {data.configuration.directMcpEnabled ? "enabled" : "disabled"} · Suite
               MCP: {data.configuration.suiteMcpEnabled ? "enabled" : "disabled"}
             </p>
-            <h4>Start product pairing</h4>
             <p>
-              Use Service connections above for normal foundation setup; Yard registers the products
-              it installs. The controls here are for advanced recovery. Pairing completion and
-              credential acknowledgement are performed by the local participant.
+              Use Service connections for Yard/Gateway setup and recovery. Installed products are
+              associated through Yard's local integration. Pairing proofs, provisioning and service
+              credentials are handled by the local participants.
             </p>
-            <SuiteForm
-              enrollment
-              label="Create pairing"
-              build={(fields) => {
-                const productId = text(fields, "productId");
-                const current = data.state.services.find(
-                  (service) => service.productId === productId && service.current,
-                );
-                const installer = text(fields, "installer");
-                if (
-                  current &&
-                  !window.confirm(
-                    `Replace the trusted association for ${productId}? The old association stays active until the new service acknowledges.`,
-                  )
-                )
-                  throw Error("Replacement cancelled.");
-                return {
-                  path: "/api/nox/pairings",
-                  method: "POST",
-                  headers: condition(current?.headRevision),
-                  body: body({
-                    contractVersion: "1.0",
-                    productId,
-                    baseUrl: text(fields, "baseUrl"),
-                    purpose: text(fields, "purpose"),
-                    ...(installer
-                      ? {
-                          managedBy: {
-                            productId: installer,
-                            deploymentId: text(fields, "deploymentId"),
-                          },
-                        }
-                      : {}),
-                  }),
-                  secretResult: true,
-                  message:
-                    "Pairing created. Transfer its setup information; membership is not yet registered.",
-                };
-              }}
-            >
-              <Field label="Product ID" name="productId" />
-              <Field label="Product local Suite origin" name="baseUrl" type="url" />
-              <Field label="Service purpose" name="purpose" value="product">
-                <option value="product">Product</option>
-                <option value="gateway">Gateway</option>
-                <option value="installer">Installer</option>
-              </Field>
-              <Field
-                label="Managing installer product ID (optional)"
-                name="installer"
-                required={false}
-              />
-              <Field label="Deployment ID (if managed)" name="deploymentId" required={false} />
-            </SuiteForm>
             <h4>Pairings</h4>
             {data.state.pairings.length === 0 && <p>No pairing operations.</p>}
             {data.state.pairings.map((pairing) => (
@@ -705,30 +522,6 @@ function SuitePanel({ actorId }: { actorId: string }) {
                 </p>
                 {["pending", "provisioned"].includes(pairing.state) && (
                   <>
-                    <SuiteForm
-                      enrollment
-                      label={`Complete pairing for ${pairing.productId}`}
-                      build={(fields) => ({
-                        path: `/api/nox/pairings/${encoded(pairing.pairingId)}/complete`,
-                        method: "POST",
-                        body: text(fields, "proof"),
-                        privateBody: true,
-                        secretResult: true,
-                        message:
-                          "Proof verified; transfer provisioning to the product and save it before acknowledgment.",
-                      })}
-                    >
-                      <label>
-                        Product pairing proof JSON
-                        <textarea
-                          name="proof"
-                          rows={4}
-                          required
-                          autoComplete="off"
-                          spellCheck={false}
-                        />
-                      </label>
-                    </SuiteForm>
                     {pairing.state === "provisioned" && (
                       <p className="muted">
                         Waiting for the local participant to persist and acknowledge provisioning.
@@ -758,8 +551,8 @@ function SuitePanel({ actorId }: { actorId: string }) {
             ))}
             <h4>Register a paired product</h4>
             <p>
-              Registration verifies the actual declaration over the proven HTTPS connection. It does
-              not depend on Gateway readiness.
+              Registration verifies the actual declaration over the local Suite channel. It does not
+              depend on Gateway readiness.
             </p>
             <SuiteForm
               enrollment
@@ -865,7 +658,7 @@ export function SuiteAdministration({ actorId }: { actorId: string }) {
     <section aria-label="Suite integration management">
       <h2>Suite integration management</h2>
       <p className="muted">
-        Pair services, verify products and manage trust independently of Gateway or Portal.
+        Inspect services, verify products and manage trust independently of Gateway or Portal.
       </p>
       {!open ? (
         <button type="button" onClick={() => setOpen(true)}>

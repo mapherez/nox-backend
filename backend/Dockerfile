@@ -22,7 +22,6 @@ ENV NOX_BACKEND_SUITE_SOCKET_DIR=/run/nox-suite
 EXPOSE 8080
 
 COPY --from=build /out/nox-backend /usr/local/bin/nox-backend
-RUN ln -s /usr/local/bin/nox-backend /usr/local/bin/nox-sync
 
 USER noxbackend
 

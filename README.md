@@ -303,7 +303,8 @@ New configuration uses `NOX_BACKEND_*`. Every runtime variable also accepts its
 legacy `NOX_SYNC_*` name. A non-empty canonical value takes precedence; empty
 values fall back to the legacy value and then to the default.
 
-The legacy `nox-sync` executable remains available. Existing API keys (`noxsync_`),
+The server executable is `nox-backend`; the obsolete `nox-sync` entry point has
+been removed. Existing API keys (`noxsync_`),
 `X-NoX-Sync-*` headers and the `nox_sync_session` cookie retain their names because
 clients depend on them. References to the NoX Sync plugin identify a separate client.
 

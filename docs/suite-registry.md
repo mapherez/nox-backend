@@ -1,6 +1,6 @@
 # Suite registry, events and availability
 
-Backend work point 5 implements the published NoX MCP 0.7.0 / Suite 1.0
+Backend work point 5 implements the published NoX MCP 0.7.2 / Suite 1.0
 [contract references](suite-migration.md#approved-references-and-progression).
 [Persistent pairing and service trust](suite-trust.md) are prerequisites for
 membership. Gateway, Yard adaptations, Portal and CLI are separate product work.
@@ -11,7 +11,7 @@ catalog encoded in the registry.
 
 ## Registration and reads
 
-All routes use the existing Suite HTTPS/trusted-proxy boundary and JSON/no-store
+All service routes use the [same-host local channel](suite-local.md) and JSON/no-store
 responses. Native HTTP administration and legacy clients retain their behavior.
 Setting an address in the dashboard only stores configuration; it does not pair,
 register or verify a destination. A completed pairing establishes trust; explicit
@@ -29,19 +29,19 @@ registration establishes membership.
 | Report availability | `POST /api/nox/products/{productId}/observations` | Corresponding reporting service; SDK observation body; 200 with SDK accepted/envelope result |
 
 All mutations require `Idempotency-Key`. Registration requests use the published
-`{ "contractVersion": "1.0", "baseUrl": "https://approved-origin", "managedBy"?: ... }`
+`{ "contractVersion": "1.0", "baseUrl": "http://product-id", "managedBy"?: ... }`
 shape. The authenticated installer must own the exact administrator-approved
 product/deployment/origin binding; `managedBy` cannot self-grant ownership.
 Gateway and ordinary product credentials cannot enroll/remove products. An admin
 can manage foundations without `managedBy`, or explicitly approved managed products.
 
-Registration resolves the current acknowledged pairing, verifies the HTTPS target
-and proven SPKI pin, and fetches `/nox/integration` again. It checks the route's
+Registration resolves the current acknowledged pairing and fetches the verified
+participant declaration at `/nox/integration` through its local socket. It checks the route's
 product ID, contract and required features, preserves unknown optional declaration
-fields, and never forwards the caller's key/cookie/service token. Existing network
-allow lists, no-redirect policy, fetch budgets and concurrency bounds apply.
+fields, and never forwards the caller's key/cookie/service token. The no-redirect
+policy, fetch budgets and concurrency bounds apply; there is no TCP fallback.
 Caller authority, trust association and conditional revision are rechecked in the
-commit transaction, after the network fetch. An unpaired, revoked or substituted
+commit transaction, after the local declaration fetch. An unpaired, revoked or substituted
 participant cannot acquire membership by serving JSON.
 
 Material declaration/configuration/association changes generate a fresh opaque
@@ -175,5 +175,5 @@ open the newer schema; rollback requires its matching full data backup.
 Native connection statuses include `registered` once current pairing and registry
 association match. The label explicitly leaves availability separate. Complete
 [native pairing/registration controls](suite-administration.md) are implemented
-in point 8 and work without Portal or Gateway. A saved random HTTPS address remains
+in point 8 and work without Portal or Gateway. A saved web address remains
 configuration only.

@@ -1,7 +1,7 @@
 # Suite authorization issuance
 
 Backend point 6 implements the [approved Gateway/integration contract](suite-migration.md#approved-references-and-progression)
-using NoX MCP SDK 0.7.0 and wire version 1.0. It uses the persistent
+using NoX MCP SDK 0.7.2 and wire version 1.0. It uses the persistent
 [issuer/signing keys and service trust](suite-trust.md) and
 [registry/event feed](suite-registry.md). It is generic to every conforming product.
 It does not implement Gateway, Portal or CLI. Backend's own protected
@@ -15,7 +15,7 @@ client APIs and independently authenticated direct `/mcp` remain operational.
 | User delegation | `POST /api/nox/authorizations` | Current Gateway service with `authorization.delegate` |
 | Service readiness probe | `POST /api/nox/service-authorizations` | Current Gateway service with `mcp.probe` |
 
-Both require the existing Suite HTTPS/trusted-proxy boundary and
+Both require the [same-host local channel](suite-local.md) and
 `Authorization: Bearer <gateway-service-credential>`. A personal key, Google cookie,
 installer/product credential or unacknowledged provisioned credential cannot act as
 the Gateway. Caller grant/head/credential validity is checked before parsing the
@@ -173,5 +173,5 @@ backup including `/data/secrets/suite`. It adds user authority revisions, opaque
 personal-key generations, declaration admission state and native invalidation
 triggers. Existing users, native sessions, personal keys, vaults, blobs, trust and
 registrations remain. No new environment variable, container or public port is
-required. Native HTTP use remains supported; Suite issuance requires HTTPS. Rollback
+required. Native HTTP use remains supported; Suite issuance uses the local participant channel. Rollback
 requires the old binary's matching complete data backup, as with prior migrations.

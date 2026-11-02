@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/netip"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mapherez/nox-backend/backend/internal/storage"
@@ -73,19 +70,6 @@ func (s *Server) fetchSuiteDeclaration(ctx context.Context, origin, pin string) 
 func validateSuiteConfig(cfg Config) error {
 	if cfg.SuiteReportInterval < 0 || cfg.SuiteObservationFreshness < 0 || cfg.SuiteReportInterval%time.Millisecond != 0 || cfg.SuiteObservationFreshness%time.Millisecond != 0 {
 		return fmt.Errorf("Suite observation intervals must be positive whole milliseconds")
-	}
-	for _, values := range [][]string{cfg.SuiteAllowedCIDRs, cfg.SuiteTrustedProxyCIDRs} {
-		for _, raw := range values {
-			if _, err := netip.ParsePrefix(strings.TrimSpace(raw)); err != nil {
-				return fmt.Errorf("invalid Suite CIDR configuration")
-			}
-		}
-	}
-	for _, raw := range cfg.SuiteAllowedPorts {
-		value, err := strconv.Atoi(strings.TrimSpace(raw))
-		if err != nil || value < 1 || value > 65535 {
-			return fmt.Errorf("invalid Suite allowed port configuration")
-		}
 	}
 	if (cfg.TLSCertFile == "") != (cfg.TLSKeyFile == "") {
 		return fmt.Errorf("TLS certificate and key files must be configured together")

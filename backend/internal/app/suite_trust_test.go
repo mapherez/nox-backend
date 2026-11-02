@@ -46,7 +46,7 @@ func suiteHTTPServer(t *testing.T, suiteEnabled ...bool) *suiteHTTPFixture {
 		t.Fatal(err)
 	}
 	socketDir := shortSuiteDirectory(t)
-	s := NewServer(Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
+	s := NewServer(Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}}, store)
 	backend := suiteTestBackend(t, s)
 	s.cfg.PublicURL = backend.URL
 	f := &suiteHTTPFixture{s: s, store: store, backend: backend, client: backend.Client(), adminKey: key, dir: dir}
@@ -111,7 +111,7 @@ func suiteHTTPStatus(t *testing.T, status, want int, raw []byte) {
 }
 func (f *suiteHTTPFixture) product(t *testing.T, product string, handler http.HandlerFunc) (*httptest.Server, json.RawMessage, string) {
 	t.Helper()
-	decl := json.RawMessage(fmt.Sprintf(`{"contractVersion":"1.0","productId":%q,"productVersion":"fixture","displayName":"TLS protocol fixture","capabilities":{},"optionalExtension":{"n":1}}`, product))
+	decl := json.RawMessage(fmt.Sprintf(`{"contractVersion":"1.0","productId":%q,"productVersion":"fixture","displayName":"Local protocol fixture","capabilities":{},"optionalExtension":{"n":1}}`, product))
 	server := suiteTestUnixServer(t, f.s.cfg.SuiteSocketDir, product, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 			t.Error("Backend forwarded client credentials to product")
@@ -279,13 +279,6 @@ func TestSuiteTransportCannotBeSpoofedByForwardedHeaders(t *testing.T) {
 	request.RemoteAddr = "192.0.2.10:44000"
 	request.Header.Set("X-Forwarded-Proto", "https")
 	request.Header.Set("X-Nox-Suite-Transport", "https")
-	for _, trusted := range [][]string{nil, {"198.51.100.0/24"}} {
-		f.s.cfg.SuiteTrustedProxyCIDRs = trusted
-		response := httptest.NewRecorder()
-		f.s.Routes().ServeHTTP(response, request)
-		suiteHTTPStatus(t, response.Code, 403, response.Body.Bytes())
-	}
-	f.s.cfg.SuiteTrustedProxyCIDRs = []string{"192.0.2.10/32"}
 	response := httptest.NewRecorder()
 	f.s.Routes().ServeHTTP(response, request)
 	suiteHTTPStatus(t, response.Code, 403, response.Body.Bytes())
@@ -336,11 +329,7 @@ func TestSuiteCertificateAndConfigFailureAreExplicit(t *testing.T) {
 	if err := validateSuiteConfig(Config{TLSCertFile: "only-cert"}); err == nil {
 		t.Fatal("half TLS configuration accepted")
 	}
-	if err := validateSuiteConfig(Config{SuiteAllowedCIDRs: []string{"not-a-cidr"}}); err == nil {
-		t.Fatal("invalid target network accepted")
-	}
-	// No default trust is inferred from a private address without configured policy.
-	f.s.cfg.SuiteAllowedCIDRs = nil
+	// A private address does not establish same-host membership.
 	if err := f.s.suiteIntentTarget("https://192.168.10.10"); err == nil {
 		t.Fatal("implicit private-network trust")
 	}
@@ -355,8 +344,7 @@ func TestSuiteHTTPRecoverySurvivesBackendProcessRestart(t *testing.T) {
 	path := "/api/nox/pairings/" + intent.PairingID + "/complete"
 	status, _, first := f.call(t, "POST", path, proof, "", map[string]string{"Idempotency-Key": "recover"})
 	suiteHTTPStatus(t, status, 200, first)
-	// Keep the externally configured HTTPS origin stable, even though the local
-	// test listener changes. The real deployment keeps its same origin/port.
+	// Restart preserves the configured native URL and the local protocol identity.
 	origin := f.s.cfg.PublicURL
 	config := f.s.cfg
 	f.backend.Close()

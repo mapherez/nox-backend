@@ -47,6 +47,7 @@ def main():
             base = "http://" + docker("port", container, "8080/tcp")
             health = wait_for_health(base + "/v1/health")
             docker("exec", container, "/usr/local/bin/nox-backend", "healthcheck")
+            docker("exec", container, "/bin/sh", "-c", "test -x /usr/local/bin/nox-backend && test ! -e /usr/local/bin/nox-sync")
             for _ in range(60):
                 status = docker("inspect", "--format", "{{.State.Health.Status}}", container)
                 if status == "healthy":

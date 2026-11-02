@@ -162,8 +162,8 @@ Suite integration uses the shared local volume described in [local deployment](s
 The [Suite administration pane](suite-administration.md) consumes the safe native
 `/api/admin/suite` projection and performs administrator changes through `/api/admin/suite/operations/*`. Service calls to `/api/nox/*` stay on the local Unix channel.
 It includes explicit same-operation recovery and displays partial failure without
-blocking native account/vault management. Setup secrets stay in memory; only
-user-scoped non-secret operation/recovery metadata is retained in this tab.
+blocking native account/vault management. Setup secrets remain in the local participants; only
+user-scoped non-secret administration operation metadata is retained in this tab.
 
 CI and Release invoke the shared `scripts/check-image-contracts.py` version matrix.
 Bounded startup waits now retry connection resets/early disconnects as well as

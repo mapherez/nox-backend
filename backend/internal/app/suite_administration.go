@@ -28,5 +28,5 @@ func (s *Server) handleSuiteAdministration(w http.ResponseWriter, r *http.Reques
 	if !ready {
 		reason = "The local Suite channel is unavailable. Use the deployment with its shared local volume."
 	}
-	writeJSON(w, 200, map[string]any{"state": state, "configuration": map[string]any{"backendOrigin": origin, "canManage": ready, "canEnroll": ready, "enrollmentReason": reason, "reason": reason, "transport": "unix", "directMcpEnabled": !s.cfg.DirectMCPDisabled, "suiteMcpEnabled": s.cfg.SuiteMCPEnabled, "allowedCidrs": []string{}, "allowedPorts": []string{}}})
+	writeJSON(w, 200, map[string]any{"state": state, "configuration": map[string]any{"backendOrigin": origin, "canManage": ready, "canEnroll": ready, "enrollmentReason": reason, "reason": reason, "transport": "unix", "directMcpEnabled": !s.cfg.DirectMCPDisabled, "suiteMcpEnabled": s.cfg.SuiteMCPEnabled}})
 }
