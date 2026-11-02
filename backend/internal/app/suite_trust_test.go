@@ -45,11 +45,7 @@ func suiteHTTPServer(t *testing.T, suiteEnabled ...bool) *suiteHTTPFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	socketDir, err := os.MkdirTemp("/private/tmp", "nox-suite-test-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(socketDir) })
+	socketDir := shortSuiteDirectory(t)
 	s := NewServer(Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}, SuiteAllowedCIDRs: []string{"127.0.0.0/8", "::1/128"}}, store)
 	backend := suiteTestBackend(t, s)
 	s.cfg.PublicURL = backend.URL

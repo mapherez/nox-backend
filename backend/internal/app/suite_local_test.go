@@ -16,7 +16,7 @@ import (
 
 func shortSuiteDirectory(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("/private/tmp", "suite-local-")
+	dir, err := os.MkdirTemp("", "suite-local-")
 	if err != nil {
 		t.Fatal(err)
 	}
