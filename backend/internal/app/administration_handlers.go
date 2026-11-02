@@ -270,8 +270,7 @@ func (s *Server) handleAdminUserStatus(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	var input struct {
-		Status string               `json:"status"`
-		Setup  *connectionSetupView `json:"setup,omitempty"`
+		Status string `json:"status"`
 	}
 	if !decodeManagementJSON(w, r, &input) {
 		return

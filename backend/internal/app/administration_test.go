@@ -173,6 +173,28 @@ func TestAdministrationRejectsMalformedMutationsWithoutChangingState(t *testing.
 	}
 }
 
+func TestNativeUserStatusRejectsSuiteSetupFields(t *testing.T) {
+	s, store, admin, _ := newTestServer(t)
+	ctx := context.Background()
+	member, err := store.UpsertAllowedUser(ctx, "status-boundary@example.com", "USER")
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth := administrationKey(t, store, admin)
+	path := "/api/admin/users/" + member.ID + "/status"
+	response := administrationRequest(t, s, "PUT", path, `{"status":"DISABLED","setup":{"state":"completed"}}`, auth)
+	administrationStatus(t, response, 400)
+	current, err := store.UserByID(ctx, member.ID)
+	if err != nil || current.Status != storage.UserStatusActive {
+		t.Fatal("invalid status request changed the native account", err)
+	}
+	administrationStatus(t, administrationRequest(t, s, "PUT", path, `{"status":"DISABLED"}`, auth), 200)
+	current, err = store.UserByID(ctx, member.ID)
+	if err != nil || current.Status != storage.UserStatusDisabled {
+		t.Fatal("native status request no longer works", err)
+	}
+}
+
 func TestAdministrationPersonalKeysAndLogout(t *testing.T) {
 	s, store, admin, _ := newTestServer(t)
 	ctx := context.Background()

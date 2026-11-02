@@ -62,6 +62,33 @@ Return `200`, `202` or `204` only for accepted delivery; Backend still requires 
 
 Yard's subsequent adaptation prepares this channel through its existing deployment/jobs/configuration/recovery system and initiates registration of installed products. Gateway consumes the authorized registry and uses the same local mapping. No additional installer, certificate service or product catalog is introduced here.
 
+## Point 5 — Preservar os usos existentes do Backend
+
+The compatibility review compares the local-channel correction with released
+Backend `v1.0.15` (`577f461`). It covers native contracts for every consumer;
+existing products do not need Suite membership to keep using those contracts.
+
+| Existing use | Review and regression evidence |
+| --- | --- |
+| Native frontend and administration | Existing dashboard, Google login/callback/logout, session cookie, legacy forms, account/key/user/vault operations and ownership rules remain. The correction removes an accidental `setup` field from the native user-status request; unknown fields are rejected without changing the account. |
+| External HTTP clients | `/v1/*` routes, Bearer and legacy query-key authentication, key rotation, disabled users, file/download responses and synchronization are retained. The new service transport does not restrict these clients to the Backend host. |
+| Direct MCP | `/mcp`, its catalog/CLI metadata, personal-key authentication, ownership, structured results and integer revisions retain their native behavior. `/mcp/suite` has the separately approved local-only policy. |
+| Installed data | Migration 8 adds only the local setup journal. A dedicated version-7 upgrade/restart regression preserves personal keys, browser sessions, committed file revisions/blobs, saved native URLs/revisions, existing service credentials/identities, issuer/signing keys, secret-store master key and migration history. Existing associations are retained as data, not silently converted into working local associations. |
+| Deployment | Existing native port, public/OAuth origin, `/data`, data volume, legacy executable and environment-variable fallback remain. The new Suite volume is additional and is not mounted into the frontend. |
+
+Read-only inspection of available sibling sources confirmed the existing sync
+client's `/v1/sync/*` usage and the wiki importer’s auth/vault/file/download
+contracts. This is source compatibility evidence, not a claim that every
+external consumer or its complete frontend workflow was run. No sibling product,
+original implementation plan, publication or installed data is changed by point 5.
+
+Point 5 is complete in source. After the compatibility fix, the full
+`go test -race -count=1 -mod=readonly ./...` suite and `go vet -mod=readonly ./...`
+passed. Existing CI/release jobs already run the new regressions; no workflow
+change is required. The owner reported successful GitHub builds for point 4 and
+its temporary-path fix; these latest changes still need their own GitHub run.
+Point 6, **Adaptar o Gateway ao mesmo processo de configuração**, remains next.
+
 ## Validation and delivery boundary
 
 Go tests use real Unix sockets and cover automatic pairing/ACK/registration, identical retries after lost delivery, receipt loss after ACK, process restart and background reconciliation, stale configuration, cancellation, active-admin/lease checks, native HTTP administration and rejection of TCP/TLS service calls. Filesystem/listener ownership and all SDK-valid ID shapes are checked separately. Existing native regressions remain in the full race/vet suite.
