@@ -26,7 +26,7 @@ func TestDashboardDataSessionIsolation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/api/dashboard?userId="+admin.ID+"&isAdmin=true", nil)
 			if tc.auth {
-				token, err := store.CreateWebSession(context.Background(), tc.user.ID, webSessionDuration)
+				token, err := fixtureWebSession(t, context.Background(), store, tc.user.ID, webSessionDuration)
 				if err != nil {
 					t.Fatal(err)
 				}

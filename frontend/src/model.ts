@@ -45,6 +45,7 @@ export interface FoundationConnection {
 }
 export interface Dashboard {
   authenticated: boolean;
+  renewLogin?: boolean;
   oauthConfigured: boolean;
   loginUrl: string;
   serverUrl: string;

@@ -56,7 +56,7 @@ func TestAdministrationAuthenticationAndJSONBoundary(t *testing.T) {
 		administrationStatus(t, administrationRequest(t, s, "GET", path, "", nil), 401)
 	}
 	administrationStatus(t, administrationRequest(t, s, "GET", "/api/admin/users?api_key="+strings.TrimPrefix(key["Authorization"], "Bearer "), "", nil), 401)
-	session, err := store.CreateWebSession(context.Background(), admin.ID, time.Hour)
+	session, err := fixtureWebSession(t, context.Background(), store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestAdministrationAuthenticationAndJSONBoundary(t *testing.T) {
 	}
 	administrationStatus(t, administrationRequest(t, s, "PATCH", "/api/admin/users", "", key), 405)
 	administrationStatus(t, administrationRequest(t, s, "GET", "/api/unknown", "", key), 404)
-	expired, err := store.CreateWebSession(context.Background(), admin.ID, -time.Minute)
+	expired, err := fixtureWebSession(t, context.Background(), store, admin.ID, -time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,8 @@ func TestAdministrationAuthenticationAndJSONBoundary(t *testing.T) {
 func TestAdministrationSessionMutationRequiresSameOrigin(t *testing.T) {
 	s, store, admin, _ := newTestServer(t)
 	s.cfg.PublicURL = "https://backend.example.com"
-	token, err := store.CreateWebSession(context.Background(), admin.ID, time.Hour)
+	setFixtureOrigin(t, s)
+	token, err := fixtureWebSession(t, context.Background(), store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +127,7 @@ func TestAdministrationAccountAndUserLifecycle(t *testing.T) {
 	if !strings.Contains(response.Body.String(), member.ID) {
 		t.Fatal("account identity was supplied by the caller")
 	}
-	memberSession, err := store.CreateWebSession(ctx, member.ID, time.Hour)
+	memberSession, err := fixtureWebSession(t, ctx, store, member.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestAdministrationPersonalKeysAndLogout(t *testing.T) {
 	if !strings.Contains(response.Body.String(), strings.TrimPrefix(memberAuth["Authorization"], "Bearer ")) || strings.Contains(response.Body.String(), strings.TrimPrefix(adminAuth["Authorization"], "Bearer ")) {
 		t.Fatal("personal key isolation failed")
 	}
-	token, err := store.CreateWebSession(ctx, member.ID, time.Hour)
+	token, err := fixtureWebSession(t, ctx, store, member.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +314,8 @@ func TestFoundationConnectionConfigurationIsNotTrust(t *testing.T) {
 func TestLegacyBrowserFormsKeepRoutesAndRejectForeignOrigin(t *testing.T) {
 	s, store, admin, _ := newTestServer(t)
 	s.cfg.PublicURL = "https://backend.example.com:443"
-	token, err := store.CreateWebSession(context.Background(), admin.ID, time.Hour)
+	setFixtureOrigin(t, s)
+	token, err := fixtureWebSession(t, context.Background(), store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,13 +332,13 @@ func TestLegacyBrowserFormsKeepRoutesAndRejectForeignOrigin(t *testing.T) {
 func TestAdministrationLogoutCannotUseBearerToDeleteAnotherSession(t *testing.T) {
 	s, store, admin, _ := newTestServer(t)
 	auth := administrationKey(t, store, admin)
-	token, err := store.CreateWebSession(context.Background(), admin.ID, time.Hour)
+	token, err := fixtureWebSession(t, context.Background(), store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
 	auth["Cookie"] = sessionCookieName + "=" + token
 	administrationStatus(t, administrationRequest(t, s, "POST", "/api/session/logout", "", auth), 400)
-	if _, valid, err := store.UserBySessionToken(context.Background(), token); err != nil || !valid {
+	if _, valid, err := fixtureSessionUser(store, context.Background(), token); err != nil || !valid {
 		t.Fatal("Bearer endpoint deleted a session", err)
 	}
 }
@@ -344,7 +346,7 @@ func TestAdministrationLogoutCannotUseBearerToDeleteAnotherSession(t *testing.T)
 func TestAdminManagerCanManagePromotedAdmins(t *testing.T) {
 	s, store, manager, _ := newTestServer(t)
 	ctx := context.Background()
-	s.cfg.AdminEmails = []string{"  TEST@EXAMPLE.COM  "}
+	fixtureManager(t, store, manager)
 	auth := administrationKey(t, store, manager)
 	response := administrationRequest(t, s, "POST", "/api/admin/users", `{"email":"secondary@example.com","role":"USER"}`, auth)
 	administrationStatus(t, response, 200)
@@ -359,7 +361,7 @@ func TestAdminManagerCanManagePromotedAdmins(t *testing.T) {
 		t.Fatal(err)
 	}
 	targetAuth := administrationKey(t, store, targetUser)
-	targetSession, err := store.CreateWebSession(ctx, target.ID, time.Hour)
+	targetSession, err := fixtureWebSession(t, ctx, store, target.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +389,7 @@ func TestAdminManagerCanManagePromotedAdmins(t *testing.T) {
 	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/status", `{"status":"ACTIVE"}`, auth), 200)
 	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"USER"}`, auth), 200)
 	administrationStatus(t, administrationRequest(t, s, "PUT", path+"/role", `{"role":"ADMIN"}`, auth), 200)
-	targetSession, err = store.CreateWebSession(ctx, target.ID, time.Hour)
+	targetSession, err = fixtureWebSession(t, ctx, store, target.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,12 +420,13 @@ func TestAdminManagerProtectionCannotBeBypassedByOtherAdminsOrUpsert(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.cfg.AdminEmails = []string{manager.Email, " SECOND-MANAGER@EXAMPLE.COM "}
+	fixtureManager(t, store, manager)
+	fixtureManager(t, store, otherManager)
 	for _, actor := range []storage.User{manager, ordinary} {
 		auth := administrationKey(t, store, actor)
-		protected := []storage.User{manager, otherManager, actor}
+		protected := []storage.User{actor}
 		if actor.ID == ordinary.ID {
-			protected = append(protected, another)
+			protected = append(protected, manager, otherManager, another)
 		}
 		for _, target := range protected {
 			path := "/api/admin/users/" + target.ID
@@ -433,6 +436,9 @@ func TestAdminManagerProtectionCannotBeBypassedByOtherAdminsOrUpsert(t *testing.
 			administrationStatus(t, administrationRequest(t, s, "POST", "/api/admin/users", fmt.Sprintf(`{"email":%q,"role":"USER"}`, strings.ToUpper(target.Email)), auth), 400)
 		}
 	}
+	// A verified manager can also delete another manager; self-protection above remains.
+	managerAuth := administrationKey(t, store, manager)
+	administrationStatus(t, administrationRequest(t, s, "DELETE", "/api/admin/users/"+otherManager.ID, "", managerAuth), 200)
 	// An upsert by the manager may demote a regular admin, with the same SQL policy.
 	auth := administrationKey(t, store, manager)
 	administrationStatus(t, administrationRequest(t, s, "POST", "/api/admin/users", `{"email":"another-admin@example.com","role":"USER"}`, auth), 200)
@@ -450,7 +456,7 @@ func TestAdminManagerProtectionCannotBeBypassedByOtherAdminsOrUpsert(t *testing.
 	}
 }
 
-func TestManagerAuthorityComesOnlyFromCurrentConfiguration(t *testing.T) {
+func TestManagerAuthorityComesOnlyFromVerifiedNoXIdentity(t *testing.T) {
 	s, store, first, _ := newTestServer(t)
 	ctx := context.Background()
 	second, err := store.UpsertAllowedUser(ctx, "later@example.com", "ADMIN")
@@ -458,31 +464,37 @@ func TestManagerAuthorityComesOnlyFromCurrentConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	if s.isAdminManager(first) || s.isAdminManager(second) {
-		t.Fatal("creation order granted unconfigured manager authority")
+		t.Fatal("creation order granted manager authority")
 	}
-	s.cfg.AdminEmails = []string{second.Email}
+	fixtureManager(t, store, second)
 	if s.isAdminManager(first) || !s.isAdminManager(second) {
-		t.Fatal("configuration did not select the manager")
+		t.Fatal("verified Auth binding did not establish manager")
 	}
-	// Simulate restarting with the owner configuration changed; no DB role migration.
-	restarted := NewServer(Config{Version: "test", AdminEmails: []string{first.Email}}, store)
-	if !restarted.isAdminManager(first) || restarted.isAdminManager(second) {
-		t.Fatal("manager rights survived removal from deployment configuration")
+	restarted := newAuthTestServer(t, Config{Version: "test"}, store)
+	if restarted.isAdminManager(first) || !restarted.isAdminManager(second) {
+		t.Fatal("verified manager binding lost across restart")
 	}
-	if user, err := store.UserByID(ctx, second.ID); err != nil || user.Role != "ADMIN" {
-		t.Fatal("configuration change unexpectedly changed the stored role", err)
+	if err = store.SetUserStatus(ctx, second.ID, "DISABLED"); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := store.UserByID(ctx, second.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.isAdminManager(disabled) {
+		t.Fatal("disabled manager retained authority")
 	}
 }
 
 func TestManagerCanDeleteAnotherAdminThroughCompatibleBrowserRoute(t *testing.T) {
 	s, store, manager, _ := newTestServer(t)
 	ctx := context.Background()
-	s.cfg.AdminEmails = []string{manager.Email}
+	fixtureManager(t, store, manager)
 	secondary, err := store.UpsertAllowedUser(ctx, "legacy-admin@example.com", "ADMIN")
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, err := store.CreateWebSession(ctx, manager.ID, time.Hour)
+	session, err := fixtureWebSession(t, ctx, store, manager.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

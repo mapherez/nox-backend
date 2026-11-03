@@ -2,7 +2,7 @@
 
 These Backend-owned APIs expose native dashboard operations independently of
 HTML and the future Portal. React uses these APIs; the legacy browser form,
-Google OAuth and dependent-product routes remain available. Existing `/v1/*`
+NoX Login entry and dependent-product routes remain available. Existing `/v1/*`
 and direct `/mcp` authentication and representations are unchanged.
 
 These routes are not the Suite `/api/nox/*` service, pairing, registry or
@@ -21,8 +21,10 @@ Every route below requires either:
   to a valid cookie. The administration API does not accept `api_key` in a URL.
 
 The API enables no CORS access. It does not create a new login scheme or forward
-personal keys to other products. Google login/session authority stays in Backend.
-Use the existing `/auth/google/start` and `/auth/google/callback` for browser login.
+personal keys to other products. Google identity and account admission belong to
+NoX Auth; Backend retains its app cookie and domain roles. Use `/auth/nox/start`
+and `/auth/nox/callback`. `/auth/google/start` aliases the new entry for existing
+integrations. See [NoX Login](nox-login.md).
 `POST /api/session/logout` specifically requires browser-session authentication;
 it removes that session and its cookie, without revoking the personal key.
 
@@ -41,6 +43,7 @@ Authorization/cookies or API-key response bodies.
 | GET | `/api/account/api-key` | `{ "apiKey": "..." }` | Own key only |
 | POST | `/api/account/api-key/rotate` | New `{ "apiKey": "..." }`; previous key immediately fails authentication | Own key only |
 | POST | `/api/session/logout` | `{ "ok": true }`, expired session cookie | Browser session only |
+| POST | `/api/session/logout-all` | `{ "ok": true }` only after Auth confirms Suite-session revocation | Browser session only |
 | GET | `/api/admin/users` | Array of allowed users, without Google subjects or keys | Admin |
 | POST | `/api/admin/users` | `{ "email": "person@example.com", "role": "USER" }`; adds/re-enables an allowed account and returns its presentation fields | Admin |
 | PUT | `/api/admin/users/{userId}/status` | `{ "status": "ACTIVE" }` or `DISABLED` | Admin |
@@ -62,23 +65,12 @@ with the legacy form. Unsupported explicit values are rejected.
 
 ### Admin Managers and account management
 
-`NOX_BACKEND_ADMIN_EMAILS` explicitly selects the deployment's **Admin Managers**.
-The existing `NOX_SYNC_ADMIN_EMAILS` fallback follows the normal configuration
-precedence. Every listed email has this authority; list only the principal account
-if it should be the sole manager. Account creation order grants no authority.
-No new stored role or database migration is introduced: an active configured
-manager still has role `ADMIN`; its extra account-management authority is derived
-from trusted server configuration on every request.
-
-- Admin Managers can disable/re-enable, demote/promote and delete ordinary admins,
-  including accounts that were previously promoted from `USER`.
-- Ordinary admins retain management of ordinary users and may promote them, but
-  cannot manage other admins or grant manager authority through the dashboard/API.
-- Nobody may delete, disable or change their own role through account management.
-- Configured manager accounts are protected from those operations and upserts by
-  every account, including another manager. Change deployment configuration and
-  restart to remove that protection; keeping an email in bootstrap configuration
-  would otherwise recreate/restore it. Keep a configured manager for recovery.
+Admitted ADMIN accounts signed in through NoX Login have **Admin Manager**
+authority. Existing USER roles are preserved. Managers can manage other admins;
+nobody may delete, disable or change their own role. The central account list is
+configured only in Auth. Backend user administration controls local roles/status
+and data, and never adds an email to that central list. Newly admitted accounts
+receive an ADMIN record. Existing identities, keys and ownership are preserved.
 
 User representations include `isAdminManager` and actor-specific
 `permissions.canDelete`, `permissions.canChangeRole` and

@@ -1,5 +1,7 @@
 # NoX Suite migration status and compatibility baseline
 
+Current authentication responsibility: [NoX Login](nox-login.md) supersedes the historical native-Google/Backend-allowlist entries below. Google credentials and account admission belong only to Auth; preserve Backend data, roles and independent keys. Update Auth before this adapter.
+
 **Current implementation:** SDK `0.7.2`, local-only service transport and automatic foundation setup are described in [the current guide](suite-local.md). The obsolete `nox-sync` executable and manual browser secret-transfer controls have been removed.
 
 **Correction history:** [same-host integration and automatic setup](suite-local.md) records the current Backend work against SDK `0.7.2`, including migration 8 and the local volume. The numbered eight-point implementation history below is retained as historical evidence; it is distinct from the fixed 12-point correction sequence and does not override the owner's subsequent same-host clarification.

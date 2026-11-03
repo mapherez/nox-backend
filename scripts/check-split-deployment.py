@@ -1,18 +1,17 @@
 """Exercise disposable backend/frontend containers; never attaches installed data."""
 import argparse
-import datetime
-import hashlib
 import json
 import os
 from pathlib import Path
 import secrets
-import sqlite3
 import subprocess
 import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+import nox_login_fixture
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -48,37 +47,26 @@ def main():
     args=parser.parse_args()
     network='nox-backend-check-'+secrets.token_hex(6)
     containers=[]
+    volume=network+'-local'
     with tempfile.TemporaryDirectory(prefix='nox-backend-split-') as temporary:
         folder=Path(temporary).resolve(); data=folder/'data';data.mkdir()
         docker('network','create',network)
+        docker('volume','create',volume)
         try:
-            backend=docker('run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','--group-add','10001','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image)
-            containers.append(backend);backend_base='http://'+docker('port',backend,'8080/tcp');ready(backend_base,'/v1/health')
-            backend_args=['run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','--group-add','10001','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','-e','NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid','-e','NOX_BACKEND_GOOGLE_CLIENT_ID=test-client','-e','NOX_BACKEND_GOOGLE_CLIENT_SECRET=test-secret',args.backend_image]
-            # Seed only while Backend is stopped: host and Docker VM SQLite must not write concurrently.
-            docker('stop',backend);containers.remove(backend)
-            connection=sqlite3.connect(data/'nox-backend.db',timeout=10)
-            connection.execute('PRAGMA foreign_keys=ON')
-            admin_id=connection.execute('SELECT id FROM users WHERE email=?',('admin@example.invalid',)).fetchone()[0]
-            api_key=connection.execute('SELECT key_value FROM api_keys WHERE user_id=?',(admin_id,)).fetchone()[0]
-            def session(user_id):
-                token=secrets.token_urlsafe(32)
-                now=datetime.datetime.now(datetime.timezone.utc)
-                stamp=lambda date: date.strftime('%Y-%m-%dT%H:%M:%SZ')
-                connection.execute('INSERT INTO web_sessions (id,user_id,token_hash,expires_at,created_at) VALUES (?,?,?,?,?)',('websess_'+secrets.token_hex(12),user_id,hashlib.sha256(token.encode()).hexdigest(),stamp(now+datetime.timedelta(hours=1)),stamp(now)))
-                connection.commit();return token
-            now=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-            member_id='user_member_fixture'
-            connection.execute('INSERT INTO users (id,email,first_name,display_name,role,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',(member_id,'member@example.invalid','','Member','USER','ACTIVE',now,now))
-            member_key='noxsync_'+secrets.token_urlsafe(32)
-            connection.execute('INSERT INTO api_keys (user_id,key_prefix,key_value,key_hash,created_at) VALUES (?,?,?,?,?)',(member_id,'noxsync_',member_key,hashlib.sha256(member_key.encode()).hexdigest(),now))
-            vault_id='vault_fixture'
-            connection.execute('INSERT INTO vaults (id,user_id,name,revision,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',(vault_id,admin_id,'Notes',9007199254740993,'ACTIVE',now,now))
-            admin_session=session(admin_id);member_session=session(member_id)
-            connection.close()
-            backend=docker(*backend_args);containers.append(backend);backend_base='http://'+docker('port',backend,'8080/tcp');ready(backend_base,'/v1/health')
             frontend=docker('run','-d','--rm','--network',network,'-p','127.0.0.1::8080',args.frontend_image)
             containers.append(frontend);base='http://'+docker('port',frontend,'8080/tcp');ready(base,'/healthz')
+            backend_args=['run','-d','--rm','--network',network,'--network-alias','backend','--user',f'{os.getuid()}:{os.getgid()}','--group-add','10001','-p','127.0.0.1::8080','--mount',f'type=bind,source={data},target=/data','--mount',f'type=volume,source={volume},target=/run/nox-suite','-e','NOX_BACKEND_PUBLIC_URL='+base,'-e','NOX_AUTH_PUBLIC_URL='+nox_login_fixture.ISSUER,args.backend_image]
+            backend=docker(*backend_args);containers.append(backend);backend_base='http://'+docker('port',backend,'8080/tcp');ready(backend_base,'/v1/health')
+            docker('stop',backend);containers.remove(backend)
+            seeded=nox_login_fixture.seed(data,base,folder)
+            admin_session,member_session,api_key,vault_id=[seeded[key] for key in ['adminSession','memberSession','apiKey','vaultId']]
+            member_id='user_member_fixture';admin_id='user_admin_fixture'
+            provider=nox_login_fixture.start_provider(docker,folder,volume,f'{os.getuid()}:{os.getgid()}');containers.append(provider)
+            for attempt in range(100):
+                if 'auth fixture ready' in docker('logs',provider): break
+                time.sleep(.1)
+            else: raise AssertionError('Auth fixture did not start')
+            backend=docker(*backend_args);containers.append(backend);backend_base='http://'+docker('port',backend,'8080/tcp');ready(backend_base,'/v1/health')
             docker('exec',backend,'/usr/local/bin/nox-backend','healthcheck')
             docker('exec',frontend,'wget','-q','-O','/dev/null','http://127.0.0.1:8080/healthz')
             auth={'Authorization':'Bearer '+api_key};cookie={'Cookie':'nox_sync_session='+admin_session}
@@ -95,9 +83,9 @@ def main():
 
             status,headers,body=request(base,'/api/dashboard');view=json.loads(body);assert status==200 and not view['authenticated'] and not view['apiKey'];assert headers['Cache-Control']=='no-store'
             status,_,body=request(base,'/api/dashboard',headers=cookie);view=json.loads(body);assert status==200, ('dashboard HTTP',status);assert view['apiKey']==api_key, ('session/key projection',view['authenticated']);assert view['isAdmin'], 'admin projection';assert view['serverUrl']==base, ('public origin',view['serverUrl'],base)
-            status,_,body=request(base,'/api/dashboard',headers={**cookie,'X-Forwarded-Proto':'https'});assert json.loads(body)['serverUrl']==base.replace('http:','https:')
+            status,_,body=request(base,'/api/dashboard',headers={**cookie,'X-Forwarded-Proto':'https'});assert json.loads(body)['serverUrl']==base
             status,headers,_=request(base,'/auth/google/start?redirect=/vault-dashboard',headers={'X-Forwarded-Proto':'https'});assert status==303
-            query=urllib.parse.parse_qs(urllib.parse.urlparse(headers['Location']).query);assert query['redirect_uri']==[base.replace('http:','https:')+'/auth/google/callback']
+            query=urllib.parse.parse_qs(urllib.parse.urlparse(headers['Location']).query);assert query['redirect_uri']==[base+'/auth/nox/callback'];assert headers['Location'].startswith(nox_login_fixture.ISSUER+'/authorize?')
             status,_,body=request(base,'/api/dashboard',headers=cookie);assert json.loads(body)['vaults'][0]['revision']=='9007199254740993'
             params=urllib.parse.urlencode({'email':'form-created@example.invalid','role':'USER'}).encode()
             status,headers,_=request(base,'/vault-dashboard/users/add',headers={**cookie,'Content-Type':'application/x-www-form-urlencoded'},data=params);assert status==303 and headers['Location']=='/vault-dashboard?message=user-saved'
@@ -135,5 +123,6 @@ def main():
             for container in reversed(containers):
                 subprocess.run(['docker','rm','-f',container],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
             docker('network','rm',network)
+            docker('volume','rm',volume)
 
 if __name__=='__main__':main()

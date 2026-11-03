@@ -621,3 +621,57 @@ func TestSuiteKnownIncompatibleUpdateBlocksNewGrantsUntilVerifiedRepair(t *testi
 		t.Fatal("verified repair did not restore eligibility", err)
 	}
 }
+
+func TestSuiteDelegationCannotExtendCachedAuthAdmission(t *testing.T) {
+	f := newIssuanceFixture(t)
+	deadline := time.Now().Add(40 * time.Second).Truncate(time.Second)
+	result, err := f.store.SuiteIssueAuthorization(context.Background(), SuiteCaller{ServiceToken: f.gateway.ServiceCredential}, f.request(f.memberKey), deadline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegated := trustDecode[noxmcp.SuiteAuthorizationResponse](t, result, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expires, err := noxmcp.ParseSuiteTimestamp(delegated.ExpiresAt)
+	if err != nil || expires.After(deadline) {
+		t.Fatal("delegation extended admission", expires, err)
+	}
+	_, err = f.store.SuiteIssueAuthorization(context.Background(), SuiteCaller{ServiceToken: f.gateway.ServiceCredential}, f.request(f.memberKey), time.Now().Add(-time.Second))
+	if err == nil {
+		t.Fatal("expired admission issued a new delegation")
+	}
+}
+
+func TestNoXAdmissionInvalidatesDelegationRevisionWithoutRewritingKeyOrRole(t *testing.T) {
+	f := newIssuanceFixture(t)
+	ctx := context.Background()
+	_, before := f.issue(t, f.memberKey)
+	caller := SuiteCaller{ServiceToken: f.gateway.ServiceCredential}
+	snapshot := registrySnapshot(t, f.trustFixture, caller)
+	if err := f.store.InvalidateNoXAdmission(ctx, f.member.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, after := f.issue(t, f.memberKey)
+	if before.Context.AuthRevision == after.Context.AuthRevision {
+		t.Fatal("admission denial retained delegation revision")
+	}
+	key, err := f.store.CurrentAPIKey(ctx, f.member.ID)
+	if err != nil || key != f.memberKey {
+		t.Fatal("invalidation rewrote independent key", err)
+	}
+	user, err := f.store.UserByID(ctx, f.member.ID)
+	if err != nil || user.Role != f.member.Role || user.Status != f.member.Status {
+		t.Fatal("invalidation changed domain account", err)
+	}
+	page := registryPage(t, f.trustFixture, caller, snapshot.Cursor, 256)
+	found := false
+	for _, event := range page.Events {
+		if event.Type == "authorization.invalidated" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("central admission invalidation was not published")
+	}
+}

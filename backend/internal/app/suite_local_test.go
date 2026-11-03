@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"github.com/mapherez/nox-backend/backend/internal/storage"
 	"io"
 	"net"
 	"net/http"
@@ -100,6 +101,12 @@ func TestBackendRunMaintainsNativeHTTPAndClosesLocalListener(t *testing.T) {
 	cfg := Config{Addr: addr, DataDir: t.TempDir(), SuiteSocketDir: dir, Version: "local-test"}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	data, err := storage.Open(context.Background(), cfg.DataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authFixture(t, data)
+	_ = data.Close()
 	stopped := make(chan error, 1)
 	go func() { stopped <- Run(ctx, cfg) }()
 	client := &http.Client{Timeout: time.Second}

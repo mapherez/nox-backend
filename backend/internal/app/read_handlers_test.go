@@ -72,7 +72,7 @@ func TestReadAPIContentsLegacyDownloadsAndZIP(t *testing.T) {
 			t.Fatalf("unexpected file fields: %#v", file)
 		}
 	}
-	token, err := store.CreateWebSession(context.Background(), user.ID, webSessionDuration)
+	token, err := fixtureWebSession(t, context.Background(), store, user.ID, webSessionDuration)
 	if err != nil {
 		t.Fatal(err)
 	}

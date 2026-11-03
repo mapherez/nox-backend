@@ -10,6 +10,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/ci.yml"
+      - ".env.example"
       - "docker-compose.yml"
       - "docker-compose.dev.yml"
       - "scripts/**"
@@ -126,3 +127,6 @@ jobs:
 
       - name: Verify local Suite channel and browser setup
         run: python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:contract-test --frontend-image nox-backend-frontend:test
+
+      - name: Verify shipped Compose and real Auth enrollment
+        run: python3 scripts/check-auth-compose.py --backend-image nox-backend:contract-test --frontend-image nox-backend-frontend:test

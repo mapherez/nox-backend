@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	noxauth "github.com/mapherez/nox-auth/client"
 	"net/http"
 
 	"github.com/mapherez/nox-backend/backend/internal/storage"
@@ -42,6 +44,12 @@ func (s *Server) apiUser(ctx context.Context, token string) (storage.User, *apiA
 	}
 	if !valid {
 		return storage.User{}, &apiAuthError{http.StatusUnauthorized, "AUTH_FAILED", "Invalid NoX Sync API key."}
+	}
+	if _, err := s.accountAdmission(ctx, user); err != nil {
+		if errors.Is(err, noxauth.ErrDenied) {
+			return storage.User{}, &apiAuthError{401, "AUTH_FAILED", "Account is not admitted by NoX Auth."}
+		}
+		return storage.User{}, &apiAuthError{503, "AUTH_UNAVAILABLE", "NoX Auth admission is unavailable."}
 	}
 	return user, nil
 }

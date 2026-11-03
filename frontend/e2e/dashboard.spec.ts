@@ -12,9 +12,9 @@ test("anonymous login, assets and responsive layout work through the frontend im
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(fixture.base + "/vault-dashboard");
-  await expect(page.getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "NoX Login" })).toHaveAttribute(
     "href",
-    "/auth/google/start?redirect=/vault-dashboard",
+    "/auth/nox/start?redirect=/vault-dashboard",
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -158,7 +158,7 @@ test("admin manages credentials, users and vaults through authenticated JSON API
   ).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("dashboard.png"), fullPage: true });
   await page.getByRole("button", { name: "Log out", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Continue with Google" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "NoX Login" })).toBeVisible();
 });
 test("a member retains their frontend and cannot see admin controls", async ({ page, context }) => {
   await context.addCookies([
@@ -171,4 +171,23 @@ test("a member retains their frontend and cannot see admin controls", async ({ p
   await expect(page.getByText("Service connections", { exact: true })).toHaveCount(0);
   expect((await page.request.get(fixture.base + "/api/admin/connections")).status()).toBe(403);
   expect((await page.request.get(fixture.base + "/api/admin/users")).status()).toBe(403);
+  // A failed global logout must not claim success or discard this app session.
+  await page.route(
+    "**/api/session/logout-all",
+    async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Suite logout unavailable." }),
+      });
+    },
+    { times: 1 },
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Sign out of all NoX apps", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("Suite logout unavailable.");
+  await expect(page.getByLabel("API key", { exact: true })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Sign out of all NoX apps", exact: true }).click();
+  await expect(page.getByRole("link", { name: "NoX Login" })).toBeVisible();
 });

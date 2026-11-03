@@ -42,7 +42,17 @@ func (s *Server) handleSuiteAuthorization(w http.ResponseWriter, r *http.Request
 		writeSuiteError(w, suiteDocumentError(err, "Invalid user authorization request."))
 		return
 	}
-	result, err := s.store.SuiteIssueAuthorization(r.Context(), caller, request)
+	user, authErr := s.apiUser(r.Context(), request.ApiKey)
+	if authErr != nil {
+		writeSuiteError(w, suiteHTTPError(authErr.status, "UNAUTHENTICATED", authErr.message))
+		return
+	}
+	until, authFailure := s.accountAdmission(r.Context(), user)
+	if authFailure != nil {
+		writeSuiteError(w, suiteHTTPError(503, "INTEGRATION_UNAVAILABLE", "Account admission unavailable."))
+		return
+	}
+	result, err := s.store.SuiteIssueAuthorization(r.Context(), caller, request, until)
 	writeSuiteResult(w, result, err)
 }
 func (s *Server) handleSuiteProbeAuthorization(w http.ResponseWriter, r *http.Request) {

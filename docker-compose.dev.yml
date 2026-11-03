@@ -1,10 +1,31 @@
 name: nox-backend-dev
 
 services:
+  auth-setup:
+    image: nox-backend:dev
+    build:
+      context: ./backend
+    command: ["auth-setup"]
+    restart: "no"
+    environment:
+      NOX_BACKEND_DATA_DIR: "${NOX_BACKEND_DATA_DIR:-${NOX_SYNC_DATA_DIR:-/data}}"
+      NOX_BACKEND_PUBLIC_URL: "${NOX_BACKEND_PUBLIC_URL:?Set the browser-facing Backend origin}"
+      NOX_AUTH_PUBLIC_URL: "${NOX_AUTH_PUBLIC_URL:?Set the NoX Auth HTTPS origin}"
+      NOX_BACKEND_SUITE_SOCKET_DIR: /run/nox-suite
+    volumes:
+      - ./data:/data
+      - nox-suite-local:/run/nox-suite
+      - nox-auth-admin:/run/nox-auth-admin
+    healthcheck:
+      disable: true
+
   backend:
     build:
       context: ./backend
     image: nox-backend:dev
+    depends_on:
+      auth-setup:
+        condition: service_completed_successfully
     container_name: nox-backend-dev
     restart: unless-stopped
     environment:
@@ -13,10 +34,8 @@ services:
       NOX_BACKEND_VERSION: "${NOX_BACKEND_VERSION:-${NOX_SYNC_VERSION:-}}"
       NOX_BACKEND_ADDR: "${NOX_BACKEND_ADDR:-${NOX_SYNC_ADDR:-:8080}}"
       NOX_BACKEND_DATA_DIR: "${NOX_BACKEND_DATA_DIR:-${NOX_SYNC_DATA_DIR:-/data}}"
-      NOX_BACKEND_PUBLIC_URL: "${NOX_BACKEND_PUBLIC_URL:-${NOX_SYNC_PUBLIC_URL:-http://localhost:5710}}"
-      NOX_BACKEND_GOOGLE_CLIENT_ID: "${NOX_BACKEND_GOOGLE_CLIENT_ID:-${NOX_SYNC_GOOGLE_CLIENT_ID:-}}"
-      NOX_BACKEND_GOOGLE_CLIENT_SECRET: "${NOX_BACKEND_GOOGLE_CLIENT_SECRET:-${NOX_SYNC_GOOGLE_CLIENT_SECRET:-}}"
-      NOX_BACKEND_ADMIN_EMAILS: "${NOX_BACKEND_ADMIN_EMAILS:-${NOX_SYNC_ADMIN_EMAILS:-}}"
+      NOX_BACKEND_PUBLIC_URL: "${NOX_BACKEND_PUBLIC_URL:?Set the browser-facing Backend origin}"
+      NOX_AUTH_PUBLIC_URL: "${NOX_AUTH_PUBLIC_URL:?Set the NoX Auth HTTPS origin}"
       NOX_BACKEND_TLS_CERT_FILE: "${NOX_BACKEND_TLS_CERT_FILE:-${NOX_SYNC_TLS_CERT_FILE:-}}"
       NOX_BACKEND_TLS_KEY_FILE: "${NOX_BACKEND_TLS_KEY_FILE:-${NOX_SYNC_TLS_KEY_FILE:-}}"
       NOX_BACKEND_TLS_CA_FILE: "${NOX_BACKEND_TLS_CA_FILE:-${NOX_SYNC_TLS_CA_FILE:-}}"
@@ -44,4 +63,8 @@ volumes:
 
   nox-suite-local:
     name: "${NOX_SUITE_LOCAL_VOLUME_NAME:-nox-suite-local}"
-    driver: local
+    external: true
+
+  nox-auth-admin:
+    name: "${NOX_AUTH_ADMIN_VOLUME_NAME:-nox-auth-admin}"
+    external: true

@@ -30,11 +30,12 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 	}
 	data := dashboardPageData{
 		Authenticated:   authenticated,
-		OAuthConfigured: s.googleOAuthConfigured(),
-		LoginURL:        "/auth/google/start?redirect=/vault-dashboard",
+		OAuthConfigured: s.noxLoginConfigured(),
+		LoginURL:        "/auth/nox/start?redirect=/vault-dashboard",
 		ServerURL:       s.publicURL(r),
 	}
 	if authenticated {
+		data.RenewLogin, _ = s.loginRenewal(r)
 		apiKey, err := s.store.CurrentAPIKey(r.Context(), user.ID)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load API key.")

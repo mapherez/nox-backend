@@ -45,10 +45,12 @@ func suiteHTTPServer(t *testing.T, suiteEnabled ...bool) *suiteHTTPFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fixtureManager(t, store, admin)
 	socketDir := shortSuiteDirectory(t)
-	s := NewServer(Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0], AdminEmails: []string{admin.Email}}, store)
+	s := newAuthTestServer(t, Config{SuiteSocketDir: socketDir, Version: "test", SuiteMCPEnabled: len(suiteEnabled) > 0 && suiteEnabled[0]}, store)
 	backend := suiteTestBackend(t, s)
 	s.cfg.PublicURL = backend.URL
+	setFixtureOrigin(t, s)
 	f := &suiteHTTPFixture{s: s, store: store, backend: backend, client: backend.Client(), adminKey: key, dir: dir}
 	t.Cleanup(func() { f.backend.Close(); _ = f.store.Close() })
 	return f
@@ -356,8 +358,9 @@ func TestSuiteHTTPRecoverySurvivesBackendProcessRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.store = reopened
-	f.s = NewServer(config, reopened)
+	f.s = newAuthTestServer(t, config, reopened)
 	f.s.cfg.PublicURL = origin
+	setFixtureOrigin(t, f.s)
 	f.backend = suiteTestBackend(t, f.s)
 	f.client = f.backend.Client()
 	status, _, again := f.call(t, "POST", path, proof, "", map[string]string{"Idempotency-Key": "recover"})

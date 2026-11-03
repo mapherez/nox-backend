@@ -41,7 +41,7 @@ func TestEnvironmentAliases(t *testing.T) {
 		{"precedence", "new-value", "legacy-value", "new-value"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, key := range []string{"ADDR", "DATA_DIR", "PUBLIC_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "ADMIN_EMAILS", "VERSION"} {
+			for _, key := range []string{"ADDR", "DATA_DIR", "PUBLIC_URL", "VERSION"} {
 				t.Setenv("NOX_BACKEND_"+key, tc.canonical)
 				t.Setenv("NOX_SYNC_"+key, tc.legacy)
 				if got := getenv("NOX_SYNC_"+key, "fallback"); got != tc.want {

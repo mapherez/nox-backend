@@ -16,7 +16,7 @@ bodies, redirects and streaming responses. HTTPS Backend targets use certificate
 install the deployment CA bundle when using a private CA. Forwarded requests
 are not automatically retried. The backend listener stays internal
 in the supplied Compose files. Keep the existing external origin, proxy routing
-and Google callback URL when migrating; no second public application origin or
+and browser-facing login entry when migrating; no second public application origin or
 browser cross-origin credential flow is introduced.
 
 Backend owns all session checks, account roles, key/vault/user operations and
@@ -55,8 +55,9 @@ docker compose -f docker-compose.dev.yml up --build
 
 Development data is mounted from `./data` only into Backend. Do not point this
 at installed application data while validating the change. In Yard the project
-contains the two services; they are not separate registered Suite products.
-Compose does not itself register anything with the Suite.
+contains the native frontend/backend and the one-shot Auth setup service; these
+are not separate registered Suite products. Auth setup enrolls a login client;
+it does not register a product MCP server with the Suite registry.
 
 Build only the frontend after a UI change:
 
@@ -110,7 +111,10 @@ This is a deployment topology change, not a database migration. First preserve
 the actual Compose project name, public URL, ports, environment, data mount and
 image references. Follow the [storage/update guide](backend-separation.md) for
 backups and validation on a copy. Existing `NOX_BACKEND_*`/`NOX_SYNC_*` precedence,
-legacy keys/cookies/headers, database names and migration history remain valid.
+legacy keys/headers, database names and migration history remain valid.
+The subsequent [NoX Login adaptation](nox-login.md) replaces native Google
+authentication: update Auth first, apply the new Compose setup service and log
+in once again. Google credentials/account admission now live only in Auth.
 
 The old Compose service was `nox-backend`; the new services are `backend` and
 `frontend`. The backend container name remains `nox-backend` in the production
@@ -184,3 +188,21 @@ python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:verif
 The browser checks require the frontend's installed Chromium. Their sessions and
 protocol participant belong only to disposable data; real Google consent and the
 installed dependent application remain operator validation.
+
+## NoX Login delivery checks
+
+Run the same-host Auth first, with a service release containing `/v1/admission`.
+The Backend setup command is `auth-setup` under its image ENTRYPOINT. The runtime
+must not mount Auth's administrative volume. [NoX Login](nox-login.md) records
+required origins, preserved data, logout and rollout acceptance.
+
+In addition to the split/browser and local-Suite tests above, CI/release execute:
+
+```sh
+python3 scripts/check-auth-compose.py --backend-image nox-backend:verification --frontend-image nox-backend-frontend:verification
+```
+
+This uses the current published Auth service image by default; use `--auth-image`
+to validate a local Auth candidate. It executes the shipped Compose with isolated
+volumes and ports, automatic enrollment, private HTTP callback and restart. It
+does not contact Google. Publish/update compatible Auth before Backend.

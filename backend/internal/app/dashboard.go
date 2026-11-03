@@ -24,7 +24,7 @@ func (s *Server) presentDashboardUser(actor, user storage.User) dashboardUser {
 	return dashboardUser{
 		ID: user.ID, Email: user.Email, FirstName: user.FirstName, DisplayName: user.DisplayName,
 		Role: user.Role, Status: user.Status, LastLoginAt: user.LastLoginAt,
-		IsAdminManager: s.configuredAdmin(user.Email),
+		IsAdminManager: s.isAdminManager(user),
 		Permissions:    userManagementPermissions{canManage, canManage, canManage},
 	}
 }
@@ -48,6 +48,7 @@ func presentDashboardVaults(vaults []storage.Vault) []dashboardVault {
 }
 
 type dashboardPageData struct {
+	RenewLogin       bool             `json:"renewLogin,omitempty"`
 	Authenticated    bool             `json:"authenticated"`
 	OAuthConfigured  bool             `json:"oauthConfigured"`
 	LoginURL         string           `json:"loginUrl"`

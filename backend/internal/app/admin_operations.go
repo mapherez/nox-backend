@@ -12,32 +12,20 @@ import (
 )
 
 func (s *Server) webUser(r *http.Request) (storage.User, bool, error) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
-		return storage.User{}, false, nil
-	}
-	return s.store.UserBySessionToken(r.Context(), cookie.Value)
+	return s.noXWebUser(r)
 }
 
-func (s *Server) configuredAdmin(email string) bool {
-	for _, configured := range s.cfg.AdminEmails {
-		if strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(email)) {
-			return true
-		}
-	}
-	return false
-}
 func (s *Server) isAdminManager(user storage.User) bool {
-	return user.Role == storage.UserRoleAdmin && user.Status == storage.UserStatusActive && s.configuredAdmin(user.Email)
+	return user.Role == storage.UserRoleAdmin && user.Status == storage.UserStatusActive && s.store.NoXManager(user.ID)
 }
 func (s *Server) canManageUser(actor, target storage.User) bool {
-	return actor.Role == storage.UserRoleAdmin && actor.Status == storage.UserStatusActive && actor.ID != target.ID && !s.configuredAdmin(target.Email) && (target.Role != storage.UserRoleAdmin || s.isAdminManager(actor))
+	return actor.Role == storage.UserRoleAdmin && actor.Status == storage.UserStatusActive && actor.ID != target.ID && (target.Role != storage.UserRoleAdmin || s.isAdminManager(actor))
 }
 func (s *Server) userManagementPolicy(actor storage.User) storage.UserManagementPolicy {
-	return storage.UserManagementPolicy{ActorID: actor.ID, CanManageAdmins: s.isAdminManager(actor), ProtectedEmails: s.cfg.AdminEmails}
+	return storage.UserManagementPolicy{ActorID: actor.ID, CanManageAdmins: s.isAdminManager(actor)}
 }
 func protectedUserError() error {
-	return fmt.Errorf("%w: this account is protected; only a configured Admin Manager can manage other admins, and configured manager accounts are managed through deployment configuration", storage.ErrBadRequest)
+	return fmt.Errorf("%w: this account is protected; an Admin Manager is required to manage another admin, and self-management is forbidden", storage.ErrBadRequest)
 }
 func (s *Server) managedUser(ctx context.Context, actor storage.User, id string) (storage.User, error) {
 	if actor.Role != storage.UserRoleAdmin || actor.Status != storage.UserStatusActive {
@@ -62,9 +50,6 @@ func (s *Server) addManagedUser(ctx context.Context, actor storage.User, email, 
 	}
 	if role != storage.UserRoleUser && role != storage.UserRoleAdmin {
 		return storage.User{}, fmt.Errorf("%w: role must be USER or ADMIN", storage.ErrBadRequest)
-	}
-	if s.configuredAdmin(email) {
-		return storage.User{}, protectedUserError()
 	}
 	existing, err := s.store.UserByEmail(ctx, email)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {

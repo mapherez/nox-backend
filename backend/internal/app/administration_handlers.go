@@ -29,6 +29,7 @@ func (s *Server) registerAdministration(mux *http.ServeMux) {
 		{"/api/account/api-key", false, s.handleAccountKey},
 		{"/api/account/api-key/rotate", false, s.handleAccountKeyRotation},
 		{"/api/session/logout", false, s.handleSessionLogout},
+		{"/api/session/logout-all", false, s.handleSuiteLogout},
 		{"/api/admin/users", true, s.handleAdminUsers},
 		{"/api/admin/users/{userId}", true, s.handleAdminUser},
 		{"/api/admin/users/{userId}/status", true, s.handleAdminUserStatus},
@@ -48,7 +49,7 @@ func (s *Server) registerAdministration(mux *http.ServeMux) {
 		mux.HandleFunc(route.path, func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
-			actor, ok := s.managementActor(w, r)
+			actor, ok := s.managementActorForRoute(w, r, route.path == "/api/session/logout")
 			if !ok {
 				return
 			}
@@ -62,6 +63,10 @@ func (s *Server) registerAdministration(mux *http.ServeMux) {
 }
 
 func (s *Server) managementActor(w http.ResponseWriter, r *http.Request) (storage.User, bool) {
+	return s.managementActorForRoute(w, r, false)
+}
+
+func (s *Server) managementActorForRoute(w http.ResponseWriter, r *http.Request, localLogout bool) (storage.User, bool) {
 	// An explicit Authorization header always wins, including an invalid one.
 	if values, present := r.Header["Authorization"]; present {
 		if len(values) != 1 {
@@ -80,7 +85,18 @@ func (s *Server) managementActor(w http.ResponseWriter, r *http.Request) (storag
 		}
 		return actor, true
 	}
-	actor, ok, err := s.webUser(r)
+	var actor storage.User
+	var ok bool
+	var err error
+	if localLogout {
+		// Clearing this browser's own session remains possible while Auth is
+		// unavailable. This path grants no data access or other mutation.
+		if cookie, e := r.Cookie(sessionCookieName); e == nil {
+			actor, _, ok, err = s.store.NoXSession(r.Context(), cookie.Value)
+		}
+	} else {
+		actor, ok, err = s.webUser(r)
+	}
 	if err != nil {
 		writeJSONError(w, 500, "SERVER_ERROR", "Failed to load session.")
 		return storage.User{}, false
@@ -216,17 +232,9 @@ func (s *Server) handleSessionLogout(w http.ResponseWriter, r *http.Request, _ s
 		writeJSONError(w, 400, "BAD_REQUEST", "Use the browser session to sign out.")
 		return
 	}
-	// This endpoint ends a browser session, never revokes an unrelated API key.
-	cookie, err := r.Cookie(sessionCookieName)
-	if err == nil {
-		err = s.store.DeleteWebSession(r.Context(), cookie.Value)
+	if s.noXLogout(w, r, false) {
+		writeJSON(w, 200, map[string]bool{"ok": true})
 	}
-	if err != nil && err != http.ErrNoCookie {
-		writeManagementError(w, err)
-		return
-	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(s.publicURL(r), "https://")})
-	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, actor storage.User) {
 	if !managementMethod(w, r, "GET", "POST") {

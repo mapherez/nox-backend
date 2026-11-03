@@ -21,9 +21,7 @@ type Config struct {
 	DataDir                                        string
 	Version                                        string
 	PublicURL                                      string
-	GoogleClientID                                 string
-	GoogleClientSecret                             string
-	AdminEmails                                    []string
+	AuthPublicURL                                  string
 	SuiteReportInterval, SuiteObservationFreshness time.Duration
 	TLSCertFile, TLSKeyFile                        string
 }
@@ -56,9 +54,6 @@ func Run(ctx context.Context, cfg Config) error {
 			log.Printf("close sqlite database: %v", err)
 		}
 	}()
-	if err := store.BootstrapAdmins(ctx, cfg.AdminEmails); err != nil {
-		return err
-	}
 
 	server := NewServer(cfg, store)
 	serverCtx, stopServer := context.WithCancel(ctx)

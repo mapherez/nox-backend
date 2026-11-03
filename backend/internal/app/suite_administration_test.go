@@ -49,7 +49,7 @@ func TestSuiteNativeAdministrationAccessAndTransportProjection(t *testing.T) {
 	if authErr != nil {
 		t.Fatal(authErr)
 	}
-	session, err := f.store.CreateWebSession(context.Background(), admin.ID, time.Hour)
+	session, err := fixtureWebSession(t, context.Background(), f.store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestDashboardPreservesNativeControlsWhenSuiteStateFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, err := f.store.CreateWebSession(ctx, admin.ID, time.Hour)
+	session, err := fixtureWebSession(t, ctx, f.store, admin.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

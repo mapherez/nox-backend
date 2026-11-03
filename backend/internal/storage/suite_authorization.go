@@ -121,7 +121,7 @@ func (x *suiteTx) signGrant(kind string, claims any) (string, error) {
 	signature := append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
 	return input + "." + base64.RawURLEncoding.EncodeToString(signature), nil
 }
-func (s *Store) SuiteIssueAuthorization(ctx context.Context, caller SuiteCaller, request noxmcp.SuiteAuthorizationRequest) (SuiteResult, error) {
+func (s *Store) SuiteIssueAuthorization(ctx context.Context, caller SuiteCaller, request noxmcp.SuiteAuthorizationRequest, admissionUntil ...time.Time) (SuiteResult, error) {
 	raw, err := json.Marshal(request)
 	if err != nil {
 		return SuiteResult{}, err
@@ -146,6 +146,15 @@ func (s *Store) SuiteIssueAuthorization(ctx context.Context, caller SuiteCaller,
 		iat, exp, err := x.grantTimes(a)
 		if err != nil {
 			return SuiteResult{}, err
+		}
+		if len(admissionUntil) > 0 {
+			until := admissionUntil[0].Unix()
+			if until <= int64(iat) {
+				return SuiteResult{}, suiteUnauthenticated()
+			}
+			if uint64(until) < exp {
+				exp = uint64(until)
+			}
 		}
 		var issuer string
 		if err = x.tx.QueryRowContext(ctx, `SELECT issuer FROM suite_authority WHERE singleton=1`).Scan(&issuer); err != nil {

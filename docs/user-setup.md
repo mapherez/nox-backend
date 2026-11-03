@@ -5,27 +5,14 @@ This guide covers a new NoX Backend installation and connecting the [NoX Sync Ob
 ## What you need
 
 - Docker Engine or Docker Desktop with Docker Compose.
-- A Google account and Google OAuth web client for dashboard login.
-- A local or public URL for the backend.
-- NoX Sync installed in Obsidian using the [plugin repository's instructions](https://github.com/mapherez/nox-sync).
+- The shared NoX Auth service running on the same host, with the service release
+  containing `/v1/admission`; Auth v0.0.1 must be updated first.
+- A browser-facing Backend HTTP(S) origin. Private HTTP hostnames/IPs work.
+- The client applications you already use with Backend.
 
-The dashboard uses Google login. The plugin authenticates using the backend API key.
-
-## Prepare Google login
-
-Create a Google OAuth web client and register the redirect URI for your backend:
-
-```text
-https://sync.example.com/auth/google/callback
-```
-
-For local testing:
-
-```text
-http://localhost:5710/auth/google/callback
-```
-
-Keep the client ID and client secret for the backend configuration.
+Google credentials and allowed accounts live only in Auth. Backend setup registers
+its callback automatically. See [NoX Login](nox-login.md) for update order and
+preservation of existing users, keys and ownership.
 
 ## Start a new backend with Docker Compose
 
@@ -47,9 +34,7 @@ Create `.env` beside it:
 
 ```bash
 NOX_BACKEND_PUBLIC_URL=https://sync.example.com
-NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
+NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
 For local testing, set `NOX_BACKEND_PUBLIC_URL=http://localhost:5710`.
@@ -64,30 +49,20 @@ For new split installations, `backend` and `frontend` are services of the `nox-b
 
 ## Open the dashboard
 
-Open `https://sync.example.com/vault-dashboard`, or `http://localhost:5710/vault-dashboard` for local testing. Sign in with an admin email listed in `NOX_BACKEND_ADMIN_EMAILS`.
-
-The dashboard provides your Server URL and API key, vault management and downloads,
-and admin user management. Each user owns their own vaults and API key.
-Accounts listed in `NOX_BACKEND_ADMIN_EMAILS` are labeled **Admin Manager** and can
-also disable, demote or delete ordinary admins. Keep only your principal account
-in that variable if it should be the sole manager; add other admins through the
-user-management interface. Configured manager accounts are protected from account
-changes there and must be managed through deployment configuration.
+Open your configured origin plus `/vault-dashboard` and choose **NoX Login**.
+Auth admits configured Google accounts. Existing Backend roles are preserved;
+newly admitted accounts are ADMIN. Admitted ADMIN accounts signed in through
+NoX Login have Admin Manager authority and can manage other admins, with
+self-deletion/disable/role changes forbidden. Managing local Backend records does
+not change Auth's allowlist.
 
 ## Initial Suite service addresses
 
-Admins can use **Service connections** to save the approved HTTPS origin of Yard
-and Gateway, for example `https://192.168.10.10:8443` or a dedicated hostname.
-Do not include an application path. This configuration survives restart and needs
-no additional environment variables for address storage alone. It initially shows
-**Awaiting pairing**. [Suite trust](suite-trust.md) provides the authenticated pairing
-APIs and requires approved HTTPS/network configuration. An acknowledged service
-shows **Service paired · Registration pending** until verified registration.
-Open **Manage Suite integrations** for the [native pairing/registration and recovery
-workflow](suite-administration.md). It works without Gateway or Portal.
-Saving does not contact the service or establish a working connection. If another
-administrator changes the configuration, refresh/review before saving again.
-See the [administration API](administration-api.md) for equivalent API operations.
+Use **Service connections** to save Yard/Gateway web origins and perform the
+existing local setup. Saving an address alone is not trust. Products communicate
+through the same-host runtime volume; private HTTP origins need no certificates.
+See [same-host setup](suite-local.md) and [administration APIs](administration-api.md).
+The NoX Login adaptation does not authorize Yard to grant itself deployment rights.
 
 ## Connect the plugin
 
@@ -103,7 +78,7 @@ In NoX Sync settings:
 
 Use the same public origin for `NOX_BACKEND_PUBLIC_URL`, the OAuth callback, and the plugin Server URL. Do not append `/v1` to the Server URL.
 
-A second device can connect with the same user's API key, select the same vault, and manually sync to receive its files. Admin users can allowlist additional users from the dashboard; each user gets their own key and vaults.
+A second device can connect with the same user's API key, select the same vault, and manually sync to receive its files. Account admission is configured only in Auth; Backend admins manage local user records and roles. Each account retains its own key and vaults.
 
 Rotating an API key invalidates the previous one. Repository separation does not require rotation or any changes to an existing plugin configuration.
 
@@ -119,6 +94,6 @@ The development configuration builds `./backend` and `./frontend` independently 
 
 For Go development and all environment variables, see the [README](../README.md) and [backend configuration](backend-configuration.md).
 Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
-`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
+`NOX_SYNC_*` values. Non-authentication aliases remain supported; native Google credentials and account admission move to Auth. The physical database
 name shown above is the new-installation default; existing `nox-sync.db` files are
 used in place until an explicit offline migration.

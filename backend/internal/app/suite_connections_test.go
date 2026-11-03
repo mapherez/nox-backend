@@ -229,7 +229,7 @@ func TestFoundationPendingSetupSurvivesRestartAndReconcilesAcknowledgement(t *te
 		t.Fatal(err)
 	}
 	f.store = store
-	f.s = NewServer(cfg, store)
+	f.s = newAuthTestServer(t, cfg, store)
 	f.backend = suiteTestBackend(t, f.s)
 	f.client = f.backend.Client()
 	p.mu.Lock()

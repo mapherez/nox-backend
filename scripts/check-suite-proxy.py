@@ -1,8 +1,5 @@
 """Validate proxy isolation and the same-host Suite channel using disposable data."""
 import argparse
-import datetime
-import hashlib
-import sqlite3
 import json
 import os
 import re
@@ -14,6 +11,8 @@ import time
 import urllib.error
 import urllib.request
 
+
+import nox_login_fixture
 
 def docker(*args):
     return subprocess.check_output(["docker", *map(str, args)], text=True).strip()
@@ -96,7 +95,7 @@ def main():
             base = "http://" + frontend_address
             browser_base = "http://nox-suite.test:" + frontend_address.rsplit(":", 1)[1]
             ready(base, "/healthz")
-            backend_args = ["run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "--group-add", "10001", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "--mount", f"type=volume,source={volume},target=/run/nox-suite", "-e", "NOX_BACKEND_PUBLIC_URL=" + browser_base, "-e", "NOX_BACKEND_SUITE_MCP_ENABLED=true", "-e", "NOX_BACKEND_ADMIN_EMAILS=admin@example.invalid", args.backend_image]
+            backend_args = ["run", "-d", "--rm", "--network", network, "--network-alias", "backend", "--user", f"{os.getuid()}:{os.getgid()}", "--group-add", "10001", "-p", "127.0.0.1::8080", "--mount", f"type=bind,source={data},target=/data", "--mount", f"type=volume,source={volume},target=/run/nox-suite", "-e", "NOX_BACKEND_PUBLIC_URL=" + browser_base, "-e", "NOX_BACKEND_SUITE_MCP_ENABLED=true", "-e", "NOX_AUTH_PUBLIC_URL=" + nox_login_fixture.ISSUER, args.backend_image]
             backend = docker(*backend_args)
             containers.append(backend)
             backend_base = "http://" + docker("port", backend, "8080/tcp")
@@ -104,15 +103,14 @@ def main():
             # Seed only with Backend stopped. Host/VM SQLite writers never overlap.
             docker("stop", backend)
             containers.remove(backend)
-            db = sqlite3.connect(data / "nox-backend.db")
-            admin_id = db.execute("SELECT id FROM users WHERE email='admin@example.invalid'").fetchone()[0]
-            api_key = db.execute("SELECT key_value FROM api_keys WHERE user_id=?", (admin_id,)).fetchone()[0]
-            session = secrets.token_urlsafe(32)
-            now = datetime.datetime.now(datetime.timezone.utc)
-            stamp = lambda value: value.strftime("%Y-%m-%dT%H:%M:%SZ")
-            db.execute("INSERT INTO web_sessions VALUES (?,?,?,?,?)", ("websess_suite_browser", admin_id, hashlib.sha256(session.encode()).hexdigest(), stamp(now + datetime.timedelta(hours=1)), stamp(now)))
-            db.commit()
-            db.close()
+            seeded = nox_login_fixture.seed(data, browser_base, folder)
+            api_key, session = seeded['apiKey'], seeded['adminSession']
+            provider = nox_login_fixture.start_provider(docker, folder, volume, f"{os.getuid()}:{os.getgid()}")
+            containers.append(provider)
+            for attempt in range(100):
+                if 'auth fixture ready' in docker('logs', provider): break
+                time.sleep(.1)
+            else: raise AssertionError('Auth fixture did not start')
             backend = docker(*backend_args)
             containers.append(backend)
             backend_base = "http://" + docker("port", backend, "8080/tcp")

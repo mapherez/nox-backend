@@ -6,7 +6,7 @@ import type { Dashboard } from "./model";
 const data: Dashboard = {
   authenticated: true,
   oauthConfigured: true,
-  loginUrl: "/auth/google/start?redirect=/vault-dashboard",
+  loginUrl: "/auth/nox/start?redirect=/vault-dashboard",
   serverUrl: "https://backend.example.com",
   apiKey: "noxsync_example",
   user: {
@@ -62,14 +62,12 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-test("anonymous view keeps Google login and configuration guidance without exposing account controls", () => {
+test("anonymous view keeps NoX Login and configuration guidance without exposing account controls", () => {
   const { rerender } = render(<DashboardView data={{ ...data, authenticated: false }} />);
-  expect(screen.getByRole("link", { name: "Continue with Google" }).getAttribute("href")).toBe(
-    data.loginUrl,
-  );
+  expect(screen.getByRole("link", { name: "NoX Login" }).getAttribute("href")).toBe(data.loginUrl);
   expect(screen.queryByLabelText("API key")).toBeNull();
   rerender(<DashboardView data={{ ...data, authenticated: false, oauthConfigured: false }} />);
-  expect(screen.getByText(/Google OAuth is not configured/)).toBeTruthy();
+  expect(screen.getByText(/NoX Login is not configured/)).toBeTruthy();
 });
 test("admin UI uses API routes and preserves exact revisions, encoded download IDs and safe text", () => {
   render(<DashboardView data={data} />);
@@ -131,9 +129,7 @@ test("loading failures are visible and retry fetches same-origin session data wi
   render(<App />);
   expect(await screen.findByRole("alert")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Continue with Google" })).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.getByRole("link", { name: "NoX Login" })).toBeTruthy());
   expect(fetchMock).toHaveBeenLastCalledWith(
     "/api/dashboard",
     expect.objectContaining({ credentials: "same-origin", cache: "no-store" }),

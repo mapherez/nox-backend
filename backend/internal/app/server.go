@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/time/rate"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,6 +17,8 @@ const sessionCookieName = "nox_sync_session"
 
 // Server owns HTTP routing for the backend.
 type Server struct {
+	noxLogin                             noxLoginState
+	loginStarts                          *rate.Limiter
 	cfg                                  Config
 	store                                *storage.Store
 	events                               *statusBroker
@@ -32,6 +35,7 @@ func NewServer(cfg Config, store *storage.Store) *Server {
 	}
 	return &Server{
 		cfg:              cfg,
+		loginStarts:      rate.NewLimiter(10, 20),
 		store:            store,
 		events:           newStatusBroker(),
 		suiteVerify:      make(chan struct{}, 8),
@@ -67,7 +71,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/vault-dashboard/vaults/purge", s.handlePurgeVault)
 	mux.HandleFunc("/vault-dashboard/vaults/download", s.handleDownloadVaultZip)
 	mux.HandleFunc("/auth/google/start", s.handleGoogleStart)
-	mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
+	mux.HandleFunc("/auth/nox/start", s.noXStart)
+	mux.HandleFunc("/auth/nox/callback", s.noXCallback)
 	mux.HandleFunc("/auth/logout", s.handleLogout)
 	mux.HandleFunc("/v1/health", s.handleHealth)
 	mux.HandleFunc("/v1/info", s.handleInfo)
@@ -278,8 +283,15 @@ func (s *Server) handleSyncEvents(w http.ResponseWriter, r *http.Request) {
 	events, unsubscribe := s.events.subscribe(vaultID)
 	defer unsubscribe()
 
+	admissionTick := time.NewTicker(15 * time.Second)
+	defer admissionTick.Stop()
 	for {
 		select {
+		case <-admissionTick.C:
+			if _, authErr := s.apiUser(r.Context(), authToken(r)); authErr != nil {
+				writeSSEError(w, authErr.code, authErr.message)
+				return
+			}
 		case <-r.Context().Done():
 			return
 		case event := <-events:

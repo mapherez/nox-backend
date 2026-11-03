@@ -6,91 +6,36 @@ NoX Backend surfaces explicit states instead of silently continuing when sync is
 
 Plugin installation, local builds, conflict resolution UI, and local trash are documented in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). This repository maintains the backend and the API used by that plugin.
 
-## Dashboard Says Google OAuth Is Not Configured
+## NoX Login is unavailable or setup exits
 
-The backend is running, but one or both Google OAuth variables are missing.
+Run the compatible Auth service first on the same Docker host. This adapter needs
+Auth's private `/v1/admission`; Auth v0.0.1 must be updated first. Verify the two
+Backend settings, `NOX_BACKEND_PUBLIC_URL` and `NOX_AUTH_PUBLIC_URL`, then inspect
+`docker compose logs auth-setup`. Use `docker compose pull` before `up -d` when
+updating a cached image. The one-shot command is `auth-setup` under the Backend
+image's executable entrypoint.
 
-Check your `.env` file:
+The runtime and admin volumes must be the same named volumes created by Auth.
+Only the setup service mounts admin; do not add it to normal Backend runtime.
+Private HTTP Backend addresses are supported without certificates. See
+[NoX Login](nox-login.md) for the exact setup and update order.
 
-```bash
-NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
-```
+## Login returns to an error or access is denied
 
-Then restart the container:
+Open the exact `NOX_BACKEND_PUBLIC_URL` including its port. Auth's issuer must
+match the enrolled `NOX_AUTH_PUBLIC_URL`. Re-run setup after changing the Backend
+origin. Do not add Backend's callback to Google: only Auth has Google's callback.
+The selected email must be in Auth's applied allowlist, and the existing Backend
+account must be active. Identity conflicts are refused rather than reassigned.
+Old native-Google session cookies require one new NoX Login; no key rotation is
+required. Adding a Backend user record does not authorize an email in Auth.
 
-```bash
-docker compose up -d
-```
+## Cannot delete another admin
 
-## Google Login Fails Or Redirects Back With An Error
-
-The most common cause is a mismatch between:
-
-- `NOX_BACKEND_PUBLIC_URL`
-- The Google OAuth redirect URI
-- The URL you use in the browser
-
-For a domain deployment, these should line up:
-
-```bash
-NOX_BACKEND_PUBLIC_URL=https://sync.example.com
-```
-
-```text
-https://sync.example.com/auth/google/callback
-```
-
-```text
-https://sync.example.com/vault-dashboard
-```
-
-For local testing with the default Compose port:
-
-```bash
-NOX_BACKEND_PUBLIC_URL=http://localhost:5710
-```
-
-```text
-http://localhost:5710/auth/google/callback
-```
-
-```text
-http://localhost:5710/vault-dashboard
-```
-
-## Google Login Works But Access Is Denied
-
-The Google account is not allowlisted or has been disabled.
-
-Make sure the first admin email is in `NOX_BACKEND_ADMIN_EMAILS`:
-
-```bash
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
-```
-
-Emails are comma-separated:
-
-```bash
-NOX_BACKEND_ADMIN_EMAILS=you@example.com,other-admin@example.com
-```
-
-Every configured email is an **Admin Manager**, created/restored as an active admin
-on startup. Use the dashboard to add ordinary admins instead of adding them to this
-variable unless they should also be managers.
-
-## Cannot Delete a Promoted Admin
-
-Sign in with an **Admin Manager** listed in `NOX_BACKEND_ADMIN_EMAILS` (or the
-supported legacy fallback). That account can delete, disable and demote ordinary
-admins. The frontend displays the manager label and enables the corresponding
-controls; both components must contain this change.
-
-An account listed in the environment configuration remains protected from UI/API
-deletion, even by another manager. Remove its email from the variable and restart
-Backend before managing it as an ordinary admin. Keep your principal manager in
-the variable. No database reset, manual role edit or account recreation is needed.
+An admitted ADMIN signed in through NoX Login has Admin Manager authority.
+Self-deletion, self-disable and self-role changes remain forbidden. Existing USER
+roles are retained rather than silently promoted. No Backend environment email
+list is required or used for new Auth admission.
 
 ## `AUTH_FAILED`
 
@@ -171,7 +116,7 @@ Then open:
 http://localhost:5711/vault-dashboard
 ```
 
-Also update `NOX_BACKEND_PUBLIC_URL` and the Google OAuth redirect URI to use the same port.
+Also update `NOX_BACKEND_PUBLIC_URL` and re-run Auth setup so the registered application callback uses the same port.
 
 ## `BLOCKED_REMOTE`
 

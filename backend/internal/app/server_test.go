@@ -65,7 +65,7 @@ func TestDashboardDataIncludesReusableAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load api key: %v", err)
 	}
-	sessionToken, err := store.CreateWebSession(context.Background(), user.ID, webSessionDuration)
+	sessionToken, err := fixtureWebSession(t, context.Background(), store, user.ID, webSessionDuration)
 	if err != nil {
 		t.Fatalf("create web session: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestRotateAPIKeyInvalidatesPreviousKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load old api key: %v", err)
 	}
-	sessionToken, err := store.CreateWebSession(context.Background(), user.ID, webSessionDuration)
+	sessionToken, err := fixtureWebSession(t, context.Background(), store, user.ID, webSessionDuration)
 	if err != nil {
 		t.Fatalf("create web session: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestPluginVaultLifecycleCanDeleteRestoreAndPurge(t *testing.T) {
 
 func TestAdminDashboardCannotDeleteAdminUser(t *testing.T) {
 	server, store, user, _ := newTestServer(t)
-	sessionToken, err := store.CreateWebSession(context.Background(), user.ID, webSessionDuration)
+	sessionToken, err := fixtureWebSession(t, context.Background(), store, user.ID, webSessionDuration)
 	if err != nil {
 		t.Fatalf("create web session: %v", err)
 	}
@@ -236,5 +236,5 @@ func newTestServer(t *testing.T) (*Server, *storage.Store, storage.User, storage
 		t.Fatalf("seed vault: %v", err)
 	}
 
-	return NewServer(Config{Version: "test"}, store), store, user, vault
+	return newAuthTestServer(t, Config{Version: "test"}, store), store, user, vault
 }

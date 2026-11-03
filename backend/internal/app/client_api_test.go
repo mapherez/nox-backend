@@ -14,7 +14,7 @@ import (
 
 func TestInfoContract(t *testing.T) {
 	// Info must work without a database and ignore credentials entirely.
-	server := NewServer(Config{Version: "contract-test"}, nil)
+	server := newAuthTestServer(t, Config{Version: "contract-test"}, nil)
 	for _, key := range []string{"", "invalid"} {
 		res := readRequest(server, key, http.MethodGet, "/v1/info", nil)
 		assertClientResponse(t, res, http.StatusOK, "")

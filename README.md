@@ -36,7 +36,7 @@ NoX Backend uses:
 - **Nginx** in the separate frontend image for static delivery and same-origin API/auth/MCP forwarding;
 - **SQLite** for metadata;
 - **filesystem blob storage** for file contents;
-- **Google OAuth** for dashboard authentication;
+- **NoX Login** through the shared NoX Auth service for dashboard authentication;
 - **API keys** for client authentication;
 - **Docker** for deployment.
 
@@ -60,7 +60,7 @@ The SQLite database and blob storage form a single logical data store and should
 - Native MCP Streamable HTTP at `/mcp`, powered by [NoX MCP](https://github.com/mapherez/nox-mcp).
 - Per-user API keys.
 - Multiple vaults per user.
-- Google-authenticated administration dashboard.
+- NoX Login administration dashboard.
 - User and admin management.
 - Vault creation, listing, download, soft deletion, restoration and permanent deletion.
 - File listing and downloads.
@@ -93,7 +93,7 @@ The backend production image is published to:
 ghcr.io/mapherez/nox-backend:latest
 ```
 
-The repository includes a production `docker-compose.yml` with `backend` and
+The repository includes a production `docker-compose.yml` with `auth-setup`, `backend` and
 `frontend` services in one `nox-backend` project. The frontend image is
 `ghcr.io/mapherez/nox-backend-frontend`. It can be built and deployed independently.
 The split topology requires a release containing both this backend data adapter
@@ -102,7 +102,10 @@ For source validation before that release, use `docker-compose.dev.yml`.
 See the [frontend/deployment guide](docs/frontend-deployment.md) before migrating
 an existing installation.
 
-For a new installation:
+For a new installation, run NoX Auth on the same Docker host first. This adapter
+requires the Auth service release with `/v1/admission` (absent from Auth v0.0.1).
+See [NoX Login deployment and update order](docs/nox-login.md).
+
 
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
@@ -112,9 +115,7 @@ Copy [`.env.example`](.env.example) to `.env` beside it and fill in your setting
 
 ```env
 NOX_BACKEND_PUBLIC_URL=https://backend.example.com
-NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
+NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
 Start the service:
@@ -159,25 +160,17 @@ existing API, auth, form and MCP routes to Backend. The backend image contains
 no frontend assets or templates. Frontend-only changes require rebuilding only
 the frontend image. [Development, configuration and migration](docs/frontend-deployment.md).
 
-## Google OAuth
+## NoX Login
 
-The web dashboard uses Google OAuth.
+The dashboard uses the installation's shared NoX Auth. Configure only the exact
+Backend browser origin and the Auth HTTPS origin in Backend. Google credentials
+and allowed emails belong only to Auth. Private HTTP application URLs work;
+there is no per-app certificate setup. Compose's one-shot `auth-setup` registers
+the callback and persists client credentials automatically.
 
-Configure the authorized redirect URI for your OAuth client:
-
-```text
-https://backend.example.com/auth/google/callback
-```
-
-For local testing:
-
-```text
-http://localhost:5710/auth/google/callback
-```
-
-`NOX_BACKEND_PUBLIC_URL` must match the origin used to access the backend.
-
-Do not include a trailing slash.
+Existing users, roles, keys and data ownership are preserved. The dashboard offers
+local logout and **Sign out of all NoX apps**. Read the [integration guide](docs/nox-login.md)
+for identity matching, five-minute admission, update order and acceptance limits.
 
 ## Client authentication
 

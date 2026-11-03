@@ -19,6 +19,8 @@ const (
 
 // Store owns access to backend metadata stored in SQLite.
 type Store struct {
+	noxDB                          *sql.DB
+	noxIdentityMu                  sync.Mutex
 	db                             *sql.DB
 	dataDir                        string
 	dbPath                         string
@@ -83,11 +85,18 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := store.openNoXLogin(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return store, nil
 }
 
 // Close closes the SQLite connection pool.
 func (s *Store) Close() error {
+	if s.noxDB != nil {
+		_ = s.noxDB.Close()
+	}
 	return s.db.Close()
 }
 

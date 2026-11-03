@@ -174,7 +174,7 @@ func TestSuiteLocalIssuanceRequiresCurrentGatewayAndProtectedBody(t *testing.T) 
 	ordinary, _ := f.paired(t, "ordinary-participant", "product")
 	status, _, raw := f.call(t, "POST", "/api/nox/authorizations", body, ordinary.ServiceCredential, nil)
 	suiteHTTPStatus(t, status, 403, raw)
-	session, err := f.store.CreateWebSession(context.Background(), f.member.ID, time.Hour)
+	session, err := fixtureWebSession(t, context.Background(), f.store, f.member.ID, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

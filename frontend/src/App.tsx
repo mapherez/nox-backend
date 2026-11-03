@@ -368,6 +368,9 @@ function Users({ users }: { users: User[] }) {
           </h2>
         </div>
       </div>
+      <p className="muted">
+        Manage Backend roles and data here. Login access is configured in NoX Auth.
+      </p>
       {users.some((user) => !user.permissions) && (
         <p role="alert" className="error-message">
           Update the Backend service to manage accounts with this frontend. Your vaults remain
@@ -599,6 +602,17 @@ export function DashboardView({ data, reload }: { data: Dashboard; reload?: () =
                     <Icon name="logout" />
                   </button>
                 </MutationForm>
+                <MutationForm
+                  path="/api/session/logout-all"
+                  message="Signed out of all NoX apps."
+                  confirm={() =>
+                    window.confirm("Sign out of all NoX apps using this Auth session?")
+                  }
+                >
+                  <button className="secondary" type="submit">
+                    Sign out of all NoX apps
+                  </button>
+                </MutationForm>
               </div>
             </header>
             {refreshError && (
@@ -657,16 +671,16 @@ export function DashboardView({ data, reload }: { data: Dashboard; reload?: () =
             </h1>
             <p className="muted">
               Manage your vaults, connect your apps and keep your data on your own server. Sign in
-              with an allowed Google account to get started.
+              through NoX Login with an authorized Google account to get started.
             </p>
             {data.oauthConfigured ? (
               <a className="button" href={data.loginUrl}>
-                Continue with Google
+                NoX Login
               </a>
             ) : (
               <p className="muted">
-                Google OAuth is not configured. Configure NOX_BACKEND_GOOGLE_CLIENT_ID and
-                NOX_BACKEND_GOOGLE_CLIENT_SECRET (legacy NOX_SYNC_* names also work).
+                NoX Login is not configured. Apply the Backend Auth setup with the running NoX Auth
+                service.
               </p>
             )}
           </div>
@@ -686,6 +700,10 @@ export function App() {
     const controller = new AbortController();
     requestJSON<Dashboard>("/api/dashboard", { signal: controller.signal })
       .then((value) => {
+        if (value.authenticated && value.renewLogin) {
+          window.location.assign(value.loginUrl);
+          return;
+        }
         setData(value);
         setFailed(false);
       })
@@ -694,12 +712,36 @@ export function App() {
       });
     return () => controller.abort();
   }, [attempt]);
+  useEffect(() => {
+    if (!data?.authenticated) return;
+    const timer = window.setInterval(
+      () => {
+        if (document.visibilityState !== "visible") return;
+        requestJSON<Dashboard>("/api/dashboard")
+          .then((value) => {
+            if (value.authenticated && value.renewLogin) {
+              window.location.assign(value.loginUrl);
+              return;
+            }
+            setData(value);
+          })
+          .catch(() => {});
+      },
+      60 * 60 * 1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [data?.authenticated]);
   if (data)
     return (
       <DashboardView
         data={data}
         reload={async () => {
-          setData(await requestJSON<Dashboard>("/api/dashboard"));
+          const next = await requestJSON<Dashboard>("/api/dashboard");
+          if (next.authenticated && next.renewLogin) {
+            window.location.assign(next.loginUrl);
+            return;
+          }
+          setData(next);
         }}
       />
     );

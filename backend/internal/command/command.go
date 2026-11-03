@@ -3,9 +3,12 @@ package command
 import (
 	"context"
 	"fmt"
+	"github.com/mapherez/nox-backend/backend/internal/noxlogin"
+	"log"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,6 +23,19 @@ func Run(buildVersion string) error {
 	if len(os.Args) > 1 {
 		if len(os.Args) == 2 {
 			switch os.Args[1] {
+			case "auth-setup":
+				ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+				defer cancel()
+				data, err := storage.Open(ctx, getenv("NOX_SYNC_DATA_DIR", "/data"))
+				if err != nil {
+					return err
+				}
+				defer data.Close()
+				err = noxlogin.Setup(ctx, data, os.Getenv("NOX_AUTH_PUBLIC_URL"), getenv("NOX_SYNC_PUBLIC_URL", ""), envDefault("NOX_AUTH_ADMIN_SOCKET", "/run/nox-auth-admin/control.sock"), filepath.Join(getenv("NOX_SYNC_SUITE_SOCKET_DIR", "/run/nox-suite"), "nox-auth.sock"))
+				if err == nil {
+					log.Print("NoX Login client configured.")
+				}
+				return err
 			case "healthcheck":
 				origin, _ := url.Parse(getenv("NOX_SYNC_PUBLIC_URL", ""))
 				name := ""
@@ -38,7 +54,7 @@ func Run(buildVersion string) error {
 				return storage.MigrateDatabaseFile(context.Background(), getenv("NOX_SYNC_DATA_DIR", "/data"))
 			}
 		}
-		return fmt.Errorf("usage: nox-backend [healthcheck|migrate-database|reset-suite-event-cursors]")
+		return fmt.Errorf("usage: nox-backend [healthcheck|auth-setup|migrate-database|reset-suite-event-cursors]")
 	}
 	report, err := suiteInterval("NOX_SYNC_SUITE_REPORT_INTERVAL_MS", 15000)
 	if err != nil {
@@ -60,14 +76,12 @@ func Run(buildVersion string) error {
 		DirectMCPDisabled: !direct, SuiteMCPEnabled: suite,
 		SuiteSocketDir:      getenv("NOX_SYNC_SUITE_SOCKET_DIR", ""),
 		SuiteReportInterval: report, SuiteObservationFreshness: freshness,
-		Addr:               getenv("NOX_SYNC_ADDR", ":8080"),
-		DataDir:            getenv("NOX_SYNC_DATA_DIR", "/data"),
-		Version:            runtimeVersion(buildVersion),
-		PublicURL:          getenv("NOX_SYNC_PUBLIC_URL", ""),
-		GoogleClientID:     getenv("NOX_SYNC_GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getenv("NOX_SYNC_GOOGLE_CLIENT_SECRET", ""),
-		AdminEmails:        splitCSV(getenv("NOX_SYNC_ADMIN_EMAILS", "")),
-		TLSCertFile:        getenv("NOX_SYNC_TLS_CERT_FILE", ""), TLSKeyFile: getenv("NOX_SYNC_TLS_KEY_FILE", ""),
+		Addr:          getenv("NOX_SYNC_ADDR", ":8080"),
+		DataDir:       getenv("NOX_SYNC_DATA_DIR", "/data"),
+		Version:       runtimeVersion(buildVersion),
+		PublicURL:     getenv("NOX_SYNC_PUBLIC_URL", ""),
+		AuthPublicURL: os.Getenv("NOX_AUTH_PUBLIC_URL"),
+		TLSCertFile:   getenv("NOX_SYNC_TLS_CERT_FILE", ""), TLSKeyFile: getenv("NOX_SYNC_TLS_KEY_FILE", ""),
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -80,28 +94,6 @@ func runtimeVersion(buildVersion string) string {
 		return version
 	}
 	return "dev"
-}
-
-func splitCSV(value string) []string {
-	if value == "" {
-		return nil
-	}
-	items := []string{}
-	start := 0
-	for i, r := range value {
-		if r == ',' {
-			if item := value[start:i]; item != "" {
-				items = append(items, item)
-			}
-			start = i + 1
-		}
-	}
-	if start <= len(value) {
-		if item := value[start:]; item != "" {
-			items = append(items, item)
-		}
-	}
-	return items
 }
 
 func getenv(key, fallback string) string {
@@ -129,4 +121,11 @@ func mcpEnabled(name string, fallback bool) (bool, error) {
 		return false, fmt.Errorf("%s must be true or false", strings.Replace(name, "NOX_SYNC_", "NOX_BACKEND_", 1))
 	}
 	return raw == "true", nil
+}
+
+func envDefault(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }

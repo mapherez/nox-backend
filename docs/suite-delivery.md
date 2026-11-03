@@ -1,5 +1,7 @@
 # Backend delivery and remaining product work
 
+Current authentication responsibility: [NoX Login](nox-login.md) supersedes the historical native-Google/Backend-allowlist entries below. Google credentials and account admission belong only to Auth; preserve Backend data, roles and independent keys. Update Auth before this adapter.
+
 The earlier eight-point sequence is historical delivery context. The current correction follows the fixed sequence recorded in NoX MCP; [same-host setup](suite-local.md) describes this Backend change. The
 [progress record](suite-migration.md) records local validation and its exact scope.
 Publishing and applying the resulting images remain operator-controlled actions.

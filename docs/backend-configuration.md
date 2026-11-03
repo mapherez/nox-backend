@@ -8,9 +8,10 @@ For an existing deployment, follow the [repository separation and update guide](
 
 For a new installation, the easiest backend setup is (after the new image has been published):
 
-1. Download `docker-compose.yml` from the repository.
-2. Create a `.env` file next to it.
-3. Run `docker compose up -d`.
+1. Run the compatible NoX Auth service on the same Docker host first; see [NoX Login](nox-login.md) for required service capability and update order.
+2. Download `docker-compose.yml` from the repository.
+3. Create a `.env` file next to it.
+4. Run `docker compose up -d`.
 
 Windows PowerShell:
 
@@ -28,18 +29,14 @@ Example `.env` file for a domain deployment:
 
 ```bash
 NOX_BACKEND_PUBLIC_URL=https://sync.example.com
-NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
+NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
 Example `.env` file for local testing:
 
 ```bash
 NOX_BACKEND_PUBLIC_URL=http://localhost:5710
-NOX_BACKEND_GOOGLE_CLIENT_ID=your-google-client-id
-NOX_BACKEND_GOOGLE_CLIENT_SECRET=your-google-client-secret
-NOX_BACKEND_ADMIN_EMAILS=you@example.com
+NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
 Start the backend:
@@ -85,34 +82,17 @@ If you change the left side of the port mapping, also use that host port in your
 | `NOX_BACKEND_ADDR` | `:8080` | HTTP listen address inside the container or process. |
 | `NOX_BACKEND_DATA_DIR` | `/data` | Persistent backend data directory. |
 | `NOX_BACKEND_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
-| `NOX_BACKEND_PUBLIC_URL` | request-derived URL | Public base URL used for dashboard display and Google OAuth callback URLs. Set this in production. The provided Compose files default it to `http://localhost:5710` for local use. |
-| `NOX_BACKEND_GOOGLE_CLIENT_ID` | none | Google OAuth client ID for dashboard login. |
-| `NOX_BACKEND_GOOGLE_CLIENT_SECRET` | none | Google OAuth client secret for dashboard login. |
-| `NOX_BACKEND_ADMIN_EMAILS` | none | Comma-separated Admin Manager emails. Created/restored as active admins on startup; can manage other admins. Every listed account has manager authority and is protected from deletion/demotion/disable through the UI/API. |
+| `NOX_BACKEND_PUBLIC_URL` | request-derived URL | Exact browser-facing HTTP(S) origin, including a non-default port. Required by Compose and registered automatically with Auth. |
+| `NOX_AUTH_PUBLIC_URL` | none | HTTPS issuer of the shared Auth service. Required by Compose. Google credentials and allowed emails are configured there only. |
 
-## Google OAuth
+## NoX Login
 
-Create a Google OAuth web client and add an authorized redirect URI that exactly matches your backend public URL plus `/auth/google/callback`.
-
-For a public deployment:
-
-```text
-https://sync.example.com/auth/google/callback
-```
-
-For local testing:
-
-```text
-http://localhost:5710/auth/google/callback
-```
-
-Set `NOX_BACKEND_PUBLIC_URL` to the same origin, without a trailing slash:
-
-```bash
-NOX_BACKEND_PUBLIC_URL=https://sync.example.com
-```
-
-Dashboard users sign in with Google, but plugin sync still uses the per-user `noxsync_` API key from `/vault-dashboard`.
+[NoX Login integration](nox-login.md) documents setup, preserved identities/data,
+sessions, account removal, independent API keys and logout. The one-shot setup
+service registers the exact Backend `/auth/nox/callback` with Auth over its
+restricted local socket. Only Auth's own callback is registered with Google.
+Backend can use a private HTTP origin without certificates. Auth v0.0.1 must be
+updated to a service release with `/v1/admission` before this adapter is deployed.
 
 ## Production Compose
 
@@ -144,7 +124,7 @@ nox-backend-data
 
 The example explicitly names the volume, without a Compose project prefix. Existing deployments must keep their actual volume name using `NOX_BACKEND_DATA_VOLUME_NAME` or the legacy `NOX_SYNC_DATA_VOLUME_NAME`; see the [update guide](backend-separation.md).
 
-Add the Google OAuth and admin email variables before exposing the dashboard publicly.
+Set the two required origins and use the same existing Auth volume names. The setup-only service receives the administrative volume; normal Backend runtime does not.
 
 ## Domain And Reverse Proxy Deployments
 
@@ -162,19 +142,10 @@ Required matching settings:
 NOX_BACKEND_PUBLIC_URL=https://sync.example.com
 ```
 
-Google redirect URI:
-
-```text
-https://sync.example.com/auth/google/callback
-```
-
-Plugin Server URL:
-
-```text
-https://sync.example.com
-```
-
-The three values above should use the same scheme and host. A mismatch is the most common cause of Google login errors.
+Auth automatically registers `NOX_BACKEND_PUBLIC_URL` plus `/auth/nox/callback`.
+Open that same origin in the browser; existing clients continue using their
+existing Server URL and API key. The public reverse proxy should target the
+frontend container, which retains the browser/API proxy routes.
 
 ## Persistent Data
 
@@ -183,6 +154,7 @@ The backend creates and uses these paths under `NOX_BACKEND_DATA_DIR`:
 | Path | Purpose |
 | --- | --- |
 | `/data/nox-backend.db` | SQLite database with users, sessions, API keys, vaults, file metadata, revisions, tombstones, locks, staged upload records, and conflict records. |
+| `/data/nox-login.db` | Private NoX Login enrollment, identity bindings, pending transactions and sessions. Include it in backups. |
 | `/data/blobs` | Finalized file contents stored by SHA-256 hash. |
 | `/data/staging` | Temporary upload content for active sync sessions. |
 | `/data/logs` | Reserved log directory. Docker console logs are still the primary runtime log target. |
@@ -273,7 +245,7 @@ docker run --rm --name nox-backend-dev -p 5710:8080 -v nox-backend-dev-data:/dat
 The production Compose example uses both `ghcr.io/mapherez/nox-backend:latest` and `ghcr.io/mapherez/nox-backend-frontend:latest`; both compatible images must be published before it can pull them. Use the development Compose example for the complete native frontend/backend from source. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
 
 Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
-`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
+`NOX_SYNC_*` values. Existing non-authentication aliases remain supported; the old Backend Google/allowlist variables are replaced by NoX Auth configuration. The physical database
 name shown above is the new-installation default; existing `nox-sync.db` files are
 used in place until an explicit offline migration.
 
@@ -289,8 +261,8 @@ It owns the host port; the `backend` service owns data and credentials.
 | `NOX_FRONTEND_IMAGE_TAG` | Backend image tag, otherwise `latest` | Independently selected frontend image version or immutable `sha-<commit>` tag |
 
 Keep `NOX_BACKEND_PUBLIC_URL` (or its legacy alias) equal to the external public
-origin, including a changed host port. Register the same public origin's
-`/auth/google/callback` with Google. Internal container addresses are not client
+origin, including a changed host port. Auth setup registers that origin's
+`/auth/nox/callback` automatically. Internal container addresses are not client
 Server URLs or OAuth callback addresses. Public HTTPS may terminate at the
 installation's existing trusted reverse proxy; the frontend preserves its
 forwarded protocol. Read the [deployment guide](frontend-deployment.md).
