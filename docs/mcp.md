@@ -91,21 +91,22 @@ registered tool lacks a unique app-local mapping.
 The Suite adapter publishes version `1.0` CLI descriptors for the same ten tools
 through `nox/tools/definitions`. They are separate from the canonical tool and
 its app-local `_meta.cli` path. The standard catalog has no menu descriptors.
+All product-facing menu labels, prompts and messages use US English (EN-US).
 
 ```text
 NoX Backend
-├── Estado do serviço
-├── Informações do serviço
-├── Conta atual
+├── Service status
+├── Service information
+├── Current account
 ├── Vaults
-│   ├── Listar
-│   ├── Criar
-│   ├── Consultar estado
-│   ├── Eliminar
-│   ├── Restaurar
-│   └── Eliminar definitivamente
-└── Ficheiros
-    └── Listar
+│   ├── List
+│   ├── Create
+│   ├── Check status
+│   ├── Delete
+│   ├── Restore
+│   └── Permanently delete
+└── Files
+    └── List
 ```
 
 The existing canonical paths stay `health`, `info`, `whoami`, `vault list`,
@@ -115,18 +116,18 @@ and order. The product name comes from its existing declaration. The Suite
 runtime still filters both catalogs by the caller's existing scopes; readers
 receive their five inspect tools and administrators receive all ten.
 
-- **Criar:** a text input supplies the existing `/name` argument. Required fields
+- **Create:** a text input supplies the existing `/name` argument. Required fields
   and validation come from the unchanged input schema.
-- **Consultar estado / Eliminar / Ficheiros → Listar:** select from the existing
+- **Check status / Delete / Files → List:** select from the existing
   `backend_vault_list` result at `/vaults`.
-- **Restaurar / Eliminar definitivamente:** select from `/deletedVaults` in that
+- **Restore / Permanently delete:** select from `/deletedVaults` in that
   same result. An absent optional `deletedVaults` means no choices. An empty
   selector must not invoke a mutation; the human client can refresh or go back.
 - Every selector uses `/name` as its label and `/vaultId` as its value relative
   to each row. Names are not unique: clients must preserve the IDs and display
   them when distinguishing equal names or reviewing a destructive operation.
-- **Eliminar:** boolean confirmation explains that the data remains restorable.
-  **Eliminar definitivamente:** typed confirmation matches the selected
+- **Delete:** boolean confirmation explains that the data remains restorable.
+  **Permanently delete:** typed confirmation matches the selected
   `/vaultId` and explicitly warns that the operation cannot be undone.
 
 Selectors declare `requires: ["dynamic-options"]`; destructive menus additionally

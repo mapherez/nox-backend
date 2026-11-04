@@ -30,16 +30,16 @@ func backendCLIDescriptors() map[string]noxmcp.JSON {
 		return noxmcp.JSON{"version": "1.0", "navigation": navigation}
 	}
 	descriptors := map[string]noxmcp.JSON{
-		"backend_health":        item("Estado do serviço", "", 10),
-		"backend_info":          item("Informações do serviço", "", 20),
-		"backend_whoami":        item("Conta atual", "", 30),
-		"backend_vault_list":    item("Listar", "Vaults", 40),
-		"backend_vault_create":  item("Criar", "Vaults", 50),
-		"backend_vault_status":  item("Consultar estado", "Vaults", 60),
-		"backend_vault_delete":  item("Eliminar", "Vaults", 70),
-		"backend_vault_restore": item("Restaurar", "Vaults", 80),
-		"backend_vault_purge":   item("Eliminar definitivamente", "Vaults", 90),
-		"backend_file_list":     item("Listar", "Ficheiros", 100),
+		"backend_health":        item("Service status", "", 10),
+		"backend_info":          item("Service information", "", 20),
+		"backend_whoami":        item("Current account", "", 30),
+		"backend_vault_list":    item("List", "Vaults", 40),
+		"backend_vault_create":  item("Create", "Vaults", 50),
+		"backend_vault_status":  item("Check status", "Vaults", 60),
+		"backend_vault_delete":  item("Delete", "Vaults", 70),
+		"backend_vault_restore": item("Restore", "Vaults", 80),
+		"backend_vault_purge":   item("Permanently delete", "Vaults", 90),
+		"backend_file_list":     item("List", "Files", 100),
 	}
 	descriptors["backend_vault_create"]["parameters"] = noxmcp.JSON{
 		"/name": noxmcp.JSON{"control": "text", "order": 10},
@@ -62,12 +62,12 @@ func backendCLIDescriptors() map[string]noxmcp.JSON {
 	}
 	descriptors["backend_vault_delete"]["requires"] = []string{"dynamic-options", "confirmation"}
 	descriptors["backend_vault_delete"]["confirmation"] = noxmcp.JSON{
-		"mode": "boolean", "message": "Eliminar o vault selecionado? Os dados ficam disponíveis para restauro.",
+		"mode": "boolean", "message": "Delete the selected vault? Its data will remain available for restoration.",
 	}
 	descriptors["backend_vault_purge"]["requires"] = []string{"dynamic-options", "confirmation"}
 	descriptors["backend_vault_purge"]["confirmation"] = noxmcp.JSON{
 		"mode": "typed", "matchPointer": "/vaultId",
-		"message": "Eliminar definitivamente o vault selecionado e os seus dados não partilhados? Esta ação não pode ser desfeita. Escreve o ID do vault para confirmar.",
+		"message": "Permanently delete the selected vault and its unshared data? This action cannot be undone. Type the vault ID to confirm.",
 	}
 	// Confirmation is local to the human interaction. Deliberately no
 	// bindPointer: the existing tools accept no extra confirmation argument.
