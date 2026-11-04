@@ -82,6 +82,10 @@ explicit policy is supplied. The private discovery view is partitioned by verifi
 identity/authorization context; renewing an equivalent grant does not make token
 bytes or expiry part of the catalog view.
 
+The same private discovery definitions include the [human menu descriptors](mcp.md#human-menus-through-nox-discovery): navigation labels/order, existing vault-list selectors
+and local confirmations. They do not alter tool arguments, results or Suite scopes.
+The standard MCP catalog continues to omit CLI metadata and descriptors.
+
 | Tools | Required scopes |
 | --- | --- |
 | `backend_info`, `backend_whoami`, `backend_vault_list`, `backend_vault_status`, `backend_file_list` | `nox:inspect` |

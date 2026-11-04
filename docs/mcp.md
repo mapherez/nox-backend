@@ -86,6 +86,63 @@ implement that CLI. A single explicit mapping supplies `_meta.cli` through the
 official runtime's `Meta` field. Runtime construction fails clearly if a
 registered tool lacks a unique app-local mapping.
 
+## Human menus through NoX discovery
+
+The Suite adapter publishes version `1.0` CLI descriptors for the same ten tools
+through `nox/tools/definitions`. They are separate from the canonical tool and
+its app-local `_meta.cli` path. The standard catalog has no menu descriptors.
+
+```text
+NoX Backend
+├── Estado do serviço
+├── Informações do serviço
+├── Conta atual
+├── Vaults
+│   ├── Listar
+│   ├── Criar
+│   ├── Consultar estado
+│   ├── Eliminar
+│   ├── Restaurar
+│   └── Eliminar definitivamente
+└── Ficheiros
+    └── Listar
+```
+
+The existing canonical paths stay `health`, `info`, `whoami`, `vault list`,
+`vault create`, `vault status`, `vault delete`, `vault restore`, `vault purge`
+and `file list`. Descriptor `navigation` supplies the human labels, groups
+and order. The product name comes from its existing declaration. The Suite
+runtime still filters both catalogs by the caller's existing scopes; readers
+receive their five inspect tools and administrators receive all ten.
+
+- **Criar:** a text input supplies the existing `/name` argument. Required fields
+  and validation come from the unchanged input schema.
+- **Consultar estado / Eliminar / Ficheiros → Listar:** select from the existing
+  `backend_vault_list` result at `/vaults`.
+- **Restaurar / Eliminar definitivamente:** select from `/deletedVaults` in that
+  same result. An absent optional `deletedVaults` means no choices. An empty
+  selector must not invoke a mutation; the human client can refresh or go back.
+- Every selector uses `/name` as its label and `/vaultId` as its value relative
+  to each row. Names are not unique: clients must preserve the IDs and display
+  them when distinguishing equal names or reviewing a destructive operation.
+- **Eliminar:** boolean confirmation explains that the data remains restorable.
+  **Eliminar definitivamente:** typed confirmation matches the selected
+  `/vaultId` and explicitly warns that the operation cannot be undone.
+
+Selectors declare `requires: ["dynamic-options"]`; destructive menus additionally
+require `confirmation`. There is no `bindPointer`, preview tool or new workflow:
+confirmation does not add an argument, grant permission or change execution.
+The client must not bypass an unsupported required interaction. It refreshes
+choices after mutations; a stale selection is handled by the existing domain
+errors, including `NOT_FOUND`, rather than being rebound to another vault.
+
+Results retain the existing `structuredContent` and `outputSchema`. No custom
+result-rendering fields or new output schemas are introduced. The future CLI
+renders these results and the menus; this Backend change prepares and tests the
+published data, without implementing a terminal UI. The descriptor factory and
+wire/lifecycle tests are in `backend/internal/app/mcp_cli.go` and
+`backend/internal/app/mcp_cli_test.go`.
+
 ## Results and Stable Client API behavior
 
 Successful results are structured JSON in MCP `structuredContent`, with equivalent

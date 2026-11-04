@@ -132,7 +132,7 @@ func (s *Server) newSuiteMCP(ctx context.Context, admission storage.SuiteBackend
 			_, err := s.store.SuiteAcceptBackendToken(ctx, identity.AccessToken(), origin, backendSuiteMCPPath)
 			return err == nil
 		},
-	})
+	}, backendCLIDiscovery())
 }
 
 func (s *Server) bindSuiteMCPTool(tool noxmcp.Tool, admission storage.SuiteBackendAdmission, origin string) noxmcp.Tool {
