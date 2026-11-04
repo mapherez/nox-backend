@@ -30,8 +30,7 @@ registration establishes membership.
 
 All mutations require `Idempotency-Key`. Registration requests use the published
 `{ "contractVersion": "1.0", "baseUrl": "http://product-id", "managedBy"?: ... }`
-shape. The authenticated installer must own the exact administrator-approved
-product/deployment/origin binding; `managedBy` cannot self-grant ownership.
+shape. The authenticated installer must own the exact product/deployment/origin binding under the authority delegated by its administrative pairing; `managedBy` cannot self-grant ownership.
 Gateway and ordinary product credentials cannot enroll/remove products. An admin
 can manage foundations without `managedBy`, or explicitly approved managed products.
 

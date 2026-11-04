@@ -562,7 +562,7 @@ func (s *Server) handleSuiteDeployment(w http.ResponseWriter, r *http.Request) {
 	if !suiteMethod(w, r, "PUT", "DELETE") {
 		return
 	}
-	caller, ok := s.suiteCaller(w, r, false)
+	caller, ok := s.suiteCaller(w, r, true)
 	if !ok {
 		return
 	}

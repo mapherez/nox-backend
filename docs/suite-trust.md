@@ -48,8 +48,10 @@ metadata; they do not obtain ordinary service grants until acknowledged.
 | `product` | `events.read` |
 
 A request's optional `grants` or identity claims cannot override these assignments.
-A Gateway cannot enroll services. An installer can request only `product` pairing
-for its exact administrator-authorized deployment, product ID and origin. Its
+A Gateway cannot enroll services. Administrative pairing delegates management of the installer’s own local
+deployments. It can request only `product` pairing for its exact deployment,
+product ID and canonical local origin. It cannot claim another installer’s
+product, a standalone/foundation association, or its own product identity. Its
 `managedBy.productId` must identify that authenticated installer. Changing or
 withdrawing that authorization prevents pending proof completion/acknowledgment.
 Read access to service metadata is admin-wide or restricted to the service itself.
@@ -94,7 +96,7 @@ bound to the newly provisioned credential rather than an administrator assertion
 | Acknowledge rotation | `POST /api/nox/services/{serviceId}/credentials/{credentialId}/ack` | Replacement credential only |
 | Revoke credential generation | `DELETE /api/nox/services/{serviceId}/credentials/{credentialId}` | Admin/current service; If-Match target credential revision |
 | Read installer deployment grants | `GET /api/nox/services/{serviceId}/deployments` | Admin or that scoped installer |
-| Authorize/change/remove deployment | `PUT` / `DELETE /api/nox/services/{serviceId}/deployments/{deploymentId}` | Admin; initial/current deployment revision |
+| Authorize/change/remove deployment | `PUT` / `DELETE /api/nox/services/{serviceId}/deployments/{deploymentId}` | Admin or that current scoped installer; initial/current deployment revision |
 
 SDK-defined pairing/proof/provisioning/rotation payloads retain their published
 schemas. The key-management, service-state, deployment-authorization and rotation
@@ -106,6 +108,18 @@ the current credential's ID/revision/grants, without its bearer secret.
 Deployment authorization input is `{ "productId": "<actual-product-id>",
 "baseUrl": "http://example-product" }`. It authorizes that installer/deployment;
 it is not registry membership, a Docker schema or permission to enroll other targets.
+The current enrolled installer can create and retire its own associations through
+its service credential on the private Unix channel. No personal Auth token,
+second account approval or per-install administrator login is forwarded. Existing
+administrator calls remain supported, and service credentials gain no native
+account/key administration.
+
+An installer cannot change an existing binding’s product or origin. A live product
+claim by another deployment conflicts; a retired association can be replaced only
+after the old registry record and deployment claim are removed. PUT and list
+responses include `trustRevision`, the product’s current trust-head revision, for
+conditional updated/reinstalled pairing. Product proofs, acknowledgement,
+conditional/idempotent mutations and exact managedBy checks remain mandatory.
 
 ## Pairing and recovery flow
 

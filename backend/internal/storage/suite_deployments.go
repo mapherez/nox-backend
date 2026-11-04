@@ -14,7 +14,7 @@ type SuiteDeploymentGrant struct {
 }
 
 func (s *Store) SuiteSetDeployment(ctx context.Context, caller SuiteCaller, serviceID, deploymentID, expected, key, digest string, grant *SuiteDeploymentGrant) (SuiteResult, error) {
-	return s.suiteMutation(ctx, caller, "deployments.manage:"+serviceID+":"+deploymentID, key, digest, suiteAdmin, func(x *suiteTx, _ suiteActor) (SuiteResult, error) {
+	return s.suiteMutation(ctx, caller, "deployments.manage:"+serviceID+":"+deploymentID, key, digest, suiteDeploymentManager(serviceID, deploymentID, grant), func(x *suiteTx, _ suiteActor) (SuiteResult, error) {
 		service, err := x.service(serviceID)
 		if err != nil {
 			return SuiteResult{}, err
@@ -47,7 +47,7 @@ func (s *Store) SuiteSetDeployment(ctx context.Context, caller SuiteCaller, serv
 		}
 		origin, err := noxmcp.NormalizeSuiteOrigin(grant.BaseURL)
 		if err != nil {
-			return SuiteResult{}, suiteError(400, "INVALID_REGISTRATION", "An approved HTTPS origin is required.")
+			return SuiteResult{}, suiteError(400, "INVALID_REGISTRATION", "An approved HTTP(S) origin is required.")
 		}
 		revision, err := randomID("deployment_revision_")
 		if err != nil {
@@ -56,7 +56,11 @@ func (s *Store) SuiteSetDeployment(ctx context.Context, caller SuiteCaller, serv
 		if _, err := x.tx.ExecContext(ctx, `INSERT INTO suite_deployments VALUES (?,?,?,?,?) ON CONFLICT(service_id,deployment_id) DO UPDATE SET product_id=excluded.product_id,origin=excluded.origin,revision=excluded.revision`, serviceID, deploymentID, grant.ProductID, origin, revision); err != nil {
 			return SuiteResult{}, err
 		}
-		return suiteResponse(200, map[string]any{"serviceId": serviceID, "deploymentId": deploymentID, "productId": grant.ProductID, "baseUrl": origin, "revision": revision})
+		_, trustRevision, err := x.head(grant.ProductID)
+		if err != nil {
+			return SuiteResult{}, err
+		}
+		return suiteResponse(200, map[string]any{"serviceId": serviceID, "deploymentId": deploymentID, "productId": grant.ProductID, "baseUrl": origin, "revision": revision, "trustRevision": trustRevision})
 	})
 }
 
@@ -84,6 +88,16 @@ func (s *Store) SuiteReadDeployments(ctx context.Context, caller SuiteCaller, id
 		}
 		if err := rows.Err(); err != nil {
 			return SuiteResult{}, err
+		}
+		if err := rows.Close(); err != nil {
+			return SuiteResult{}, err
+		}
+		for _, item := range result {
+			_, revision, err := x.head(item["productId"])
+			if err != nil {
+				return SuiteResult{}, err
+			}
+			item["trustRevision"] = revision
 		}
 		return suiteResponse(200, result)
 	})
