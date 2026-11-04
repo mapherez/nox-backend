@@ -1,6 +1,6 @@
 # Same-host Suite integration and automatic foundation setup
 
-This implements the Backend part of **4. Completar a configuração inicial no Backend**, including its remaining work under **2. Corrigir o transporte e a configuração dos endereços**. It consumes NoX MCP `v0.7.2`, wire contract `1.0`, and follows the [same-host integration record](https://github.com/mapherez/nox-mcp/blob/v0.7.2/Documents/SUITE_SAME_HOST_INTEGRATION.md). The original Suite implementation plan is not rewritten. The subsequent cleanup removes the obsolete server executable alias, unused network-policy configuration and manual secret-transfer browser controls; the local participant protocol remains available.
+This implements the Backend part of **4. Completar a configuração inicial no Backend**, including its remaining work under **2. Corrigir o transporte e a configuração dos endereços**. It consumes NoX MCP `v0.7.3`, wire contract `1.0`, and follows the [same-host integration record](https://github.com/mapherez/nox-mcp/blob/v0.7.3/Documents/SUITE_SAME_HOST_INTEGRATION.md). The original Suite implementation plan is not rewritten. The subsequent cleanup removes the obsolete server executable alias, unused network-policy configuration and manual secret-transfer browser controls; the local participant protocol remains available.
 
 ## Runtime and deployment
 

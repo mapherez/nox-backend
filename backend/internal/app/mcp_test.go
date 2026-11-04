@@ -123,6 +123,17 @@ func TestMCPCatalogAndPublicTools(t *testing.T) {
 	if len(catalog.Tools) != 10 {
 		t.Fatalf("tools/list: got %d tools", len(catalog.Tools))
 	}
+	sourceTools, err := server.mcpTools()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := setBackendCLIMetadata(sourceTools); err != nil {
+		t.Fatal(err)
+	}
+	sourcePaths := map[string]any{}
+	for _, tool := range sourceTools {
+		sourcePaths[tool.Name] = tool.Meta["cli"]
+	}
 	seenNames, seenPaths := map[string]bool{}, map[string]bool{}
 	for _, tool := range catalog.Tools {
 		expected, ok := want[tool.Name]
@@ -130,9 +141,12 @@ func TestMCPCatalogAndPublicTools(t *testing.T) {
 			t.Fatalf("unexpected/duplicate tool: %q", tool.Name)
 		}
 		seenNames[tool.Name] = true
-		cli, ok := tool.Meta["cli"].(string)
-		if !ok || cli == "" || cli != expected.cli || seenPaths[cli] || strings.HasPrefix(cli, "backend ") || len(tool.Meta) != 1 {
-			t.Fatalf("wire _meta.cli for %s: %#v", tool.Name, tool.Meta)
+		if len(tool.Meta) != 0 {
+			t.Fatalf("CLI metadata leaked into tools/list for %s: %#v", tool.Name, tool.Meta)
+		}
+		cli, ok := sourcePaths[tool.Name].(string)
+		if !ok || cli == "" || cli != expected.cli || seenPaths[cli] || strings.HasPrefix(cli, "backend ") {
+			t.Fatalf("source _meta.cli for %s: %#v", tool.Name, sourcePaths[tool.Name])
 		}
 		seenPaths[cli] = true
 		a := tool.Annotations

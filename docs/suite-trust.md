@@ -1,6 +1,6 @@
 # Suite authority, pairing and service trust
 
-This implements Backend work point 4 against the published NoX MCP `0.7.2`
+This implements Backend work point 4 against the published NoX MCP `0.7.3`
 contracts, wire version `1.0`. The [approved work sequence](suite-migration.md)
 links the authoritative Gateway/integration documents. These APIs are HTTP
 management operations, not new MCP methods. They work for any conforming product;

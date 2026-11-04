@@ -124,8 +124,11 @@ func TestBackendSuiteLocalCatalogCapabilitiesAndOwnership(t *testing.T) {
 			t.Fatalf("catalog has %d tools, want %d", len(listed.Tools), tc.count)
 		}
 		for _, tool := range listed.Tools {
-			if tool.Meta["cli"] == nil || tool.Meta["nox/authorization"] == nil {
-				t.Fatal("tool missing policy/CLI metadata", tool.Name)
+			if _, leaked := tool.Meta["cli"]; leaked {
+				t.Fatal("CLI metadata leaked into Suite tools/list", tool.Name)
+			}
+			if tool.Meta["nox/authorization"] == nil {
+				t.Fatal("tool missing policy metadata", tool.Name)
 			}
 		}
 	}

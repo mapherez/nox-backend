@@ -1,7 +1,7 @@
 # Backend as a NoX Suite product
 
 Backend point 7 implements the protected product adapter using the published
-NoX MCP Go SDK `v0.7.2` and Suite contract `1.0`. It shares the ten existing MCP
+NoX MCP Go SDK `v0.7.3` and Suite contract `1.0`. It shares the ten existing MCP
 operations and storage with [direct MCP](mcp.md) and the Stable Client API.
 Gateway, CLI and Portal are separate products; this work does not implement them.
 The native frontend remains part of this Backend project.
@@ -74,8 +74,10 @@ including its protocol admission, filtered discovery and policy metadata.
 
 ## Explicit tool policy and ownership
 
-Every exposed Suite tool has its existing `_meta.cli` and the SDK's
-`_meta["nox/authorization"]` policy. Unclassified future tools stay absent until an
+Every canonical Suite tool definition retains its existing `_meta.cli` and the
+SDK's `_meta["nox/authorization"]` policy. Standard `tools/list` excludes only
+`_meta.cli` and preserves the authorization policy; `nox/tools/definitions`
+retains both for NoX clients. Unclassified future tools stay absent until an
 explicit policy is supplied. The private discovery view is partitioned by verified
 identity/authorization context; renewing an equivalent grant does not make token
 bytes or expiry part of the catalog view.

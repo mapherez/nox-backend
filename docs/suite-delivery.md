@@ -57,7 +57,7 @@ images are installed, or that the whole NoX Suite already runs end to end.
 
 ## Next separate implementations
 
-Implement the Gateway and installer/product adapters against SDK `0.7.2` and Suite
+Implement the Gateway and installer/product adapters against SDK `0.7.3` and Suite
 wire `1.0`, then the dependent CLI flows. Build the Portal as its own application;
 the Backend's native frontend stays in this project. Existing and future products
 must implement the same contracts. Product-specific work does not require another

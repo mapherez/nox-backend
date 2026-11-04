@@ -1,6 +1,6 @@
 # Suite registry, events and availability
 
-Backend work point 5 implements the published NoX MCP 0.7.2 / Suite 1.0
+Backend work point 5 implements the published NoX MCP 0.7.3 / Suite 1.0
 [contract references](suite-migration.md#approved-references-and-progression).
 [Persistent pairing and service trust](suite-trust.md) are prerequisites for
 membership. Gateway, Yard adaptations, Portal and CLI are separate product work.

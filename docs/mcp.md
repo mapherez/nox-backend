@@ -1,8 +1,8 @@
 # Direct MCP API
 
 NoX Backend exposes **POST `/mcp`** (enabled by default) through the official
-[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.2/go), using
-the published `github.com/mapherez/nox-mcp v0.7.2` module. It runs in the same
+[NoX MCP Go runtime](https://github.com/mapherez/nox-mcp/tree/v0.7.3/go), using
+the published `github.com/mapherez/nox-mcp v0.7.3` module. It runs in the same
 Go process, HTTP server, bind address and port as the existing backend APIs.
 The separate React frontend forwards `/mcp` unchanged on the public origin; it
 does not implement MCP or hold user/service authority. Configure a Streamable HTTP MCP client with
@@ -58,7 +58,8 @@ rechecked after key rotation or account disabling, even for an initialized clien
 ## Tools and CLI metadata
 
 Exactly these 10 canonical tools are exposed. Every tool has an input schema,
-output schema, description, annotations and `_meta.cli`.
+output schema, description and annotations. Canonical source definitions also retain
+`_meta.cli`; standard `tools/list` omits it through SDK 0.7.3.
 
 | Tool | `_meta.cli` | Input | Read-only | Destructive | Idempotent |
 | --- | --- | --- | --- | --- | --- |
@@ -74,11 +75,11 @@ output schema, description, annotations and `_meta.cli`.
 | `backend_file_list` | `file list` | `{"vaultId":"vault_example"}` | Yes | No | Yes |
 
 CLI paths are app-local: they contain no `backend ` prefix. For example,
-`backend_vault_list` appears in `tools/list` with:
-
-```json
-{"_meta":{"cli":"vault list"}}
-```
+`backend_vault_list` retains `{"_meta":{"cli":"vault list"}}` in its source
+definition. Standard `tools/list` omits this CLI metadata, so ordinary MCP clients
+receive the tool names, schemas, descriptions and annotations without menu data.
+The Suite adapter's `nox/tools/definitions` retains the canonical CLI metadata
+for NoX clients. The direct `/mcp` endpoint does not enable NoX discovery.
 
 A future CLI can compose `nox backend vault list`. This repository does not
 implement that CLI. A single explicit mapping supplies `_meta.cli` through the

@@ -1,7 +1,7 @@
 # Suite authorization issuance
 
 Backend point 6 implements the [approved Gateway/integration contract](suite-migration.md#approved-references-and-progression)
-using NoX MCP SDK 0.7.2 and wire version 1.0. It uses the persistent
+using NoX MCP SDK 0.7.3 and wire version 1.0. It uses the persistent
 [issuer/signing keys and service trust](suite-trust.md) and
 [registry/event feed](suite-registry.md). It is generic to every conforming product.
 It does not implement Gateway, Portal or CLI. Backend's own protected
