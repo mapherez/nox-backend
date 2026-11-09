@@ -44,6 +44,7 @@ export interface FoundationConnection {
     | "recovery_required";
 }
 export interface Dashboard {
+  suiteMcpEnabled?: boolean;
   authenticated: boolean;
   renewLogin?: boolean;
   oauthConfigured: boolean;

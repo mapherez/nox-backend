@@ -40,6 +40,7 @@ func (s *Server) registerAdministration(mux *http.ServeMux) {
 		{"/api/vaults/{vaultId}/purge", false, s.handleManagementVaultPurge},
 		{"/api/vaults/{vaultId}/download", false, s.handleManagementVaultDownload},
 		{"/api/admin/suite", true, s.handleSuiteAdministration},
+		{"/api/admin/suite/backend/publish", true, s.handleBackendPublication},
 		{"/api/admin/suite/operations/{operation...}", true, s.handleSuiteAdminOperation},
 		{"/api/admin/connections/{service}/{action}", true, s.handleConnectionSetup},
 		{"/api/admin/connections", true, s.handleConnections},

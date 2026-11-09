@@ -27,7 +27,7 @@ a release, replace installed containers or modify installed volumes.
    installed deployment. Backend's compatibility tests retain those routes and
    authentication contracts. Real Google account consent and another application's
    complete runtime remain installed-deployment checks, not simulated claims.
-5. Use the local channel prepared by the deployment and the [native connection cards](suite-administration.md). HTTPS, target CIDRs, certificate copying and trusted proxy configuration are not prerequisites for local association. Keep Suite MCP opt-in until its own enrollment is ready.
+5. Use the local channel prepared by the deployment and the [native connection cards](suite-administration.md). HTTPS, target CIDRs, certificate copying and trusted proxy configuration are not prerequisites for local association. Suite MCP remains opt-in. To expose Backend tools through Gateway, set `NOX_BACKEND_SUITE_MCP_ENABLED=true`, install both updated Backend/frontend images and open the dashboard with the existing administrator account. Its normal flow publishes the Backend automatically; manual product registration is not required.
 
 The separate frontend publication workflow still builds/checks only the frontend,
 including its standalone proxy guard, and publishes an immutable commit tag.

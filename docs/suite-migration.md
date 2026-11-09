@@ -560,3 +560,50 @@ Those remote/installed actions were not performed here. No real Google session,
 other product, installed deployment/volume, Git history, package version or release
 was modified by these local checks. Gateway, installer/product adaptations, CLI and
 Portal remain their own subsequent implementations under the original contracts.
+
+
+## Backend MCP publication correction — November 9, 2026
+
+The own-product MCP adapter and CLI descriptors existed, but normal deployment
+had no complete path to establish Backend's own product registration. Earlier
+protocol acceptance explicitly prepared that registration; it did not prove
+normal initial publication. This correction closes that specific gap.
+
+With `NOX_BACKEND_SUITE_MCP_ENABLED=true`, opening the native dashboard as the
+existing NoX Auth administrator automatically starts the administrator-protected
+publication operation. It uses the unchanged pairing, HMAC, durable provisioning,
+ACK, verified registration and transactional event operations. No privileged
+caller, user-token forwarding, new account approval or credential-copying step is
+introduced. The browser receives no service credential or pairing material.
+
+The current association and workflow marker retain the actual administrative
+initiator for restart reconciliation. Its account must remain active, administrative
+and admitted by Auth. An interrupted acknowledged pairing can finish registration;
+pre-ACK recovery retires only pending attempts marked by this workflow. Removed
+or revoked associations/credentials are not automatically recreated. Unchanged
+publication preserves identity and revision; declaration updates and the Suite
+MCP switch update the advertised capability without changing direct MCP.
+
+No schema migration, database reset, dependency change or additional environment
+variable is required. Initial publication requires both updated Backend/frontend
+images. The source-only implementation does not update installed images.
+
+Verification completed locally on macOS ARM64 and disposable Linux containers:
+
+- Full Backend `go test -race -mod=readonly ./... -count=1` and `go vet` passed,
+  including fresh-registry publication, actual MCP/domain calls, admission/CSRF,
+  concurrency, interruption, revoked-state protection and runtime shutdown/reopen.
+- All 35 frontend tests and Vite+ format/lint/type checks passed. Backend and
+  independent frontend Docker images built successfully.
+- The required `check-suite-proxy.py --browser` path now rejects a pre-created
+  Backend product record, opens the actual React dashboard in Chromium, verifies
+  automatic publication and unchanged identity on reload, and consumes that
+  publication through the unchanged published Gateway v0.0.1. Actual MCP execution,
+  the ten canonical CLI definitions and restart persistence passed.
+- Existing 41 release-tooling tests and three Python script tests passed. These
+  tests use fixture repositories and do not publish a release.
+
+The existing CI and release workflows already invoke this updated packaged check;
+no workflow gate was removed. These are local results, not a claim that a new remote
+CI run or the owner's installed acceptance has passed. Gateway, Yard and SDK source
+were not changed. Work stops here for owner validation of this correction.

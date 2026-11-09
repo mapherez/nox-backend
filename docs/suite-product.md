@@ -49,11 +49,28 @@ Before using protected Suite MCP:
 
 1. Deploy the image/Compose with its local Suite volume. Native web/OAuth URLs keep their existing function and do not establish service locality.
 2. Enable `NOX_BACKEND_SUITE_MCP_ENABLED=true` when the Backend product is to expose tools through Suite.
-3. The product association and registry entry must be established through the authorized local pairing/ACK and verified registry APIs, using its actual declaration and logical `http://nox-backend` origin. The declaration alone does not create membership. Foundation setup and participant adapter responsibilities are documented in [local integration](suite-local.md); no certificates or manual provisioning transfer are prerequisites.
+3. Open the native Backend dashboard as the existing NoX Auth administrator. With Suite MCP enabled, the dashboard automatically sends an authenticated, same-origin `POST /api/admin/suite/backend/publish`. Backend performs its own pairing, HMAC proof, durable provisioning, ACK and verified registration through the existing operations, using its actual declaration and logical `http://nox-backend` origin. No pairing JSON, service credential or certificate is copied by the user or sent to the browser. The declaration alone does not create membership.
 4. An acknowledged Gateway service with the appropriate grant requests a
    [user delegation or service probe](suite-authorization.md) for the current
    `nox-backend` registration revision. Its audience is exactly the accepted
    Backend origin plus `/mcp/suite`.
+
+The initial publication requires that existing administrator session; it is not
+an anonymous startup privilege. Reopening the dashboard retains the same association
+and unchanged registration revision. After a restart, the existing reconciler may
+refresh publication using the administrator recorded on the acknowledged pairing,
+only while that account remains active, administrative and admitted by Auth. A
+crash after ACK but before registration is recovered from that same persisted state.
+Interrupted pre-ACK attempts from this workflow are canceled before replacement;
+unrelated administrative pairings are not canceled. Explicitly removed/revoked
+associations or credentials are never recreated by this automation.
+
+Disabling Suite MCP withdraws its advertised capability on reconciliation while
+retaining the association and leaving direct MCP independent. Re-enabling the flag
+can republish that same active association. Missing local transport or publication
+failures are shown in the dashboard with an explicit retry action. The new Backend
+and frontend images must both be installed for the initial dashboard trigger.
+No database reset, new environment variables or manual registry calls are needed.
 
 Send only the resulting token as `Authorization: Bearer <suite-access-token>`.
 Native personal keys, service credentials and browser cookies cannot authenticate

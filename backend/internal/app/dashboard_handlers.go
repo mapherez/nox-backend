@@ -57,6 +57,7 @@ func (s *Server) handleDashboardData(w http.ResponseWriter, r *http.Request) {
 		data.DeletedVaults = presentDashboardVaults(deletedVaults)
 		data.IsAdmin = user.Role == storage.UserRoleAdmin
 		if data.IsAdmin {
+			data.SuiteMCPEnabled = s.cfg.SuiteMCPEnabled
 			users, err := s.store.ListUsers(r.Context())
 			if err != nil {
 				writeJSONError(w, http.StatusInternalServerError, "SERVER_ERROR", "Failed to load users.")

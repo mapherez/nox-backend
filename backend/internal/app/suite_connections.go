@@ -358,6 +358,7 @@ func (s *Server) cancelConnection(ctx context.Context, caller storage.SuiteCalle
 	return nil
 }
 func (s *Server) reconcileConnections(ctx context.Context) {
+	s.reconcileBackendPublication(ctx)
 	attempts, err := s.store.SuiteConnectionAttempts(ctx)
 	if err != nil {
 		return

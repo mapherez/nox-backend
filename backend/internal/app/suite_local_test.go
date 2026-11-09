@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/mapherez/nox-backend/backend/internal/storage"
 	"io"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -176,5 +178,117 @@ func TestLocalOriginSupportsEveryProductIDShape(t *testing.T) {
 		if err != nil || filepath.Base(path) != id+".sock" {
 			t.Fatal("valid product identity lost its local mapping", id, err)
 		}
+	}
+}
+
+func TestBackendRunPublishesFromEmptyRegistryAndRecoversAfterStoreReopen(t *testing.T) {
+	ctx := context.Background()
+	dir := shortSuiteDirectory(t)
+	reservation, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := reservation.Addr().String()
+	_ = reservation.Close()
+	cfg := Config{Addr: addr, PublicURL: "http://backend.test", DataDir: t.TempDir(), SuiteSocketDir: dir, SuiteMCPEnabled: true}
+	data, err := storage.Open(ctx, cfg.DataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authFixture(t, data)
+	owner, err := data.UpsertAllowedUser(ctx, "runtime-owner@example.test", "ADMIN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixtureManager(t, data, owner)
+	key, err := data.CurrentAPIKey(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := data.SuiteAdministration(ctx, storage.SuiteCaller{UserID: owner.ID})
+	if err != nil || len(initial.Products) != 0 || len(initial.Services) != 0 {
+		t.Fatal("fresh registry was not empty", err)
+	}
+	if err = data.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var association, revision string
+	for iteration, version := range []string{"runtime-first", "runtime-updated"} {
+		cfg.Version = version
+		runContext, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		var runErr error
+		go func() { runErr = Run(runContext, cfg); close(done) }()
+		stop := sync.OnceFunc(func() {
+			cancel()
+			select {
+			case <-done:
+				if runErr != nil {
+					t.Error("runtime stopped with error", runErr)
+				}
+			case <-time.After(10 * time.Second):
+				t.Error("runtime failed to stop")
+			}
+		})
+		t.Cleanup(stop)
+		client := &http.Client{Timeout: 2 * time.Second}
+		request := func(method, path string) (int, []byte) {
+			req, err := http.NewRequest(method, "http://"+addr+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Authorization", "Bearer "+key)
+			res, err := client.Do(req)
+			if err != nil {
+				return 0, nil
+			}
+			defer res.Body.Close()
+			raw, err := io.ReadAll(res.Body)
+			if err != nil {
+				return 0, nil
+			}
+			return res.StatusCode, raw
+		}
+		deadline := time.Now().Add(12 * time.Second)
+		for {
+			if status, _ := request("GET", "/v1/health"); status == 200 {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("runtime failed to start")
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if iteration == 0 {
+			status, raw := request("POST", "/api/admin/suite/backend/publish")
+			suiteHTTPStatus(t, status, 200, raw)
+		}
+		// The second process receives no publication request: its persisted,
+		// still-admitted initiator must refresh the declaration automatically.
+		for {
+			status, raw := request("GET", "/api/admin/suite")
+			var response struct {
+				State storage.SuiteAdministration `json:"state"`
+			}
+			if status == 200 && json.Unmarshal(raw, &response) == nil {
+				for _, record := range response.State.Products {
+					if record.ProductID != serviceName || record.Declaration.ProductVersion != version {
+						continue
+					}
+					if iteration == 0 {
+						association, revision = record.AssociationID, record.Revision
+					} else if record.AssociationID != association || record.Revision == revision {
+						t.Fatal("restart replaced association or failed to refresh registration")
+					}
+					stop()
+					goto recovered
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("runtime did not publish its actual Backend declaration", status, string(raw))
+			}
+			time.Sleep(30 * time.Millisecond)
+		}
+	recovered:
 	}
 }

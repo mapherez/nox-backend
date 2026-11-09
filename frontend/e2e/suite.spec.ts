@@ -21,7 +21,29 @@ test("HTTP dashboard connects the local participant automatically and recovers a
     { name: "nox_sync_session", value: fixture.adminSession, url: fixture.base },
   ]);
   page.on("dialog", (dialog) => dialog.accept());
+  const publication = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/admin/suite/backend/publish",
+  );
   await page.goto(fixture.base + "/vault-dashboard");
+  const publicationResponse = await publication;
+  expect(publicationResponse.status()).toBe(200);
+  expect(await publicationResponse.text()).not.toMatch(
+    /noxsvc_|"secret"|"nonce"|"serviceCredential"/,
+  );
+  const ownProduct = await page.evaluate(async () => {
+    const response = await fetch("/api/admin/suite");
+    const value = await response.json();
+    const product = value.state.products.find(
+      (item: { productId: string }) => item.productId === "nox-backend",
+    );
+    return {
+      associationId: product?.associationId,
+      revision: product?.revision,
+      path: product?.declaration.capabilities.suiteMcp?.path,
+    };
+  });
+  expect(ownProduct.path).toBe("/mcp/suite");
+  expect(ownProduct.associationId).toBeTruthy();
   expect(await page.evaluate(() => window.isSecureContext)).toBe(false);
   await page.getByLabel("Yard address", { exact: true }).fill("http://yard.native.invalid:8095");
   await page.getByRole("button", { name: "Save Yard configuration", exact: true }).click();
@@ -54,7 +76,22 @@ test("HTTP dashboard connects the local participant automatically and recovers a
   );
   await page.getByRole("button", { name: "Connect Yard", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Request could not be confirmed");
+  const repeatedPublication = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/admin/suite/backend/publish",
+  );
   await page.reload();
+  expect((await repeatedPublication).status()).toBe(200);
+  const repeatedOwnProduct = await page.evaluate(async () => {
+    const value = await (await fetch("/api/admin/suite")).json();
+    const product = value.state.products.find(
+      (item: { productId: string }) => item.productId === "nox-backend",
+    );
+    return { associationId: product?.associationId, revision: product?.revision };
+  });
+  expect(repeatedOwnProduct).toEqual({
+    associationId: ownProduct.associationId,
+    revision: ownProduct.revision,
+  });
   await expect(
     page.getByText("Service registered · Availability tracked separately"),
   ).toBeVisible();

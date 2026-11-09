@@ -48,6 +48,7 @@ func presentDashboardVaults(vaults []storage.Vault) []dashboardVault {
 }
 
 type dashboardPageData struct {
+	SuiteMCPEnabled  bool             `json:"suiteMcpEnabled,omitempty"`
 	RenewLogin       bool             `json:"renewLogin,omitempty"`
 	Authenticated    bool             `json:"authenticated"`
 	OAuthConfigured  bool             `json:"oauthConfigured"`

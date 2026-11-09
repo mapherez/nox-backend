@@ -340,3 +340,28 @@ test("foundation trust states do not claim registry or MCP readiness", () => {
   );
   expect(screen.getByText("Pairing pending · Awaiting service confirmation")).toBeTruthy();
 });
+
+test("only an authenticated administrator with Suite enabled starts Backend publication", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue({ ok: true, status: 200, json: async () => ({ enabled: true }) });
+  vi.stubGlobal("fetch", fetcher);
+  const view = render(
+    <DashboardView data={{ ...data, suiteMcpEnabled: true, authenticated: false }} />,
+  );
+  expect(fetcher).not.toHaveBeenCalled();
+  view.rerender(<DashboardView data={{ ...data, suiteMcpEnabled: true, isAdmin: false }} />);
+  expect(fetcher).not.toHaveBeenCalled();
+  view.rerender(<DashboardView data={{ ...data, suiteMcpEnabled: false }} />);
+  expect(fetcher).not.toHaveBeenCalled();
+  view.rerender(<DashboardView data={{ ...data, suiteMcpEnabled: true }} />);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/admin/suite/backend/publish",
+    expect.objectContaining({
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-Nox-Request": "1" },
+    }),
+  );
+});

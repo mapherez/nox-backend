@@ -17,6 +17,8 @@ const sessionCookieName = "nox_sync_session"
 
 // Server owns HTTP routing for the backend.
 type Server struct {
+	backendPublicationMu                 sync.Mutex
+	backendPublicationDone               bool
 	noxLogin                             noxLoginState
 	loginStarts                          *rate.Limiter
 	cfg                                  Config

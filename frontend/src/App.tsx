@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { MutationContext, MutationForm, requestJSON } from "./MutationForm";
 import { Connections } from "./Connections";
 import { SuiteAdministration } from "./SuiteAdministration";
+import { BackendPublication } from "./BackendPublication";
 import type { Dashboard, User, Vault } from "./model";
 import { formatBytes, formatTime, messages } from "./model";
 
@@ -655,7 +656,17 @@ export function DashboardView({ data, reload }: { data: Dashboard; reload?: () =
                 </p>
               )}
               {data.isAdmin && <Connections connections={data.connections ?? []} />}
-              {data.isAdmin && <SuiteAdministration key={data.user.id} actorId={data.user.id} />}
+              {data.isAdmin && (
+                <>
+                  {data.suiteMcpEnabled && (
+                    <BackendPublication
+                      key={`publication-${data.user.id}`}
+                      actorId={data.user.id}
+                    />
+                  )}
+                  <SuiteAdministration key={data.user.id} actorId={data.user.id} />
+                </>
+              )}
             </div>
           </>
         ) : (
