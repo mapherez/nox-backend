@@ -182,7 +182,7 @@ retains connection intent/revisions. Unsupported historical or tampered schemas
 continue to fail before modification.
 
 Back up all of `/data` before upgrading and validate a copy as described in the
-[storage guide](backend-separation.md). Older binaries reject the new migration
+[delivery guide](suite-delivery.md). Older binaries reject the new migration
 history: rollback across this schema addition requires the retained pre-upgrade
 data backup and the matching old images/topology; it must not run an old binary
 against the upgraded database or delete migration records to bypass validation.

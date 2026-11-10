@@ -2,7 +2,7 @@
 
 NoX Backend is configured with environment variables and stores all persistent state under `/data` inside the container.
 
-For an existing deployment, follow [updates and delivery](suite-delivery.md) before changing the image. The [repository separation guide](backend-separation.md) covers older naming/topology transitions. Preserve the original deployment folder, Compose project, configuration, and data mount.
+For an existing deployment, follow [updates and delivery](suite-delivery.md) before changing the image. Preserve the original deployment folder, Compose project, configuration, and data mount.
 
 ## Quick Docker Compose Setup
 
@@ -122,7 +122,7 @@ The new-installation example uses this Docker volume:
 nox-backend-data
 ```
 
-The example explicitly names the volume, without a Compose project prefix. Existing deployments must keep their actual volume name using `NOX_BACKEND_DATA_VOLUME_NAME` or the legacy `NOX_SYNC_DATA_VOLUME_NAME`; see the [update guide](backend-separation.md).
+The example explicitly names the volume, without a Compose project prefix. Keep the actual data volume name configured through `NOX_BACKEND_DATA_VOLUME_NAME`; see [updates and recovery](suite-delivery.md).
 
 Set the two required origins and use the same existing Auth volume names. The setup-only service receives the administrative volume; normal Backend runtime does not.
 
@@ -179,7 +179,7 @@ Because blobs are content-addressed by SHA-256 hash, a blob shared by another re
 
 ## Updating The Backend
 
-For the initial switch from the old image, including validation and rollback, follow the [separation guide](backend-separation.md). Do not replace an existing Compose deployment with a fresh one or run `docker compose down -v`.
+Follow [updates and recovery](suite-delivery.md) when changing a deployment. Preserve its actual data volume and Compose project; do not use `docker compose down -v` for an update.
 
 For subsequent updates to a Compose deployment that already uses `ghcr.io/mapherez/nox-backend:latest`:
 
@@ -245,10 +245,7 @@ docker run --rm --name nox-backend-dev -p 5710:8080 -v nox-backend-dev-data:/dat
 
 The production Compose example uses both `ghcr.io/mapherez/nox-backend:latest` and `ghcr.io/mapherez/nox-backend-frontend:latest`; select compatible published versions for both services. Use the development Compose example for the complete native frontend/backend from source. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
 
-Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
-`NOX_SYNC_*` values. Existing non-authentication aliases remain supported; the old Backend Google/allowlist variables are replaced by NoX Auth configuration. The physical database
-name shown above is the new-installation default; existing `nox-sync.db` files are
-used in place until an explicit offline migration.
+Use the documented `NOX_BACKEND_*` variables and the current Compose configuration. Google credentials and the account allowlist belong in NoX Auth.
 
 ## Separate frontend configuration
 
@@ -261,7 +258,7 @@ It owns the host port; the `backend` service owns data and credentials.
 | `NOX_FRONTEND_BACKEND_URL` | `http://backend:8080` | Internal Backend origin used by the frontend proxy; set it when changing the Backend listener |
 | `NOX_FRONTEND_IMAGE_TAG` | Backend image tag, otherwise `latest` | Independently selected frontend image version or immutable `sha-<commit>` tag |
 
-Keep `NOX_BACKEND_PUBLIC_URL` (or its legacy alias) equal to the external public
+Keep `NOX_BACKEND_PUBLIC_URL` equal to the external public
 origin, including a changed host port. Auth setup registers that origin's
 `/auth/nox/callback` automatically. Internal container addresses are not client
 Server URLs or OAuth callback addresses. Public HTTPS may terminate at the
@@ -307,7 +304,7 @@ See [`.env.example`](../.env.example) for supported deployment defaults.
 
 `NOX_BACKEND_SUITE_REPORT_INTERVAL_MS` defaults to `15000` and
 `NOX_BACKEND_SUITE_OBSERVATION_FRESHNESS_MS` defaults to `45000`. Both accept
-positive integer milliseconds and their existing environment aliases. They
+positive integer milliseconds. They
 configure reporting/freshness, not Google login or work-session duration.
 See [registry/events operations](suite-registry.md).
 
@@ -317,7 +314,7 @@ See [registry/events operations](suite-registry.md).
 existing public/personal-key policy. `NOX_BACKEND_SUITE_MCP_ENABLED=false` keeps
 Suite MCP opt-in. When enabled, `/mcp/suite` accepts Suite grants only through the
 local channel. HTTPS and forwarded headers do not enable that path over TCP.
-Both flags accept only `true`/`false` and retain their existing environment aliases.
+Both flags accept only `true`/`false`.
 When enabling Backend Suite MCP, install compatible Backend/frontend images and
 open the administrator dashboard to initiate its automatic publication. A flag
 or declaration alone does not establish membership. See [Suite product setup](suite-product.md).

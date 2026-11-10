@@ -114,6 +114,6 @@ removes its resources. It never contacts Google or installed data.
 On November 4, 2026, after updating Auth, Backend and Yard, the owner confirmed
 Google login in both applications. Backend's **Logout all** also logged out Yard
 when switching to its tab, and both applications accepted a new login afterwards.
-This records owner-reported installed acceptance of those login, shared-session
-revocation and re-login flows. This adaptation does not complete Yard lifecycle
-authorization, product MCP metadata, Gateway/CLI work or the full Suite integration.
+This records installed login, shared-session revocation and re-login behavior.
+Yard deployment integration, Gateway routing and CLI execution remain separate
+product responsibilities; their implementations do not change this login contract.

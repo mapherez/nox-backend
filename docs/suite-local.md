@@ -2,8 +2,7 @@
 
 Backend uses NoX MCP `v0.7.3`, wire contract `1.0`, and the
 [same-host integration contract](https://github.com/mapherez/nox-mcp/blob/v0.7.3/Documents/SUITE_SAME_HOST_INTEGRATION.md).
-This guide describes current setup and transport; the [implementation record](suite-migration.md)
-is historical context, not installation instructions.
+This guide describes current setup and transport.
 
 ## Runtime and deployment
 

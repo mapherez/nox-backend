@@ -47,8 +47,6 @@ Unknown histories, missing historical baseline and schema mismatches are refused
 before modification. Older binaries reject migrations newer than their supported history; retain a pre-upgrade
 backup for rollback. See [administration persistence](../../../docs/administration-api.md#persistence-and-delivery).
 
-Existing `nox-sync.db` is used in place. `nox-backend migrate-database` performs an explicit offline SQLite copy to `nox-backend.db`, retaining `nox-sync.db.legacy`. Both active filenames at once, or an interrupted migration with only the archive left, cause startup to fail rather than create an empty replacement. Back up all of `/data` before running the command. See [the update guide](../../../docs/backend-separation.md).
-
 ## Delete Behavior
 
 Vault delete is soft by default:

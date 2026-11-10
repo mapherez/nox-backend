@@ -22,8 +22,7 @@ The direct/native APIs keep their TCP listener and frontend routing. Protected S
 | `NOX_BACKEND_DIRECT_MCP_ENABLED` | `true` | Mount the existing direct `/mcp` endpoint |
 | `NOX_BACKEND_SUITE_MCP_ENABLED` | `false` | Mount `/mcp/suite` and advertise `capabilities.suiteMcp.path` |
 
-Use literal `true` or `false`; invalid values stop startup. The existing
-`NOX_SYNC_*` aliases work, with canonical variables taking precedence. Both
+Use literal `true` or `false`; invalid values stop startup. Both
 Compose files pass these options through. Existing installations need no env
 change for their native frontend, APIs or direct MCP.
 
@@ -168,4 +167,4 @@ API/direct MCP, sync streaming and frontend replacement remain covered by the
 existing Chromium/split-deployment checks. No database migration is added here.
 [Native integration administration](suite-administration.md) provides setup and recovery.
 See the [delivery guide](suite-delivery.md) for publication/installed validation and
-the boundary with subsequent Gateway/product work.
+the boundary between Backend checks and consumer-specific deployment verification.

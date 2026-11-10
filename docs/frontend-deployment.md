@@ -109,10 +109,9 @@ When upgrading a deployment without the shared channel, also apply the [local-vo
 
 The image split itself does not migrate the database. Current Backend upgrades can also include additive database migrations and NoX Login enrollment. First preserve
 the actual Compose project name, public URL, ports, environment, data mount and
-image references. Follow the [storage/update guide](backend-separation.md) for
-backups and validation on a copy. Supported `NOX_BACKEND_*`/`NOX_SYNC_*` precedence,
-legacy keys/headers and database names remain valid. Former native-Google settings
-are replaced by Auth configuration.
+image references. Follow [updates and recovery](suite-delivery.md) for consistent backups and
+configuration. Use the documented `NOX_BACKEND_*` settings; Google credentials
+and account admission belong in Auth.
 The subsequent [NoX Login adaptation](nox-login.md) replaces native Google
 authentication: update Auth first, apply the new Compose setup service and log
 in once again. Google credentials/account admission now live only in Auth.

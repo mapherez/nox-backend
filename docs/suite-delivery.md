@@ -1,9 +1,8 @@
 # Backend releases, updates and validation
 
 This guide covers the current Backend project: separate Backend/frontend images,
-NoX Login, persistent data and same-host Suite integration. The
-[implementation record](suite-migration.md) is historical evidence, not deployment
-instructions. For a new installation use [setup](user-setup.md).
+NoX Login, persistent data and same-host Suite integration. For a new installation
+use [setup](user-setup.md).
 
 ## Release from source
 
@@ -12,7 +11,7 @@ Node/npm, Git and Docker tools. The script validates the version, Go/frontend
 code and both image builds before committing and pushing the version/tag.
 GitHub CI and Release perform their own checks and publication. A local success
 or push is not confirmation that the remote workflow or publication succeeded.
-See the [release overview](../README.md#releases-and-updates).
+The [release helper](../scripts/release.mjs) implements the local checks and Git handoff.
 
 Stable releases publish versioned Backend/frontend images and update both
 `latest` tags. Prereleases leave `latest` unchanged. A separate frontend workflow
