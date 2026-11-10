@@ -45,9 +45,9 @@ their meanings. These checks do not claim full Suite MCP readiness.
 
 ## Build and run from source
 
-Before a release containing this split is published, use source builds. The old
-published Backend `v1.0.7` image does not supply `/api/dashboard`; do not combine
-that old image with the new frontend.
+Use development Compose for local source builds. Run compatible Auth on the
+same host and configure the required origins first. Backend v1.0.7 predates the
+split and is not compatible with the current frontend.
 
 ```sh
 docker compose -f docker-compose.dev.yml up --build
@@ -100,18 +100,19 @@ docker compose pull frontend
 docker compose up -d --no-deps frontend
 ```
 
-No workflow publication is performed by local validation of point 2.
+Local verification does not publish an image or update a deployment.
 
 ## Existing installations
 
-For the current Suite correction, also apply the [local-volume deployment update](suite-local.md#runtime-and-deployment). It preserves the existing data volume and native URL/ports. Updating images alone does not add mounts.
+When upgrading a deployment without the shared channel, also apply the [local-volume deployment update](suite-local.md#runtime-and-deployment). It preserves the existing data volume and native URL/ports. Updating images alone does not add mounts.
 
 
-This is a deployment topology change, not a database migration. First preserve
+The image split itself does not migrate the database. Current Backend upgrades can also include additive database migrations and NoX Login enrollment. First preserve
 the actual Compose project name, public URL, ports, environment, data mount and
 image references. Follow the [storage/update guide](backend-separation.md) for
-backups and validation on a copy. Existing `NOX_BACKEND_*`/`NOX_SYNC_*` precedence,
-legacy keys/headers, database names and migration history remain valid.
+backups and validation on a copy. Supported `NOX_BACKEND_*`/`NOX_SYNC_*` precedence,
+legacy keys/headers and database names remain valid. Former native-Google settings
+are replaced by Auth configuration.
 The subsequent [NoX Login adaptation](nox-login.md) replaces native Google
 authentication: update Auth first, apply the new Compose setup service and log
 in once again. Google credentials/account admission now live only in Auth.
@@ -126,16 +127,14 @@ Do not run `down -v`. Configure the new backend service to use the exact existin
 custom service/container names required by deployment automation explicitly in
 the installation's configuration, and update its routing deliberately.
 
-Use a matched candidate pair containing this separation. Validate health, login,
-existing keys and sessions, roles, vault IDs/revisions, downloads, sync, wiki/read
-integration and the product that depends on the native frontend before changing
-the installed deployment. [Point-8 delivery](suite-delivery.md) distinguishes local
-implementation checks from the operator's published/installed rollout.
-Rollback requires restoring the previous image/topology and the same preserved
-data mount. Point 2 added no schema change. Point 3 adds the non-destructive
-connection-configuration table through migration 4. See the
-[administration migration notes](administration-api.md#persistence-and-delivery)
-before upgrading: older binaries require the pre-upgrade data backup for rollback.
+Use compatible Backend/frontend versions. Validate health, NoX Login, existing
+keys, roles, owned vaults, file reads, sync and native-frontend consumers. Moving
+from native Google to NoX Login requires one new browser login. See [delivery](suite-delivery.md).
+
+Rollback across a database migration requires the previous images/topology and
+matching complete pre-upgrade backup, including private secrets. An old binary
+must not open a newer schema. A compatible frontend-only rollback does not roll
+back Backend data. See [migration notes](administration-api.md#persistence-and-delivery).
 
 ## Verification
 
@@ -177,7 +176,7 @@ flow is required through `check-suite-proxy.py --browser`; standalone frontend
 publication continues to use its `--frontend-only` mode without a Backend build.
 
 
-Full Suite delivery checks use the same candidate images:
+Backend local-channel delivery checks use the same candidate images:
 
 ```sh
 python3 -m unittest discover -s scripts -p "test_*.py"

@@ -6,7 +6,7 @@ NoX Login entry and dependent-product routes remain available. Existing `/v1/*`
 and direct `/mcp` authentication and representations are unchanged.
 
 These routes are not the Suite `/api/nox/*` service, pairing, registry or
-issuance contracts. Those retain their approved definitions and work sequence.
+issuance contracts. Those have separate [service protocol contracts](suite-trust.md).
 
 ## Authentication and request boundary
 
@@ -45,7 +45,7 @@ Authorization/cookies or API-key response bodies.
 | POST | `/api/session/logout` | `{ "ok": true }`, expired session cookie | Browser session only |
 | POST | `/api/session/logout-all` | `{ "ok": true }` only after Auth confirms Suite-session revocation | Browser session only |
 | GET | `/api/admin/users` | Array of allowed users, without Google subjects or keys | Admin |
-| POST | `/api/admin/users` | `{ "email": "person@example.com", "role": "USER" }`; adds/re-enables an allowed account and returns its presentation fields | Admin |
+| POST | `/api/admin/users` | `{ "email": "person@example.com", "role": "USER" }`; creates/re-enables a local record and returns its presentation fields; does not change Auth admission | Admin |
 | PUT | `/api/admin/users/{userId}/status` | `{ "status": "ACTIVE" }` or `DISABLED` | Admin |
 | PUT | `/api/admin/users/{userId}/role` | `{ "role": "USER" }` or `ADMIN` | Admin |
 | DELETE | `/api/admin/users/{userId}` | Deletes the account and its owned sync records | Admin |
@@ -57,6 +57,7 @@ Authorization/cookies or API-key response bodies.
 | GET | `/api/admin/connections` | Foundation-service connection intent and configuration revisions | Admin |
 | PUT | `/api/admin/connections/{service}` | Save `{ "origin": "https://yard.example.com" }`, with a creation/update precondition | Admin |
 | DELETE | `/api/admin/connections/{service}` | Remove saved connection intent, with its revision precondition | Admin |
+| POST | `/api/admin/suite/backend/publish` | No body or query; publish/reconcile Backend's own Suite association when configured | Admin |
 
 Successful mutations return HTTP 200 with `{ "ok": true }` except operations
 that explicitly return a user, key or connection. User roles and statuses are
@@ -79,8 +80,7 @@ and delete controls for manageable admins. These fields are read-only projection
 the API always enforces the same authority independently. If an older Backend
 does not return these capabilities, the independent frontend stays usable and
 disables account changes with an explicit Backend-update message.
-Target/self/configured
-account restrictions are also part of the SQL write, so a concurrent promotion
+Target and self-account restrictions are also part of the SQL write, so a concurrent promotion
 cannot bypass the current manager policy. Deleting an admin removes its account,
 keys, sessions and owned sync records with the existing deletion semantics.
 
@@ -88,7 +88,7 @@ An admin role grants no access to another account's vaults. Foreign and missing
 vaults both return 404. Vault IDs must be URL-encoded as a path segment. Vault
 `revision` and `sizeBytes` are decimal strings so browsers preserve the full int64
 range. The existing client API remains the creation/synchronization API; vault
-creation is not a new dashboard operation in this point.
+creation uses the client API rather than a separate administration route.
 
 `GET /api/dashboard` remains the native browser bootstrap aggregate. It uses only
 session authentication, returns an anonymous login/configuration view otherwise,
@@ -98,7 +98,7 @@ login/configuration projection does not grant administration rights.
 ## Initial Yard/Gateway configuration
 
 Here `service` is the foundation role `yard` or `gateway`, not a list of supported
-Suite products. Future product enrollment remains generic under the registry
+Suite products. Product enrollment is generic under the registry
 contract. Each entry contains `service`, `origin`, `revision`, `updatedAt` and:
 
 - `not_configured`: no saved address, with empty origin/revision/timestamp.
@@ -108,13 +108,17 @@ contract. Each entry contains `service`, `origin`, `revision`, `updatedAt` and:
 - `registered`: current technical association matches accepted membership; availability remains separate.
 - `recovery_required`: association retained but no usable credential generation.
 
-Origin validation reuses SDK `NormalizeSuiteOrigin`: HTTPS IP/hostname with an
-optional port or dedicated domain, with root slash normalized. Credentials,
-queries, fragments, `/apps/...` and other base paths are rejected. Saving does
-not resolve DNS, fetch a declaration, probe a service, install a pin, provision a
-credential or register a product. [Suite trust APIs](suite-trust.md) now implement
-network/TLS verification, pairing and credential lifecycle separately. No credential
-is sent to a target by these address APIs. No pairing secret is stored in this table.
+Origin validation uses SDK `NormalizeSuiteOrigin`: an HTTP or HTTPS IP/hostname
+with an optional port, with a root slash normalized. Credentials, queries,
+fragments, `/apps/...` and other base paths are rejected. Private HTTP origins
+are supported without certificates.
+
+Saving an address stores native web configuration only. **Verify** contacts the
+product's same-host Unix socket and checks its actual declaration; **Connect**
+performs pairing, credential delivery, acknowledgment and registration. The web
+URL is not fetched to establish same-host presence. The browser receives no
+pairing secret or service credential. See [automatic local setup](suite-local.md)
+and [service trust](suite-trust.md).
 
 Create with `If-None-Match: *`. Change/remove with `If-Match: "<revision>"` using
 the current entry's opaque revision. PUT also returns that quoted value in ETag.
@@ -137,7 +141,7 @@ const response = await fetch('/api/admin/connections/yard', {
     'X-Nox-Request': '1',
     'If-None-Match': '*',
   },
-  body: JSON.stringify({ origin: 'https://192.168.10.10:8443' }),
+  body: JSON.stringify({ origin: 'http://yard.home.arpa:8095' }),
 });
 // Check response.ok; 412 requires a fresh read and administrator review.
 ```
@@ -184,14 +188,25 @@ data backup and the matching old images/topology; it must not run an old binary
 against the upgraded database or delete migration records to bypass validation.
 A frontend-only rollback to a compatible UI does not roll back the database.
 
-CI and release workflows already run all Go tests, frontend checks/tests and the
-real split-image/browser checks. The point-3 tests run through those existing
-jobs. [Pairing/trust (4)](suite-trust.md) is now implemented separately.
-[Registry/events (5)](suite-registry.md) and [issuance (6)](suite-authorization.md)
-are implemented separately. [Suite product adaptation (7)](suite-product.md) and
-[native integration administration (8)](suite-administration.md) are implemented.
-See the [delivery checklist](suite-delivery.md) for installed/remote verification.
+CI and release workflows run the Go and frontend checks and disposable
+split-image/browser validation. Related contracts cover [service trust](suite-trust.md),
+[registry/events](suite-registry.md), [delegation](suite-authorization.md),
+[Suite MCP](suite-product.md) and [native Suite administration](suite-administration.md).
+See [delivery](suite-delivery.md) for installed verification.
 
+## Backend tool publication
+
+With `NOX_BACKEND_SUITE_MCP_ENABLED=true`, the authenticated administrator dashboard
+calls `POST /api/admin/suite/backend/publish` automatically. It uses the existing
+session and CSRF protection; explicit callers can use an active admin personal key.
+The route accepts no body or query and returns `{ "enabled": true }` on success
+when Suite MCP is enabled. It never returns service credentials.
+
+Publication uses the normal pairing/proof/ACK/registration operations and private
+storage. Repeated unchanged publication keeps the association/revision. Recovery
+after restart remains bound to the originating administrator's active role and
+Auth admission. Removed/revoked associations are not silently recreated. See
+[Backend product setup](suite-product.md#trust-and-enrollment).
 
 ## Suite administration snapshot
 

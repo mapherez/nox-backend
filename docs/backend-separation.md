@@ -1,6 +1,6 @@
 # Backend refactor: compatibility, validation, update and rollback
 
-This guide records the earlier repository/name refactor. The subsequent frontend/backend container separation has an explicit [deployment migration](frontend-deployment.md#existing-installations). Preserve the storage and client contracts below while applying that topology change.
+This guide records the earlier repository/name refactor, not the current fresh-install procedure. Use [setup](user-setup.md), [NoX Login](nox-login.md) and [delivery](suite-delivery.md) for current requirements. Historical native-Google settings do not configure current login. The subsequent frontend/backend container separation has an explicit [deployment migration](frontend-deployment.md#existing-installations). Preserve the storage and client contracts below while applying that topology change.
 
 NoX Backend is independent from the [NoX Sync plugin](https://github.com/mapherez/nox-sync).
 The refactor changes internal names and the dashboard presentation, preserving
@@ -9,7 +9,7 @@ The nox-wiki-codex read integration keeps its conditional downloads and original
 
 ## Configuration and storage compatibility
 
-Use `NOX_BACKEND_*` for new configuration. All matching `NOX_SYNC_*` runtime
+Use `NOX_BACKEND_*` for new configuration. Matching `NOX_SYNC_*` non-authentication runtime
 variables remain accepted: non-empty canonical value, then non-empty legacy
 value, then the existing default. Compose resolves both names using the same rule.
 The server executable is `nox-backend`. The obsolete `nox-sync` executable alias

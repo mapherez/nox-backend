@@ -2,9 +2,11 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest backend release/image maintained in this repository. Backend and plugin releases are independent.
+Security fixes are provided for the latest backend release/image maintained in this repository. Backend and its clients have independent releases.
 
-The Obsidian plugin is maintained in [mapherez/nox-sync](https://github.com/mapherez/nox-sync); report plugin-specific vulnerabilities through that repository's security policy.
+Report vulnerabilities specific to independently maintained clients or NoX Auth
+through their respective repositories. Backend's integration boundaries remain
+in scope here.
 
 ## Reporting a vulnerability
 
@@ -26,7 +28,8 @@ Helpful reports include:
 In scope:
 
 - Unauthorized access to another user's vaults.
-- API key, OAuth, or session handling issues.
+- API key, NoX Login integration or session handling issues.
+- Suite credential, delegation, pairing or authorization-boundary failures.
 - Sync data corruption caused by backend logic.
 - Path traversal or filesystem access outside intended backend data paths.
 - Unsafe handling of uploaded or downloaded file content.
@@ -42,6 +45,13 @@ Out of scope:
 
 ## Security model
 
-NoX Backend is self-hosted and owns user access, vault ownership, sync locks, remote state, and commits. The dashboard uses Google OAuth; API clients use per-user `noxsync_` keys. Users cannot access each other's vaults.
+NoX Backend is self-hosted and owns user access, vault ownership, sync locks, remote state, and commits. The dashboard uses NoX Login through the shared Auth service, which owns Google authentication and the allowed-account list. Backend enforces local roles/status and data ownership; API clients use per-user `noxsync_` keys and central admission checks. Users cannot access each other's vaults.
 
-The separate NoX Sync plugin connects to the Server URL configured by the user. Keep backend `/data` backups and API keys private. Repository separation preserves the existing authentication and storage behavior.
+Suite service operations use the shared same-host Unix channel with scoped
+credentials and signed delegations. Native TCP/HTTPS access does not grant that
+channel. The frontend receives neither the data volume nor service credentials;
+only the one-shot Auth setup service receives the restricted setup volume.
+
+Keep complete Backend backups, personal keys, login state and Suite secret storage
+private. Report Backend integration vulnerabilities here; consumer-specific or
+Auth-provider issues belong to their respective repositories.

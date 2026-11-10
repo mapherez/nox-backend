@@ -1,11 +1,20 @@
-# NoX Suite migration status and compatibility baseline
+# Historical Backend implementation and validation record
 
-Current authentication responsibility: [NoX Login](nox-login.md) supersedes the historical native-Google/Backend-allowlist entries below. Google credentials and account admission belong only to Auth; preserve Backend data, roles and independent keys. Update Auth before this adapter.
+This preserves implementation checkpoints and their evidence. It is not the current
+installation, configuration or API reference. Entries describe behavior at their
+recorded checkpoint, including superseded HTTPS-only service transport, native
+Google login, SDK versions and work that was pending then. Do not apply those
+statements as current setup instructions.
 
-**Current implementation:** SDK `0.7.3`, local-only service transport and automatic foundation setup are described in [the current guide](suite-local.md). The obsolete `nox-sync` executable and manual browser secret-transfer controls have been removed.
+Current guides:
 
-**Correction history:** [same-host integration and automatic setup](suite-local.md) records the current Backend work against SDK `0.7.2`, including migration 8 and the local volume. The numbered eight-point implementation history below is retained as historical evidence; it is distinct from the fixed 12-point correction sequence and does not override the owner's subsequent same-host clarification.
+- [Overview](../README.md), [setup](user-setup.md) and [configuration](backend-configuration.md).
+- [NoX Login](nox-login.md) and [same-host Suite setup](suite-local.md).
+- [Backend MCP publication](suite-product.md), [delivery](suite-delivery.md) and [troubleshooting](troubleshooting.md).
 
+Current Backend uses SDK 0.7.3 / Suite contract 1.0. Google credentials and admission
+belong to Auth; service traffic uses the shared Unix channel. The chronological
+records below do not override the current guides.
 
 **Historical record of the earlier eight-point implementation.** These point numbers
 are not the later 12-point correction sequence. Original Backend baseline: commit `a2382ec` (`v1.0.7`).

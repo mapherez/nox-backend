@@ -1,20 +1,18 @@
 # Suite authority, pairing and service trust
 
-This implements Backend work point 4 against the published NoX MCP `0.7.3`
-contracts, wire version `1.0`. The [approved work sequence](suite-migration.md)
-links the authoritative Gateway/integration documents. These APIs are HTTP
+Backend implements service trust with published NoX MCP `0.7.3`, wire contract
+`1.0`, over the [same-host channel](suite-local.md). These APIs are HTTP
 management operations, not new MCP methods. They work for any conforming product;
 `gateway`, `installer` and `product` are technical purposes, not a product catalog.
 
 Backend now persists its issuer, ES256 signing keys, verified service associations,
 credential generations, pairing recovery and conditional/idempotent outcomes.
-[Registry membership/event delivery](suite-registry.md) is implemented in point 5.
-[User/probe token issuance](suite-authorization.md) is implemented in point 6.
-[Backend Suite MCP adaptation](suite-product.md) is implemented in point 7.
-[Native integration setup](suite-administration.md) is implemented in point 8;
-[delivery and installed validation](suite-delivery.md) have an explicit checklist.
+Related contracts cover [registry/events](suite-registry.md),
+[user/probe delegation](suite-authorization.md), [Backend Suite MCP](suite-product.md)
+and [native setup](suite-administration.md). Use [delivery](suite-delivery.md)
+for updates and installed validation.
 A paired service is not a registered product and has no integrated execution rights.
-Existing direct `/mcp`, `/v1/*`, Google login and native account/vault administration
+Existing direct `/mcp`, `/v1/*`, NoX Login and native account/vault administration
 retain their own authentication and behavior.
 
 ## Transport and target policy
@@ -29,7 +27,7 @@ TLS remains an independent option for the existing native web/client listener or
 
 ## Caller authority and service grants
 
-Administrator calls use an existing active Google-backed session or personal
+Administrator calls use an existing active NoX Login browser session or personal
 Bearer key. Cookie mutations additionally require `X-Nox-Request: 1` and a matching
 browser origin, just like native administration. Authentication and authorization
 are rechecked against Backend-local state for each management request and again
@@ -184,7 +182,7 @@ clock safety margin and monotonic/high-water bounds; it does not extend an origi
 expiry after clock rollback. Significant rollback fails closed until synchronized
 time is restored. Expiry is checked on every call independently of the 30-second
 housekeeping cadence. Pairing/rotation timers concern service provisioning, not a
-person's work session or Google login. See [user/probe issuance](suite-authorization.md) for the implemented point-6 exchanges.
+person's work session or Google login. See [user/probe issuance](suite-authorization.md) for delegation behavior.
 
 ## Persistence, backup and state
 
@@ -208,8 +206,8 @@ Encrypted files are installed before their metadata commit; failed mutations
 roll back their state, outcome and invalidation together. Ambiguous commit failure
 preserves files for reconciliation. Startup validates references and collects only
 uncommitted file orphans under the same SQLite write reservation as secret creators.
-Persistent invalidations are in `suite_trust_events`; public event delivery and
-registry mutations and event delivery are implemented by the [point-5 APIs](suite-registry.md).
+Persistent invalidations are in `suite_trust_events`; registry mutations and
+public event delivery are implemented by the [registry APIs](suite-registry.md).
 
 The native frontend reports `not_configured`, `not_paired`, `pairing_pending`,
 `paired` (shown as **Service paired · Registration pending**), `registered`

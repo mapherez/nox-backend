@@ -2,11 +2,11 @@
 
 NoX Backend is configured with environment variables and stores all persistent state under `/data` inside the container.
 
-For an existing deployment, follow the [repository separation and update guide](backend-separation.md) before changing the image. Preserve the original deployment folder, Compose project, configuration, and data mount.
+For an existing deployment, follow [updates and delivery](suite-delivery.md) before changing the image. The [repository separation guide](backend-separation.md) covers older naming/topology transitions. Preserve the original deployment folder, Compose project, configuration, and data mount.
 
 ## Quick Docker Compose Setup
 
-For a new installation, the easiest backend setup is (after the new image has been published):
+For a new installation:
 
 1. Run the compatible NoX Auth service on the same Docker host first; see [NoX Login](nox-login.md) for required service capability and update order.
 2. Download `docker-compose.yml` from the repository.
@@ -28,7 +28,7 @@ curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-com
 Example `.env` file for a domain deployment:
 
 ```bash
-NOX_BACKEND_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_PUBLIC_URL=https://backend.example.com
 NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
@@ -61,7 +61,7 @@ From a terminal in the folder containing both files:
 docker compose up -d
 ```
 
-Docker Desktop/Yard should show `backend` and `frontend` services in the same project. The backend container retains the name:
+Docker Desktop/Yard shows `backend`, `frontend` and the one-shot `auth-setup` service in the same project. A successful setup exit is normal. The backend container retains the name:
 
 ```text
 nox-backend
@@ -73,7 +73,7 @@ The frontend owns host port `5710`; it forwards backend routes to the internal b
 localhost:5710 -> frontend:8080 -> backend:8080
 ```
 
-If you change the left side of the port mapping, also use that host port in your browser and plugin Server URL.
+If you change the left side of the port mapping, also use that host port in your browser and client base URL.
 
 ## Environment Variables
 
@@ -82,7 +82,7 @@ If you change the left side of the port mapping, also use that host port in your
 | `NOX_BACKEND_ADDR` | `:8080` | HTTP listen address inside the container or process. |
 | `NOX_BACKEND_DATA_DIR` | `/data` | Persistent backend data directory. |
 | `NOX_BACKEND_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
-| `NOX_BACKEND_PUBLIC_URL` | request-derived URL | Exact browser-facing HTTP(S) origin, including a non-default port. Required by Compose and registered automatically with Auth. |
+| `NOX_BACKEND_PUBLIC_URL` | unset outside Compose | Exact browser-facing HTTP(S) origin, including a non-default port. Required by Compose and NoX Login setup; registered automatically with Auth. |
 | `NOX_AUTH_PUBLIC_URL` | none | HTTPS issuer of the shared Auth service. Required by Compose. Google credentials and allowed emails are configured there only. |
 
 ## NoX Login
@@ -102,7 +102,7 @@ The root `docker-compose.yml` is the minimal production-oriented example:
 docker compose up -d
 ```
 
-It targets the paired images published by this repository (use a release containing the frontend/backend separation):
+It uses compatible Backend/frontend images published by this repository:
 
 ```text
 ghcr.io/mapherez/nox-backend:latest
@@ -128,18 +128,18 @@ Set the two required origins and use the same existing Auth volume names. The se
 
 ## Domain And Reverse Proxy Deployments
 
-If you run NoX Backend behind a reverse proxy, the proxy should forward traffic to the backend container on port `8080`.
+Point the reverse proxy at the frontend's published host port (5710 by default), or its port 8080 on a shared deployment network. Keep Backend private behind the frontend.
 
 Example public URL:
 
 ```text
-https://sync.example.com
+https://backend.example.com
 ```
 
 Required matching settings:
 
 ```bash
-NOX_BACKEND_PUBLIC_URL=https://sync.example.com
+NOX_BACKEND_PUBLIC_URL=https://backend.example.com
 ```
 
 Auth automatically registers `NOX_BACKEND_PUBLIC_URL` plus `/auth/nox/callback`.
@@ -158,10 +158,11 @@ The backend creates and uses these paths under `NOX_BACKEND_DATA_DIR`:
 | `/data/blobs` | Finalized file contents stored by SHA-256 hash. |
 | `/data/staging` | Temporary upload content for active sync sessions. |
 | `/data/logs` | Reserved log directory. Docker console logs are still the primary runtime log target. |
+| `/data/secrets/suite` | Encrypted Suite keys/recovery material and master key; back up with the database. |
 
 Back up the whole `/data` directory as one unit. Restoring only the database or only the blobs can leave metadata and file content out of sync.
 
-This release uses the multi-user, multi-vault schema. Existing databases must already have migrations 1, 2 and 3 with the expected schema. Older or unknown schemas are refused before startup migrations; the historical reset is never used as an automatic upgrade of existing data.
+Backend uses the multi-user, multi-vault schema with additive Suite migrations. Existing databases must already have migrations 1, 2 and 3 with the expected schema. Older or unknown schemas are refused before startup migrations; the historical reset is never used as an automatic upgrade of existing data.
 
 ## Vault Delete, Restore, And Storage Usage
 
@@ -203,7 +204,7 @@ For local source builds, use the development Compose file:
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-This builds `./backend` locally and mounts `./data` to `/data` for easy inspection while developing.
+This builds `./backend` and `./frontend` independently and mounts disposable `./data` into Backend. The same-host Auth prerequisite and enrollment volumes also apply to development Compose.
 
 ## Local Docker Image Build
 
@@ -242,7 +243,7 @@ For backend API-only development, you can run that local image directly (it does
 docker run --rm --name nox-backend-dev -p 5710:8080 -v nox-backend-dev-data:/data nox-backend:dev
 ```
 
-The production Compose example uses both `ghcr.io/mapherez/nox-backend:latest` and `ghcr.io/mapherez/nox-backend-frontend:latest`; both compatible images must be published before it can pull them. Use the development Compose example for the complete native frontend/backend from source. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
+The production Compose example uses both `ghcr.io/mapherez/nox-backend:latest` and `ghcr.io/mapherez/nox-backend-frontend:latest`; select compatible published versions for both services. Use the development Compose example for the complete native frontend/backend from source. Building a local image does not publish anything to GitHub Container Registry. Running NoX Backend does not require external databases or external sync providers.
 
 Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
 `NOX_SYNC_*` values. Existing non-authentication aliases remain supported; the old Backend Google/allowlist variables are replaced by NoX Auth configuration. The physical database
@@ -289,6 +290,19 @@ used. Their old aliases do not enable service networking. No certificate or prox
 allowlist setup is needed for the local channel. Existing native TLS certificate,
 key and healthcheck CA options remain available for the web/client listener.
 
+### Image and volume selection
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NOX_BACKEND_IMAGE_TAG` | `latest` | Backend image tag; also the frontend default unless overridden. |
+| `NOX_BACKEND_DATA_VOLUME_NAME` | `nox-backend-data` | Actual data volume; preserve an existing installation's name. |
+| `NOX_SUITE_LOCAL_VOLUME_NAME` | `nox-suite-local` | External runtime volume created by Auth, shared by same-host participants. |
+| `NOX_AUTH_ADMIN_VOLUME_NAME` | `nox-auth-admin` | External Auth setup volume, mounted only by `auth-setup`. |
+
+The production Compose uses external Auth/runtime volumes so a missing volume
+fails rather than creating a disconnected installation. Auth creates them first.
+See [`.env.example`](../.env.example) for supported deployment defaults.
+
 ### Suite registry observations
 
 `NOX_BACKEND_SUITE_REPORT_INTERVAL_MS` defaults to `15000` and
@@ -304,6 +318,9 @@ existing public/personal-key policy. `NOX_BACKEND_SUITE_MCP_ENABLED=false` keeps
 Suite MCP opt-in. When enabled, `/mcp/suite` accepts Suite grants only through the
 local channel. HTTPS and forwarded headers do not enable that path over TCP.
 Both flags accept only `true`/`false` and retain their existing environment aliases.
+When enabling Backend Suite MCP, install compatible Backend/frontend images and
+open the administrator dashboard to initiate its automatic publication. A flag
+or declaration alone does not establish membership. See [Suite product setup](suite-product.md).
 
 **Manage Suite integrations** provides inspection and non-secret administration
 through `/api/admin/suite` and `/api/admin/suite/operations/*`. Pairing, provisioning

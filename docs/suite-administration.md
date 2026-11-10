@@ -10,7 +10,7 @@ Saving the address alone establishes no trust. Verification establishes no membe
 
 ## Configuration and current state
 
-`GET /api/admin/suite` supplies the authenticated no-store administration projection using an existing personal admin key or Google session. Current active role is rechecked in storage. It reports issuer/signing keys, conditional revisions, current/provisioned services and credentials, recent pairings, authorized deployment references, registrations and observations. It returns no service credentials, pairing secrets, proofs, private keys, verifiers or encrypted-store handles.
+`GET /api/admin/suite` supplies the authenticated no-store administration projection using an existing personal admin key or NoX Login browser session. Current active role is rechecked in storage. It reports issuer/signing keys, conditional revisions, current/provisioned services and credentials, recent pairings, authorized deployment references, registrations and observations. It returns no service credentials, pairing secrets, proofs, private keys, verifiers or encrypted-store handles.
 
 The complete view is bounded at 2 MiB. Historical retired services and old revoked credential generations are not an unbounded history. Use scoped advanced management operations if the snapshot exceeds the bound. A Suite dependency failure leaves native account/vault controls usable.
 
@@ -20,7 +20,7 @@ The complete view is bounded at 2 MiB. Historical retired services and old revok
 
 **Manage Suite integrations** retains inspection, conditional/idempotent service/key revocation, signing-key lifecycle and registry recovery. Browser operations go through `/api/admin/suite/operations/*`, behind the existing active-admin and CSRF checks. Direct network `/api/nox/*` and `/mcp/suite` calls are refused, even with TLS or forwarding headers. Service credentials are not accepted through the human adapter; participant-only completion/acknowledgement must occur on the local channel.
 
-The panel inspects pairing state and retains cancellation, service/credential revocation, registration recovery and signing-key management. It has no manual pairing/proof/provisioning forms or credential-copy controls. Use the connection cards for foundations and the adapted Yard for installed products. The local protocol retains credential rotation for participant integrations; this cleanup does not implement a new automatic rotation receiver in unadapted products. Product registration is not inferred from a product name, URL, socket or UI choice.
+The panel inspects pairing state and retains cancellation, service/credential revocation, registration recovery and signing-key management. It has no manual pairing/proof/provisioning forms or credential-copy controls. Use the connection cards for foundations and the adapted Yard for installed products. The local protocol retains credential rotation for participant integrations; automatic credential-rotation support depends on the participant adapter. Product registration is not inferred from a product name, URL, socket or UI choice.
 
 The browser journals only non-secret operation metadata, per user/tab. It retains durable keys for exact retry and marks uncertain responses for reconciliation. Private proof/credential bodies and secret results are not accepted as browser operations. Old manual-operation records must be reconciled and cleared rather than replayed. SHA-256 fingerprinting and secure random operation IDs work in HTTP contexts without relying on HTTPS-only browser APIs. Pairing and credential acknowledgement remain participant responsibilities, including private persistence before acknowledging.
 
@@ -28,4 +28,4 @@ Revocation invalidates active use; it does not uninstall products or delete thei
 
 ## Verification boundary
 
-Current tests exercise the native dashboard/API, real local protocol exchanges, response loss and restart using disposable data. The existing native frontend and all Backend consumers remain supported by their own API contracts. Test fixtures do not claim that Gateway, CLI, Portal or the Yard adapter have already been implemented. See [delivery guidance](suite-delivery.md).
+Current tests exercise the native dashboard/API, real local protocol exchanges, response loss and restart using disposable data. The existing native frontend and all Backend consumers remain supported by their own API contracts. An isolated participant fixture verifies the protocol, not the behavior of every installed product. See [delivery guidance](suite-delivery.md).

@@ -1,9 +1,10 @@
 # Backend as a NoX Suite product
 
-Backend point 7 implements the protected product adapter using the published
+Backend provides a protected Suite product adapter using the published
 NoX MCP Go SDK `v0.7.3` and Suite contract `1.0`. It shares the ten existing MCP
 operations and storage with [direct MCP](mcp.md) and the Stable Client API.
-Gateway, CLI and Portal are separate products; this work does not implement them.
+Gateway routes this adapter to clients; the CLI renders its human-menu definitions.
+Those applications and the future Portal have separate repositories.
 The native frontend remains part of this Backend project.
 
 ## Paths and independent configuration
@@ -147,7 +148,7 @@ Timeout/cancellation of writes retains the SDK's unknown-outcome/no-automatic-re
 semantics. Read current state before retrying an uncertain mutation.
 
 A five-minute delegation reuse bound is not a working-session timeout. A user can
-work for hours; the future Gateway renews expired grants when a new operation needs
+work for hours; Gateway renews expired grants when a new operation needs
 them. The product adapter does not prompt for Google login every five minutes.
 
 ## Validation and delivery boundary
@@ -165,6 +166,6 @@ boundary and rejection of forged HTTP transport claims on `/mcp/suite`; its
 frontend-only mode covers the new proxy guard independently. Native frontend,
 API/direct MCP, sync streaming and frontend replacement remain covered by the
 existing Chromium/split-deployment checks. No database migration is added here.
-[Native integration administration](suite-administration.md) is implemented in point 8.
+[Native integration administration](suite-administration.md) provides setup and recovery.
 See the [delivery guide](suite-delivery.md) for publication/installed validation and
 the boundary with subsequent Gateway/product work.

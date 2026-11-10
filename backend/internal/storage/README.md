@@ -11,6 +11,8 @@ File contents are stored outside SQLite:
 ```text
 /data/
   nox-backend.db
+  nox-login.db
+  secrets/suite/
   blobs/
   staging/
   logs/
@@ -21,8 +23,7 @@ File contents are stored outside SQLite:
 The multi-user, multi-vault schema stores:
 
 - users and Google identity metadata
-- server-side web sessions
-- OAuth state tokens
+- retained legacy web-session/OAuth metadata (current NoX Login state is separate)
 - per-user API keys
 - per-user vaults
 - vault-scoped files, revisions, tombstones, locks, sessions, plans, uploads, and conflicts
@@ -43,7 +44,7 @@ runs as an automatic upgrade. Later additive migrations are applied only after
 validating the exact schema corresponding to the recorded history. Migration 4
 adds non-secret foundation connection intent (origin, opaque revision, timestamp).
 Unknown histories, missing historical baseline and schema mismatches are refused
-before modification. Older binaries reject migration 4; retain a pre-upgrade
+before modification. Older binaries reject migrations newer than their supported history; retain a pre-upgrade
 backup for rollback. See [administration persistence](../../../docs/administration-api.md#persistence-and-delivery).
 
 Existing `nox-sync.db` is used in place. `nox-backend migrate-database` performs an explicit offline SQLite copy to `nox-backend.db`, retaining `nox-sync.db.legacy`. Both active filenames at once, or an interrupted migration with only the archive left, cause startup to fail rather than create an empty replacement. Back up all of `/data` before running the command. See [the update guide](../../../docs/backend-separation.md).
@@ -84,3 +85,20 @@ and key rotation/deletion commit their invalidations atomically through schema-g
 triggers. It also records admission failure for a verified incompatible product
 update. JWTs are signed from the persistent secret store and never persisted as
 replay outcomes. See [authorization issuance](../../../docs/suite-authorization.md).
+
+## Local setup and NoX Login storage
+
+Migration 8 adds the non-secret Suite connection journal for verification,
+configuration-bound setup, delivery recovery and registration reconciliation.
+Pairing/provisioning secrets remain in the private Suite store, not the journal
+or browser. See [same-host setup](../../../docs/suite-local.md).
+
+Current browser enrollment, identity bindings, transactions and sessions use
+`nox-login.db` beside the main database. Google credentials and admission lists
+belong to Auth, not this schema. Historical identity/session columns in the main
+database are retained; they do not mean Backend runs a Google OAuth provider.
+See [NoX Login](../../../docs/nox-login.md).
+
+Back up the complete data directory consistently, including both databases and
+SQLite sidecars, blobs and the entire Suite secret store. A main-database copy
+alone is not a complete login or service-trust backup.

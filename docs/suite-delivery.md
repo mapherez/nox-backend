@@ -1,65 +1,93 @@
-# Backend delivery and remaining product work
+# Backend releases, updates and validation
 
-Current authentication responsibility: [NoX Login](nox-login.md) supersedes the historical native-Google/Backend-allowlist entries below. Google credentials and account admission belong only to Auth; preserve Backend data, roles and independent keys. Update Auth before this adapter.
+This guide covers the current Backend project: separate Backend/frontend images,
+NoX Login, persistent data and same-host Suite integration. The
+[implementation record](suite-migration.md) is historical evidence, not deployment
+instructions. For a new installation use [setup](user-setup.md).
 
-The earlier eight-point sequence is historical delivery context. The current correction follows the fixed sequence recorded in NoX MCP; [same-host setup](suite-local.md) describes this Backend change. The
-[progress record](suite-migration.md) records local validation and its exact scope.
-Publishing and applying the resulting images remain operator-controlled actions.
-This repository work does not itself push commits, run remote workflows, publish
-a release, replace installed containers or modify installed volumes.
+## Release from source
 
-## Deliver the Backend
+Use `npm run release` from a clean repository checkout with the required Go,
+Node/npm, Git and Docker tools. The script validates the version, Go/frontend
+code and both image builds before committing and pushing the version/tag.
+GitHub CI and Release perform their own checks and publication. A local success
+or push is not confirmation that the remote workflow or publication succeeded.
+See the [release overview](../README.md#releases-and-updates).
 
-1. Review/commit the changes and push them to GitHub. Require the CI jobs for this
-   exact commit to pass. They include Go race/vet/format checks, React checks/tests,
-   release/readiness tooling, packaged version/health contracts, native Chromium
-   flows and the full native Suite administration flow through real HTTP and local Unix sockets.
-2. Run the usual release process after CI approval. Release validates its tagged
-   source and both images, including the same packaged version matrix and HTTP/local-channel
-   browser flow before publishing. Stable/prerelease tagging and separate
-   `nox-backend`/`nox-backend-frontend` images retain the existing behavior.
-3. Back up the existing complete `/data` consistently. Preserve the actual volume,
-   project, public origin, Google callback and configuration. Apply the selected
-   published images using the existing Compose/Yard project and both services.
-   The current correction adds migration 8 (non-secret setup journal) and the local Suite volume/mount. Preserve the existing encrypted private store as well as the database.
-4. Confirm native login, account/manager controls, personal keys, owned vaults,
-   existing connected clients and the dependent frontend entry points on the
-   installed deployment. Backend's compatibility tests retain those routes and
-   authentication contracts. Real Google account consent and another application's
-   complete runtime remain installed-deployment checks, not simulated claims.
-5. Use the local channel prepared by the deployment and the [native connection cards](suite-administration.md). HTTPS, target CIDRs, certificate copying and trusted proxy configuration are not prerequisites for local association. Suite MCP remains opt-in. To expose Backend tools through Gateway, set `NOX_BACKEND_SUITE_MCP_ENABLED=true`, install both updated Backend/frontend images and open the dashboard with the existing administrator account. Its normal flow publishes the Backend automatically; manual product registration is not required.
+Stable releases publish versioned Backend/frontend images and update both
+`latest` tags. Prereleases leave `latest` unchanged. A separate frontend workflow
+can publish a compatible immutable `sha-<commit>` image without rebuilding Backend;
+see [independent frontend updates](frontend-deployment.md#published-images-and-independent-frontend-updates).
 
-The separate frontend publication workflow still builds/checks only the frontend,
-including its standalone proxy guard, and publishes an immutable commit tag.
-A frontend-only replacement does not rebuild Backend or touch its data. A newer
-frontend with an older Backend can keep native functions usable while a missing
-Suite administration API is shown as unavailable; use matching versions for the
-new integration controls.
+## Update an existing installation
 
-## Validation boundaries
+1. Record the existing Compose project, origin/port, image references and actual
+   data/runtime/setup volume names. Retain the previous Compose and `.env` privately.
+2. Back up the complete Backend data consistently, including the main SQLite
+   database and sidecars, blobs, `nox-login.db` and `secrets/suite`. Do not run
+   `docker compose down -v` or replace an existing volume with a new default.
+3. Ensure compatible NoX Auth is installed first. It must provide `/v1/admission`.
+   Google credentials and allowed emails belong there, not in Backend's `.env`.
+4. Apply relevant shipped Compose changes as well as images when upgrading an
+   older topology: `auth-setup`, separate Backend/frontend services and the
+   external runtime/setup volumes. Backend runtime mounts the shared local volume;
+   only setup receives Auth's restricted admin volume. Preserve the actual data mount.
+5. Select compatible image tags, then use the existing project/options:
 
-Tests use actual disposable Backend images/storage, the actual frontend/proxy,
-the released SDK verifier/client and an explicitly identified local protocol
-participant. They exercise actual pairing/ACK/registration and credential/key
-rotation without requiring Gateway, Portal or an adapted Yard to exist.
-No test participant is a shipped product or a product-specific contract.
+```sh
+docker compose pull
+docker compose up -d
+```
 
-The current dependent clients' personal-key `/v1/auth/check`, vault, file listing,
-conditional download and sync contracts remain covered by the existing Backend
-regression suite and image checks. Source references in NoX Sync and NoX Wiki Codex
-still use those preserved routes; this work does not adapt or execute those other
-applications. Browser session/redirect/key-copy/native form entry points remain
-covered through the actual frontend image. Manual owner checks of earlier installed
-Backend steps are recorded separately from these disposable tests.
+The frontend inherits `NOX_BACKEND_IMAGE_TAG` unless overridden by
+`NOX_FRONTEND_IMAGE_TAG`. Pulling/recreating images alone does not add missing
+services, mounts or configuration. Current default volume names and required
+origins are documented in [configuration](backend-configuration.md).
 
-Local completion does not claim a new GitHub run has passed, that unpublished
-images are installed, or that the whole NoX Suite already runs end to end.
+Moving from native Google login to NoX Login requires one new browser login.
+Existing identity bindings, roles, personal keys and vault ownership are retained;
+no API-key rotation is required for the change. Auth setup persists and reuses its
+installation-specific client. Do not copy or reveal generated setup credentials.
 
-## Next separate implementations
+## Confirm the installed update
 
-Implement the Gateway and installer/product adapters against SDK `0.7.3` and Suite
-wire `1.0`, then the dependent CLI flows. Build the Portal as its own application;
-the Backend's native frontend stays in this project. Existing and future products
-must implement the same contracts. Product-specific work does not require another
-numbered Backend implementation phase merely because those products do not yet
-exist; any subsequently discovered defect is handled as a concrete fix.
+- Check successful Auth setup, Backend health and frontend dashboard access.
+- Sign in through NoX Login; confirm account/manager controls, owned vaults and
+  current API-key access. Check the existing clients and native frontend consumers.
+- Verify file reads, conditional downloads and synchronization as applicable to
+  the installation. These contracts do not require Suite membership.
+- Check existing Yard/Gateway connections and recovery state. Their web URLs may
+  use private HTTP; local service communication requires no certificates/CIDRs.
+- If exposing Backend MCP through Gateway, enable
+  `NOX_BACKEND_SUITE_MCP_ENABLED=true` and open the administrator dashboard with
+  compatible Backend/frontend images. It publishes Backend automatically. Refresh
+  the client's catalog and execute a read-only tool; do not equate a declaration
+  or stored URL with registration or MCP readiness.
+
+## Rollback and restore
+
+A compatible frontend-only rollback changes no Backend data. A Backend rollback
+across schema additions requires the previous binary/images and a matching full
+pre-upgrade data backup. Do not run older binaries against a newer schema or edit
+migration records to bypass validation. An authentication rollback also needs
+its matching previous Compose and login configuration.
+
+After restoring complete Suite authority from backup, follow the explicit offline
+[event-cursor reset procedure](suite-registry.md#events-and-reconciliation).
+Routine restarts do not require that reset. Restore matching secret storage with
+SQLite; missing keys must not be replaced to force startup.
+
+## Verification scope
+
+CI/release checks include Go and frontend tests, disposable image/version checks,
+NoX Auth Compose enrollment and native HTTP/local-Suite browser flows. The
+[frontend guide](frontend-deployment.md#verification) lists the concrete scripts.
+They use isolated accounts, sessions, storage and protocol participants, not
+installed data or personal credentials.
+
+These checks validate the interfaces they exercise. They do not establish that
+any arbitrary product adapter works, that a remote workflow passed, or that the
+complete installed Suite has been validated. Yard deployment behavior, Gateway
+routing, CLI navigation and other products retain their own repositories and
+validation. Backend remains the data/integration authority and keeps its native
+frontend; no additional deployment manager or replacement Portal is introduced.

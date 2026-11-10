@@ -1,6 +1,9 @@
 # Same-host Suite integration and automatic foundation setup
 
-This implements the Backend part of **4. Completar a configuração inicial no Backend**, including its remaining work under **2. Corrigir o transporte e a configuração dos endereços**. It consumes NoX MCP `v0.7.3`, wire contract `1.0`, and follows the [same-host integration record](https://github.com/mapherez/nox-mcp/blob/v0.7.3/Documents/SUITE_SAME_HOST_INTEGRATION.md). The original Suite implementation plan is not rewritten. The subsequent cleanup removes the obsolete server executable alias, unused network-policy configuration and manual secret-transfer browser controls; the local participant protocol remains available.
+Backend uses NoX MCP `v0.7.3`, wire contract `1.0`, and the
+[same-host integration contract](https://github.com/mapherez/nox-mcp/blob/v0.7.3/Documents/SUITE_SAME_HOST_INTEGRATION.md).
+This guide describes current setup and transport; the [implementation record](suite-migration.md)
+is historical context, not installation instructions.
 
 ## Runtime and deployment
 
@@ -62,32 +65,18 @@ Return `200`, `202` or `204` only for accepted delivery; Backend still requires 
 
 Yard's subsequent adaptation prepares this channel through its existing deployment/jobs/configuration/recovery system and initiates registration of installed products. Gateway consumes the authorized registry and uses the same local mapping. No additional installer, certificate service or product catalog is introduced here.
 
-## Point 5 — Preservar os usos existentes do Backend
+## Existing clients and storage
 
-The compatibility review compares the local-channel correction with released
-Backend `v1.0.15` (`577f461`). It covers native contracts for every consumer;
-existing products do not need Suite membership to keep using those contracts.
+Native HTTP APIs and direct MCP remain available without Suite membership or
+mounting the runtime volume into client applications. NoX Login provides browser
+authentication; personal-key APIs retain their own request credentials and central
+admission checks. See [authentication](nox-login.md).
 
-| Existing use | Review and regression evidence |
-| --- | --- |
-| Native frontend and administration | Existing dashboard, Google login/callback/logout, session cookie, legacy forms, account/key/user/vault operations and ownership rules remain. The correction removes an accidental `setup` field from the native user-status request; unknown fields are rejected without changing the account. |
-| External HTTP clients | `/v1/*` routes, Bearer and legacy query-key authentication, key rotation, disabled users, file/download responses and synchronization are retained. The new service transport does not restrict these clients to the Backend host. |
-| Direct MCP | `/mcp`, its catalog/CLI metadata, personal-key authentication, ownership, structured results and integer revisions retain their native behavior. `/mcp/suite` has the separately approved local-only policy. |
-| Installed data | Migration 8 adds only the local setup journal. A dedicated version-7 upgrade/restart regression preserves personal keys, browser sessions, committed file revisions/blobs, saved native URLs/revisions, existing service credentials/identities, issuer/signing keys, secret-store master key and migration history. Existing associations are retained as data, not silently converted into working local associations. |
-| Deployment | Existing native port, public/OAuth origin, `/data`, data volume, `nox-backend` executable and environment-variable fallback remain. The new Suite volume is additional and is not mounted into the frontend. |
-
-Read-only inspection of available sibling sources confirmed the existing sync
-client's `/v1/sync/*` usage and the wiki importer’s auth/vault/file/download
-contracts. This is source compatibility evidence, not a claim that every
-external consumer or its complete frontend workflow was run. No sibling product,
-original implementation plan, publication or installed data is changed by point 5.
-
-Point 5 is complete in source. After the compatibility fix, the full
-`go test -race -count=1 -mod=readonly ./...` suite and `go vet -mod=readonly ./...`
-passed. Existing CI/release jobs already run the new regressions; no workflow
-change is required. The owner reported successful GitHub builds for point 4 and
-its temporary-path fix; these latest changes still need their own GitHub run.
-Point 6, **Adaptar o Gateway ao mesmo processo de configuração**, remains next.
+The local setup journal uses additive migration 8. Existing keys, vaults, committed
+files, issuer/signing keys and encrypted Suite state are preserved. Network-era
+associations are retained as data, not silently converted into working local
+participants. Preserve complete data and apply current Compose mounts on upgrade.
+Never reset a database to recover pairing.
 
 ## Validation and delivery boundary
 
@@ -95,4 +84,4 @@ Go tests use real Unix sockets and cover automatic pairing/ACK/registration, ide
 
 `check-suite-proxy.py --browser` exercises packaged Backend/frontend images and an explicitly disposable local protocol participant. It performs setup in an actual insecure HTTP browser context, drops a response after server commit, reloads, checks registration without duplicate delivery and rejects network service routes. It preserves authority through restart and deletes test containers/network/volume. Native split-deployment/browser and image-version checks remain required in CI/release. The test participant is not a shipped Yard implementation.
 
-Review, CI, publication and installed rollout remain separate. Update the existing Compose definition as well as the images to add the shared volume; image pull/recreate alone cannot add mounts. Preserve the existing `/data` volume, project, native ports, OAuth origin and settings. Back up the full data directory before the schema upgrade; do not use `down -v`. Gateway/Yard/CLI adaptation and actual Suite end-to-end validation remain later points in the fixed correction sequence.
+Review, CI, publication and installed rollout remain separate. Update the existing Compose definition as well as the images to add the shared volume; image pull/recreate alone cannot add mounts. Preserve the existing `/data` volume, project, native ports, OAuth origin and settings. Back up the full data directory before the schema upgrade; do not use `down -v`. Validate each installed participant and client against its own release; an isolated Backend fixture does not establish full Suite readiness.

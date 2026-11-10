@@ -6,9 +6,8 @@ frontend, user roles, personal API keys, vault ownership and client APIs.
 
 ## Installation and update order
 
-This adapter requires the Auth service release containing the private
-`POST /v1/admission` endpoint. Auth `v0.0.1` lacks it. **Publish/update Auth first,
-then publish/update Backend and its frontend.** The Backend Go client uses the
+Backend requires Auth with private `POST /v1/admission` support. Auth `v0.0.1`
+lacks it. **Install/update compatible Auth first, then Backend and its frontend.** The Backend Go client uses the
 published Auth `v0.0.1` package; the additional endpoint is a service capability,
 not an unpublished Go dependency. Setup refuses an older Auth with an explicit
 update message before the normal Backend container starts.
@@ -19,7 +18,7 @@ projects; the Backend declares them external. No certificate copying or manual
 client IDs/secrets are needed. Set only these required Backend settings:
 
 ```env
-NOX_BACKEND_PUBLIC_URL=http://backend.home.arpa
+NOX_BACKEND_PUBLIC_URL=http://backend.home.arpa:5710
 NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 

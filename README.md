@@ -6,490 +6,280 @@
 [![Release](https://github.com/mapherez/nox-backend/actions/workflows/release.yml/badge.svg)](https://github.com/mapherez/nox-backend/actions/workflows/release.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-A self-hosted backend service providing storage, authentication, vault management and synchronization APIs for NoX applications and external integrations.
+A self-hosted Go service for vault storage, file synchronization, client APIs and
+NoX Suite integration authority. Its native React dashboard manages accounts,
+personal API keys, owned vaults and Suite service connections.
 
-## Overview
+## What Backend provides
 
-NoX Backend is an independent Go service designed to be shared by multiple clients.
+- SQLite metadata and content-addressed file storage.
+- Per-user vaults, committed file revisions, conditional downloads, soft deletion,
+  restoration and permanent deletion of unreferenced data.
+- Staged uploads, atomic sync commits, conflict planning, vault locks, heartbeats
+  and synchronization-status events.
+- HTTP APIs for application clients and external integrations.
+- Ten MCP tools, available directly or through the Suite Gateway.
+- Native user, role, key, vault and Suite administration.
+- Suite pairing, service credentials, signing keys, product registration,
+  authorization delegation, durable events and availability observations.
 
-It provides a common backend for applications that need:
-
-- authenticated users and API access;
-- logical vaults containing files and revisions;
-- persistent metadata and blob storage;
-- file upload and download APIs;
-- synchronization primitives;
-- conflict-aware change planning;
-- administrative tooling;
-- self-hosted deployment through Docker.
-
-Clients interact with NoX Backend through its HTTP API or native MCP endpoint and do not depend on its source code or release cycle.
-
-[NoX Sync](https://github.com/mapherez/nox-sync) is one client of NoX Backend, using it to synchronize Obsidian vaults.
+Backend is shared infrastructure for multiple independent applications. A client
+uses its API contracts, not its source code or release cycle. It does not require
+Gateway, Yard or Portal to serve its native APIs and dashboard. Dashboard login
+uses the installation's shared NoX Auth service.
 
 ## Architecture
 
-NoX Backend uses:
+The `nox-backend` project contains three Compose services:
 
-- **Go** for the backend HTTP service;
-- **React + TypeScript + Vite+** for the native frontend;
-- **Nginx** in the separate frontend image for static delivery and same-origin API/auth/MCP forwarding;
-- **SQLite** for metadata;
-- **filesystem blob storage** for file contents;
-- **NoX Login** through the shared NoX Auth service for dashboard authentication;
-- **API keys** for client authentication;
-- **Docker** for deployment.
+| Service | Responsibility |
+| --- | --- |
+| `auth-setup` | One-shot enrollment of Backend's login callback with NoX Auth; reuses persisted credentials. |
+| `backend` | Go HTTP service, authorization, SQLite, blobs and the local Suite listener. |
+| `frontend` | React + TypeScript + Vite+ dashboard, served by Nginx with same-origin forwarding to Backend. |
 
-Persistent data is stored under:
+Frontend and Backend have separate images and build contexts in this repository.
+A compatible frontend can be updated without rebuilding or replacing Backend.
+The future NoX Portal is a separate application; it does not replace this native
+frontend. See [frontend deployment](docs/frontend-deployment.md).
 
-```text
-/data/
-├── nox-backend.db
-├── blobs/
-├── staging/
-└── logs/
-```
+NoX Auth owns Google credentials and the allowed-account list. Backend owns its
+local account roles/status, personal API keys, data ownership and Suite authority.
+Yard manages deployments; Gateway routes MCP calls. Backend does not manage Docker
+containers and does not mount the Docker socket.
 
-The SQLite database and blob storage form a single logical data store and should be backed up together.
+## Install with Docker Compose
 
-## Features
+Run a compatible [NoX Auth](https://github.com/mapherez/nox-auth) service on the
+same Docker host first. It must support the private `/v1/admission` endpoint;
+Auth v0.0.1 does not. Its Compose creates the shared runtime and setup volumes.
 
-- HTTP + JSON API under `/v1`.
-- Independently configurable direct `/mcp` and protected Suite `/mcp/suite`, with
-  a public `/nox/integration` declaration; see [Suite product setup](docs/suite-product.md).
-- Native MCP Streamable HTTP at `/mcp`, powered by [NoX MCP](https://github.com/mapherez/nox-mcp).
-- Per-user API keys.
-- Multiple vaults per user.
-- NoX Login administration dashboard.
-- User and admin management.
-- Vault creation, listing, download, soft deletion, restoration and permanent deletion.
-- File listing and downloads.
-- Content-addressed blob storage.
-- Current and previous file revisions.
-- Deletion tombstones.
-- SHA-256 content validation.
-- Staged uploads and atomic commits.
-- Manifest-based synchronization planning.
-- Upload, download, delete and conflict operations.
-- Per-vault synchronization locks.
-- Heartbeats and stale-lock recovery.
-- Server-sent events for synchronization status.
-- Read APIs for external integrations.
-
-The MCP endpoint runs in the backend Go process, on the same HTTP server and port as its APIs. The separate frontend forwards the existing public `/mcp` route.
-Its 10 tools share the existing backend logic and storage with the Stable Client
-API. User operations use the existing per-user API key in
-`Authorization: Bearer <API_KEY>`; health and service information are public.
-Each tool exposes `_meta.cli` for a future NoX CLI. Binary file download remains
-at `/v1/files/download`, and synchronization remains at `/v1/sync/*` through the
-specialized HTTP API. See the [MCP contract](docs/mcp.md) for tools and connection
-details.
-
-## Docker
-
-The backend production image is published to:
-
-```text
-ghcr.io/mapherez/nox-backend:latest
-```
-
-The repository includes a production `docker-compose.yml` with `auth-setup`, `backend` and
-`frontend` services in one `nox-backend` project. The frontend image is
-`ghcr.io/mapherez/nox-backend-frontend`. It can be built and deployed independently.
-The split topology requires a release containing both this backend data adapter
-and the new frontend image; existing `v1.0.7` images predate this separation.
-For source validation before that release, use `docker-compose.dev.yml`.
-See the [frontend/deployment guide](docs/frontend-deployment.md) before migrating
-an existing installation.
-
-For a new installation, run NoX Auth on the same Docker host first. This adapter
-requires the Auth service release with `/v1/admission` (absent from Auth v0.0.1).
-See [NoX Login deployment and update order](docs/nox-login.md).
-
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
-```
-
-Copy [`.env.example`](.env.example) to `.env` beside it and fill in your settings:
+Download `docker-compose.yml` and `.env.example` into a deployment folder, copy
+`.env.example` to `.env`, and set the two required origins:
 
 ```env
-NOX_BACKEND_PUBLIC_URL=https://backend.example.com
+NOX_BACKEND_PUBLIC_URL=http://backend.home.arpa:5710
 NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
-Start the service:
+Use the actual Backend address opened by your browser, including its port. Private
+HTTP hostnames/IPs are supported. Backend does not need a certificate for local
+use; Auth uses its own HTTPS origin for the Google login flow. Google client IDs,
+secrets and allowed emails are configured only in Auth.
 
-```bash
+Start the project:
+
+```sh
+docker compose pull
 docker compose up -d
 ```
 
-The default Compose configuration exposes:
+Open your Backend origin plus `/vault-dashboard`. The default port mapping is:
 
 ```text
-localhost:5710 → frontend:8080 → backend:8080
+host:5710 → frontend:8080 → backend:8080
 ```
 
-The dashboard is available at:
+Published images:
 
 ```text
-http://localhost:5710/vault-dashboard
+ghcr.io/mapherez/nox-backend:latest
+ghcr.io/mapherez/nox-backend-frontend:latest
 ```
 
-or through the configured public URL.
+The production Compose automatically mounts the Auth runtime and setup volumes.
+If their names were customized, use the matching names from that installation;
+see [configuration](docs/backend-configuration.md) and [NoX Login](docs/nox-login.md).
+For an existing installation, preserve its project, actual data volume, origin
+and selected image tags. Follow the [update guide](docs/suite-delivery.md) rather
+than replacing the deployment with a new-installation example.
 
-The Docker image includes a healthcheck using `nox-backend healthcheck`, with no
-`wget` or `curl` dependency. It requests `/v1/health` directly inside the container
-and succeeds only on HTTP 200, with a 3-second request timeout. It uses
-`NOX_BACKEND_ADDR` (or the legacy `NOX_SYNC_ADDR`), defaulting to `:8080`, and
-replaces wildcard listen addresses with loopback addresses.
+## Login, accounts and client keys
 
-Docker checks every 30 seconds, with a 5-second timeout, a 10-second startup grace
-period and 3 consecutive failures before marking the container unhealthy. Docker
-managers can display this health status without additional Compose configuration.
-The endpoint checks HTTP responsiveness after initialization; it does not probe
-ongoing database or disk health. Rebuild or pull an image containing this change
-and recreate existing containers to enable the healthcheck.
+Choose **NoX Login** in the dashboard. Auth authenticates the Google account and
+checks its configured allowlist. Existing Backend identities, roles, keys and
+vault ownership are retained. Newly admitted accounts receive an ADMIN record;
+existing USER roles are preserved.
 
-The native dashboard lives in `frontend/`, using React, TypeScript and Vite+.
-Its [authenticated administration APIs](docs/administration-api.md) cover users,
-personal keys, vault operations and persistent initial Yard/Gateway addresses.
-Saved service addresses remain explicitly awaiting pairing until trust is implemented.
-Its independent image serves `/vault-dashboard` and its assets and forwards the
-existing API, auth, form and MCP routes to Backend. The backend image contains
-no frontend assets or templates. Frontend-only changes require rebuilding only
-the frontend image. [Development, configuration and migration](docs/frontend-deployment.md).
+An admitted ADMIN using NoX Login has Admin Manager authority and can manage
+other admins. Self-deletion, self-disable and self-role changes remain forbidden.
+An ADMIN role does not grant access to another account's vaults. Backend user
+administration does not modify Auth's allowed-account list.
 
-## NoX Login
+Browser sessions last one year with renewal during admitted use. Admission is
+rechecked within five minutes without routine Google login prompts. **Log out**
+ends this application's session. **Sign out of all NoX apps** requests revocation
+of the current Auth session and its derived application sessions, enforced within
+five minutes. It does not revoke independent personal API keys or other devices'
+Auth sessions. See [NoX Login](docs/nox-login.md) for the exact behavior.
 
-The dashboard uses the installation's shared NoX Auth. Configure only the exact
-Backend browser origin and the Auth HTTPS origin in Backend. Google credentials
-and allowed emails belong only to Auth. Private HTTP application URLs work;
-there is no per-app certificate setup. Compose's one-shot `auth-setup` registers
-the callback and persists client credentials automatically.
-
-Existing users, roles, keys and data ownership are preserved. The dashboard offers
-local logout and **Sign out of all NoX apps**. Read the [integration guide](docs/nox-login.md)
-for identity matching, five-minute admission, update order and acceptance limits.
-
-## Client authentication
-
-API clients connect using:
-
-- the backend base URL;
-- a user API key.
-
-Example base URL:
-
-```text
-https://backend.example.com
-```
-
-Clients authenticate using:
+API clients use the Backend base URL and their user's personal API key:
 
 ```http
 Authorization: Bearer <API_KEY>
 ```
 
-API keys are created and managed through the backend dashboard.
+Keys are managed in the dashboard. Rotation invalidates the previous key; update
+clients that use it. Keys do not grant access to other users' vaults. Account
+admission and active status still apply. Do not put credentials in URLs or logs.
 
-## API
+## HTTP and MCP interfaces
 
-The HTTP API is exposed under:
+| Interface | Purpose |
+| --- | --- |
+| `/v1/health`, `/v1/info` | Service health and identity/version. |
+| `/v1/auth/check`, `/v1/vaults/*`, `/v1/status` | Client identity, vault lifecycle and status. |
+| `/v1/files`, `/v1/files/download` | Committed file metadata and binary downloads, with optional revision/hash conditions. |
+| `/v1/sync/*` | Specialized synchronization protocol, uploads, planning, locks and events. |
+| `/api/*` | Native dashboard/account/vault/admin APIs with their documented session or key requirements. |
+| `/mcp` | Direct MCP, enabled by default; public discovery/health/info and eight authenticated tools. |
+| `/nox/integration` | Public, non-secret Suite declaration. |
+| `/api/nox/*`, `/mcp/suite` | Suite service protocol on the same-host Unix channel only; refused by the frontend/native TCP listener. |
+
+The direct and Suite MCP adapters share the same ten canonical tools and domain
+logic. Conventional `tools/list` omits `_meta.cli`. Canonical menu paths and rich
+human-menu descriptors are available to NoX clients through the Suite adapter's
+negotiated `nox/tools/definitions`. The direct `/mcp` endpoint does not expose that
+extension. MCP tool names, arguments and permissions do not depend on menu layout.
+Binary downloads and sync orchestration remain HTTP APIs, not additional MCP tools.
+See the [MCP contract](docs/mcp.md).
+
+## Connect to NoX Suite
+
+Backend and participating Suite services run on the same Docker host. Their
+Compose files share the local runtime volume; service traffic uses HTTP over Unix
+sockets. It does not use public product URLs, LAN discovery, manually copied
+certificates or per-installation CIDR allowlists. Browser/client URLs remain
+separate and can be private HTTP or HTTPS origins without application prefixes.
+
+In **Service connections**, save the Yard/Gateway native origin, select **Verify**,
+then **Connect** and confirm the verified identity. Backend handles the local
+pairing, persisted credentials, acknowledgment and registration. Use **Resume
+connection** after an uncertain delivery. A saved address alone establishes no
+trust; registered service status is separate from MCP availability.
+
+To publish Backend's own tools through Gateway, set:
+
+```env
+NOX_BACKEND_SUITE_MCP_ENABLED=true
+```
+
+Update both Backend and frontend images and open the dashboard as the existing
+administrator. The dashboard initiates Backend's publication automatically.
+Restart recovery reuses the persisted association while its administrator remains
+authorized; removed or revoked associations are not recreated automatically.
+Direct `/mcp` remains independently controlled by `NOX_BACKEND_DIRECT_MCP_ENABLED`.
+See [same-host setup](docs/suite-local.md) and [Backend as a Suite product](docs/suite-product.md).
+
+## Persistent data and backups
+
+Backend data resides under `/data` by default:
 
 ```text
-/v1
+/data/
+├── nox-backend.db
+├── nox-login.db
+├── blobs/
+├── staging/
+├── logs/
+└── secrets/
+    └── suite/
 ```
 
-Current endpoint groups include:
+An existing `nox-sync.db` remains in use instead of being renamed automatically.
+SQLite sidecar files may also be present. Back up the complete directory
+consistently, including NoX Login state and the Suite secret store. Database,
+blobs and secrets must be restored together; a database-only backup cannot restore
+service trust. Never run `docker compose down -v` when preserving installed data.
 
-```text
-/v1/health
-/v1/info
-/v1/auth/*
-/v1/vaults/*
-/v1/files/*
-/v1/status
-/v1/sync/*
-```
-
-These cover:
-
-- health and credential checks;
-- vault management;
-- file listing and downloads;
-- synchronization sessions;
-- locks and heartbeats;
-- manifest planning;
-- staged uploads;
-- commits;
-- synchronization status events.
-
-The [stable client API](docs/client-api.md) covers service discovery, identity,
-vault management, vault status and file reads. `/v1/sync/*` remains the
-specialized synchronization protocol for synchronization clients.
-
-## Example client: NoX Sync
-
-[NoX Sync](https://github.com/mapherez/nox-sync) is an Obsidian plugin that uses NoX Backend as its remote synchronization service.
-
-The plugin connects using the backend's:
-
-```text
-Server URL
-API key
-```
-
-NoX Sync and NoX Backend are separate projects with independent repositories and release cycles.
-
-NoX Backend is not specific to Obsidian and can be consumed by other applications through the same HTTP API.
-
-## Persistent data
-
-All persistent backend state lives under `/data`.
-
-Back up the complete directory as one unit:
-
-```text
-/data
-```
-
-Do not restore only the SQLite database or only the blob directory independently. Metadata and file contents must remain consistent.
-
-## Existing installations
-
-NoX Backend was originally maintained inside the NoX Sync repository.
-
-The repository separation does not intentionally change:
-
-- database schema;
-- stored data;
-- API routes;
-- JSON contracts;
-- authentication behavior;
-- API-key format;
-- blob and staging paths;
-- ports;
-- stored schema and migration records.
-
-Existing deployments should preserve their current Compose project, volumes, configuration and `/data` contents when switching to:
-
-```text
-ghcr.io/mapherez/nox-backend:latest
-```
-
-See:
-
-[Repository separation and update guide](docs/backend-separation.md)
-
-Do not use:
-
-```bash
-docker compose down -v
-```
-
-when the existing data must be preserved.
-
-## Compatibility identifiers
-
-New configuration uses `NOX_BACKEND_*`. Every runtime variable also accepts its
-legacy `NOX_SYNC_*` name. A non-empty canonical value takes precedence; empty
-values fall back to the legacy value and then to the default.
-
-The server executable is `nox-backend`; the obsolete `nox-sync` entry point has
-been removed. Existing API keys (`noxsync_`),
-`X-NoX-Sync-*` headers and the `nox_sync_session` cookie retain their names because
-clients depend on them. References to the NoX Sync plugin identify a separate client.
-
-New databases use `nox-backend.db`. An existing `nox-sync.db` is detected and used
-without renaming it. If both active filenames exist, startup refuses to choose.
-The optional `nox-backend migrate-database` command must run with the backend
-stopped and after a complete backup; see the [update guide](docs/backend-separation.md).
-The existing volume name does not need to change.
-
-The Go module is `github.com/mapherez/nox-backend/backend`.
+Supported `NOX_BACKEND_*` runtime settings retain their matching `NOX_SYNC_*`
+aliases: a non-empty canonical value takes precedence, then the legacy value,
+then the default. Former Backend Google credentials/allowlist settings no longer
+configure login; those belong only to Auth. Existing `noxsync_` keys,
+`X-NoX-Sync-*` headers and the `nox_sync_session` cookie retain their protocol names.
+These identifiers do not make Backend dependent on the separate NoX Sync plugin.
 
 ## Development
 
-The backend source lives in:
+Go service source lives in `backend/`; the React source lives in `frontend/`.
+Use disposable data for development. The complete source deployment uses the
+same Auth prerequisite and `.env` origins as production:
 
-```text
-backend/
+```sh
+docker compose -f docker-compose.dev.yml up --build
 ```
 
-Run the test suite:
+Backend tests:
 
-```bash
+```sh
 cd backend
 go test ./...
 ```
 
-Run the service locally:
+Frontend checks and build, from the repository root:
 
-```bash
-go run ./cmd/nox-backend
+```sh
+npm ci --prefix frontend
+npm run check --prefix frontend
+npm test --prefix frontend
+npm run build --prefix frontend
 ```
 
-Build the Docker image:
+See [frontend development](docs/frontend-deployment.md) for the development proxy,
+independent image updates and disposable browser/integration checks. Container
+health uses `nox-backend healthcheck` against `/v1/health`; it checks HTTP response
+after initialization, not ongoing database/disk integrity or complete Suite readiness.
 
-```bash
-docker build -t nox-backend:dev ./backend
-```
+## Releases and updates
 
-Run the development Compose configuration:
+From a clean Git checkout, with Node.js 24+, npm, Git, Go and Docker available:
 
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
-
-The development configuration uses:
-
-```text
-./data:/data
-```
-
-as a local bind mount.
-
-Do not use production data for development or testing.
-
-## Releases
-
-Backend releases are independent from client releases.
-
-Release from a clean working tree on the branch you want to publish, with Node.js
-24+, npm, Git, Go and a running Docker daemon available:
-
-```bash
+```sh
 npm run release
 ```
 
-The command displays the current version and asks for the new version:
+Enter an unused SemVer version, or pass it as `npm run release -- X.Y.Z`.
+The script checks the version/tags, validates Go and frontend code, builds both
+images, commits the version and pushes the branch/tag atomically. Failed local
+checks restore the package version. A successful push starts GitHub Actions;
+monitor that workflow for image publication and the GitHub Release result.
 
-```text
-Versao atual: 1.0.4
-Nova versao (X.Y.Z): 1.0.5
-```
+Stable releases publish the versioned tags and update `latest` for both images.
+Prereleases publish only their versioned tags. Build metadata (`+build`) is not
+accepted because Docker tags cannot contain `+`.
 
-`package.json` is the source of the current version, stored without `v`. Choose a different
-unused version for each release. For automation, `npm run release -- X.Y.Z` is
-still supported. An optional `v` prefix is normalized; stable SemVer and
-prereleases such as `1.1.0-rc.1` are supported.
-Build metadata (`+build`) is refused because Docker tags cannot contain `+`;
-the complete tag must fit Docker's 128-character limit.
+For normal deployment updates, back up complete data first, preserve the existing
+Compose project/volumes, select `NOX_BACKEND_IMAGE_TAG` in `.env`, then run:
 
-The command checks local and origin tags, updates `package.json`,
-runs `go test ./...` in `backend`, installs the locked frontend dependencies,
-checks frontend types/lint/formatting/tests, and builds both images. Backend uses
-`VERSION=v1.0.5` for the example above. Failed checks restore `package.json` and create no
-commit, tag or push. Successful checks commit the version change as
-`chore: release v1.0.5`, create an annotated `v1.0.5` tag, and push the current branch and
-that tag atomically to origin. If the push fails, the local commit and tag are
-kept and the command prints the exact recovery push command.
-
-If Windows temporarily locks Docker context metadata, the command retries the
-build up to 3 times, waiting 2 seconds between attempts. If the lock persists,
-restart Docker Desktop and rerun the command. Other build failures abort
-immediately and restore the package version.
-
-The **Release** GitHub Actions workflow runs only on `v*` tag pushes. It verifies
-the tag against `package.json`, tests Go and the React/Vite+ frontend, and publishes
-both images for `linux/amd64` and `linux/arm64`. A stable release publishes these tags:
-
-```text
-ghcr.io/mapherez/nox-backend:v1.0.5
-ghcr.io/mapherez/nox-backend:latest
-ghcr.io/mapherez/nox-backend-frontend:v1.0.5
-ghcr.io/mapherez/nox-backend-frontend:latest
-```
-
-Prereleases publish only their version tag, for example
-`ghcr.io/mapherez/nox-backend:v1.1.0-rc.1`, and never change `latest`.
-
-Both images include OCI labels `org.opencontainers.image.version`,
-`org.opencontainers.image.revision`, `org.opencontainers.image.source` and
-`org.opencontainers.image.created`. The creation timestamp is generated in UTC
-immediately before the image build.
-After publishing both, the workflow creates a GitHub Release with generated notes;
-prereleases are marked as prerelease on GitHub. An existing release causes failure
-and is never replaced. Monitor the workflow
-until it completes: a successful local push starts the remote publication.
-
-The backend image reports its Git tag through the existing `buildVersion` ldflags
-mechanism in both `/v1/health` and `/v1/info`. A non-empty `NOX_BACKEND_VERSION`
-overrides it at runtime; unversioned local builds report `dev`.
-
-To deploy latest, set this in the deployment's `.env`:
-
-```env
-NOX_BACKEND_IMAGE_TAG=latest
-```
-
-To deploy a pinned release instead:
-
-```env
-NOX_BACKEND_IMAGE_TAG=v0.1.0
-```
-
-Then pull and apply the selected image:
-
-```bash
+```sh
 docker compose pull
 docker compose up -d
 ```
 
-`latest` is the default when `NOX_BACKEND_IMAGE_TAG` is unset. Only stable releases
-update `latest`; deploy a prerelease by explicitly pinning its version tag.
-Publishing an image does not automatically update existing deployments.
-Frontend-only image publication and updates are described in the
-[frontend guide](docs/frontend-deployment.md#published-images-and-independent-frontend-updates).
-
-Test release tooling without publishing anything:
-
-```bash
-node --test scripts/release.test.mjs
-python3 -m unittest discover -s scripts -p "test_*.py"
-```
+Frontend inherits that tag unless `NOX_FRONTEND_IMAGE_TAG` selects a compatible
+independent frontend image. Changes to the shipped Compose, Auth requirements or
+mounts must also be applied when upgrading from an older topology; pulling images
+alone does not add services or mounts. See [delivery and updates](docs/suite-delivery.md).
 
 ## Documentation
 
-- [Suite migration status and compatibility baseline](docs/suite-migration.md)
-- [Frontend development, split deployment and migration](docs/frontend-deployment.md)
-- [Administration API and initial foundation configuration](docs/administration-api.md)
-- [Suite authority, secure pairing, service credentials and recovery](docs/suite-trust.md)
-- [Suite registry, durable events and availability](docs/suite-registry.md)
-- [Suite user delegation and service probe issuance](docs/suite-authorization.md)
-- [Backend as a Suite product: enrollment, permissions and MCP access paths](docs/suite-product.md)
-- [Same-host Suite integration and automatic foundation setup](docs/suite-local.md)
-- [Native Suite administration and recovery](docs/suite-administration.md)
-- [Backend delivery checklist and subsequent product work](docs/suite-delivery.md)
-- [Setup and client connection](docs/user-setup.md)
-- [Backend configuration](docs/backend-configuration.md)
-- [Repository separation and updates](docs/backend-separation.md)
-- [Stable client API](docs/client-api.md)
-- [Read API](docs/read-api.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Security policy](SECURITY.md)
+| Topic | Guide |
+| --- | --- |
+| Installation and use | [Setup](docs/user-setup.md), [configuration](docs/backend-configuration.md), [troubleshooting](docs/troubleshooting.md) |
+| Login and account admission | [NoX Login](docs/nox-login.md) |
+| Client contracts | [Stable Client API](docs/client-api.md), [read/download API](docs/read-api.md), [MCP](docs/mcp.md) |
+| Native management | [Administration API](docs/administration-api.md) |
+| Suite setup and management | [Same-host channel](docs/suite-local.md), [native Suite administration](docs/suite-administration.md) |
+| Suite protocol | [Trust](docs/suite-trust.md), [registry/events](docs/suite-registry.md), [delegation](docs/suite-authorization.md), [Backend product adapter](docs/suite-product.md) |
+| Build and delivery | [Frontend](docs/frontend-deployment.md), [updates and validation](docs/suite-delivery.md) |
+| Historical context | [Repository separation](docs/backend-separation.md), [implementation record](docs/suite-migration.md); these are not fresh-install instructions. |
 
-## Security
+## Security and license
 
-NoX Backend stores application data and manages authentication credentials.
-
-For deployments exposed outside a trusted network:
-
-- use HTTPS;
-- restrict administrative access;
-- protect OAuth credentials;
-- treat API keys as secrets;
-- back up `/data`;
-- keep the backend image and host system updated.
-
-Report security issues according to [SECURITY.md](SECURITY.md).
-
-## License
+Keep personal keys, cookies, Google credentials, Auth setup credentials and Suite
+secret storage private. Use HTTPS and appropriate access restrictions for native
+services exposed outside a trusted network. Protect the host and its shared local
+volumes, and back up complete data consistently. Report security issues according
+to [SECURITY.md](SECURITY.md).
 
 NoX Backend is licensed under the [GNU General Public License v3.0](LICENSE).
-
-Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
-`NOX_SYNC_*` values. Legacy configurations continue to work. The physical database
-name shown above is the new-installation default; existing `nox-sync.db` files are
-used in place until an explicit offline migration.

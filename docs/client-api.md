@@ -1,8 +1,8 @@
 # Stable client HTTP API
 
-This is the small, stable HTTP API provided by NoX Backend for external clients,
-including a future standalone NoX CLI. Existing NoX Sync clients continue to use
-their current contracts. This repository does not implement the CLI.
+This is the stable HTTP API provided by NoX Backend for application clients and
+external integrations. It can be used without Suite enrollment. Specialized
+synchronization remains under `/v1/sync/*`.
 
 ## Base URL and authentication
 
@@ -25,6 +25,9 @@ produce `401` and `AUTH_REQUIRED`.
 The legacy `api_key` query parameter remains supported. A Bearer token takes
 precedence over it. Use the Authorization header for new integrations so keys
 do not appear in URLs. Dashboard cookies are not API-key authentication.
+
+Central NoX Auth admission also applies to personal-key access; see
+[NoX Login](nox-login.md#sessions-admission-and-logout).
 
 All vault operations are restricted to the authenticated user's vaults,
 including for users with role `ADMIN`. An inaccessible vault is reported as

@@ -1,99 +1,90 @@
-# Backend setup and client connection
+# Install and connect to Backend
 
-This guide covers a new NoX Backend installation and connecting the [NoX Sync Obsidian plugin](https://github.com/mapherez/nox-sync). To update an existing backend with real data, use the [separation and update guide](backend-separation.md).
+Backend provides a native dashboard, HTTP APIs and MCP tools for application
+clients. This guide covers a current installation. For older deployments, also
+read [updates and delivery](suite-delivery.md) before changing images or Compose.
 
-## What you need
+## Prerequisites
 
-- Docker Engine or Docker Desktop with Docker Compose.
-- The shared NoX Auth service running on the same host, with the service release
-  containing `/v1/admission`; Auth v0.0.1 must be updated first.
-- A browser-facing Backend HTTP(S) origin. Private HTTP hostnames/IPs work.
-- The client applications you already use with Backend.
+- Docker with Docker Compose.
+- A compatible NoX Auth service on the same Docker host, including its private
+  `/v1/admission` endpoint. Auth v0.0.1 must be updated first.
+- The Backend origin you will open in the browser. Private HTTP names/IPs work;
+  no Backend certificate setup is required for local use.
 
-Google credentials and allowed accounts live only in Auth. Backend setup registers
-its callback automatically. See [NoX Login](nox-login.md) for update order and
-preservation of existing users, keys and ownership.
+Google credentials and allowed accounts are configured only in Auth. Its Compose
+creates the shared runtime and restricted setup volumes used by Backend.
 
-## Start a new backend with Docker Compose
+## Start Backend
 
-In a dedicated deployment folder, download this repository's Compose file.
+Download the repository's `docker-compose.yml` and `.env.example` into a deployment
+folder. Copy `.env.example` to `.env` and set:
 
-Windows PowerShell:
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -OutFile docker-compose.yml
-```
-
-macOS or Linux:
-
-```bash
-curl -L https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml -o docker-compose.yml
-```
-
-Create `.env` beside it:
-
-```bash
-NOX_BACKEND_PUBLIC_URL=https://sync.example.com
+```env
+NOX_BACKEND_PUBLIC_URL=http://backend.home.arpa:5710
 NOX_AUTH_PUBLIC_URL=https://auth.example.com
 ```
 
-For local testing, set `NOX_BACKEND_PUBLIC_URL=http://localhost:5710`.
+Use the exact browser origin, including a non-default port. If you use a custom
+Auth/runtime volume name, set the matching name in Backend; default names require
+no overrides. For existing data, preserve the actual data-volume name.
+See [configuration](backend-configuration.md).
 
-After `ghcr.io/mapherez/nox-backend:latest` has been published, start the service:
+From that deployment folder:
 
-```bash
+```sh
+docker compose pull
 docker compose up -d
 ```
 
-For new split installations, `backend` and `frontend` are services of the `nox-backend` project. Host port `5710` maps to the frontend, which forwards API/auth/MCP requests to the internal Backend port `8080`. The frontend image must come from a release containing this separation; use the development Compose file while validating unreleased source. The default volume is `nox-backend-data`. Existing installations must preserve their actual data volume; both `NOX_BACKEND_DATA_VOLUME_NAME` and the legacy `NOX_SYNC_DATA_VOLUME_NAME` are supported.
+The `nox-backend` project contains the one-shot `auth-setup`, persistent `backend`
+and independent `frontend` services. Setup enrolls the login callback automatically;
+a successful setup exit is normal. Frontend owns port 5710 by default and forwards
+to Backend on the internal port 8080. Data uses the `nox-backend-data` volume unless
+the deployment config selects another name.
 
-## Open the dashboard
+## Sign in and manage data
 
-Open your configured origin plus `/vault-dashboard` and choose **NoX Login**.
-Auth admits configured Google accounts. Existing Backend roles are preserved;
-newly admitted accounts are ADMIN. Admitted ADMIN accounts signed in through
-NoX Login have Admin Manager authority and can manage other admins, with
-self-deletion/disable/role changes forbidden. Managing local Backend records does
-not change Auth's allowlist.
+Open your origin plus `/vault-dashboard` and choose **NoX Login**. Select the
+Google account admitted by Auth. Newly admitted accounts receive an ADMIN record;
+existing identities, roles, keys and vault ownership are preserved.
 
-## Initial Suite service addresses
+Admitted ADMIN accounts using NoX Login can manage other admins. Self-deletion,
+self-disable and self-role changes are forbidden. An admin does not own another
+user's vaults. Backend administration does not add an account to Auth's allowlist.
 
-Use **Service connections** to save Yard/Gateway web origins and perform the
-existing local setup. Saving an address alone is not trust. Products communicate
-through the same-host runtime volume; private HTTP origins need no certificates.
-See [same-host setup](suite-local.md) and [administration APIs](administration-api.md).
-The NoX Login adaptation does not authorize Yard to grant itself deployment rights.
+The dashboard provides your Server URL and personal API key, owned vaults,
+deleted-vault restore/purge, user administration and service connections.
+Local logout affects Backend's browser session. **Sign out of all NoX apps**
+revokes the current shared Auth session and its derived application sessions;
+see [NoX Login](nox-login.md) for the five-minute enforcement bound and exclusions.
 
-## Connect the plugin
+## Connect an application
 
-Plugin installation, releases, local builds, settings, conflict handling, and local trash instructions are maintained in [mapherez/nox-sync](https://github.com/mapherez/nox-sync). Plugin assets are available from its [releases](https://github.com/mapherez/nox-sync/releases).
+Configure the application's Backend base URL without `/v1` and your personal key.
+For new integrations, send the key in `Authorization: Bearer <API_KEY>`. Select or
+create a vault using the [client API](client-api.md) or that application's UI.
+Clients using the same key share access to that user's vaults; other users' data
+remains isolated. Rotation invalidates the old key, so update each client using it.
 
-In NoX Sync settings:
+File readers use the [read/download API](read-api.md); specialized sync clients use
+`/v1/sync/*`. MCP clients can use the independent direct `/mcp` endpoint with its
+[documented authentication](mcp.md). Client-specific installation and local UI
+belong in each client's own documentation, such as the separate
+[NoX Sync plugin](https://github.com/mapherez/nox-sync).
 
-1. Paste the Server URL and API key from the backend dashboard.
-2. Set a readable Client name, such as `Laptop`.
-3. Use **Test connection**.
-4. Select or create a backend vault.
-5. Trigger manual sync.
+## Connect Suite services
 
-Use the same public origin for `NOX_BACKEND_PUBLIC_URL`, the OAuth callback, and the plugin Server URL. Do not append `/v1` to the Server URL.
+Under **Service connections**, save Yard/Gateway native HTTP or HTTPS origins,
+select **Verify**, then **Connect** and confirm the verified local identity. These
+services must share the same-host runtime channel. No certificates or manual
+credential files are required. Saving a URL alone does not register a service.
+See [same-host setup](suite-local.md).
 
-A second device can connect with the same user's API key, select the same vault, and manually sync to receive its files. Account admission is configured only in Auth; Backend admins manage local user records and roles. Each account retains its own key and vaults.
+Backend's own tools are opt-in through `NOX_BACKEND_SUITE_MCP_ENABLED=true`.
+With compatible Backend/frontend images installed, open the administrator dashboard
+to publish them automatically. Refresh the Gateway/CLI catalog afterward. Direct
+MCP remains independent. See [Backend Suite MCP](suite-product.md).
 
-Rotating an API key invalidates the previous one. Repository separation does not require rotation or any changes to an existing plugin configuration.
-
-## Build the backend locally
-
-```bash
-git clone https://github.com/mapherez/nox-backend.git
-cd nox-backend
-docker compose -f docker-compose.dev.yml up --build
-```
-
-The development configuration builds `./backend` and `./frontend` independently and mounts `./data` to `/data` only in the backend container. Use separate test data rather than a production data directory.
-
-For Go development and all environment variables, see the [README](../README.md) and [backend configuration](backend-configuration.md).
-Configuration compatibility: non-empty `NOX_BACKEND_*` values override matching
-`NOX_SYNC_*` values. Non-authentication aliases remain supported; native Google credentials and account admission move to Auth. The physical database
-name shown above is the new-installation default; existing `nox-sync.db` files are
-used in place until an explicit offline migration.
+Use [troubleshooting](troubleshooting.md) for startup, login, missing tools or data
+issues, and back up all Backend data before upgrades.

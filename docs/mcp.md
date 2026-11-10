@@ -36,8 +36,9 @@ MCP calls. The legacy `api_key` query parameter follows the HTTP API's existing
 behavior, including Bearer precedence; prefer the header to keep secrets out of
 URLs.
 
-The backend validates credentials against the existing storage on every HTTP
-request. A small request-context adapter passes the authenticated user or the
+Backend validates credentials against its storage on every HTTP request and
+checks central admission with bounded reuse; see
+[NoX Login](nox-login.md#sessions-admission-and-logout). A small request-context adapter passes the authenticated user or the
 authentication failure into tool execution. The SDK's mandatory Bearer middleware
 cannot preserve both public tools and structured per-tool authentication errors.
 The adapter retains the resolved identity/error, not the API key.
@@ -81,9 +82,9 @@ receive the tool names, schemas, descriptions and annotations without menu data.
 The Suite adapter's `nox/tools/definitions` retains the canonical CLI metadata
 for NoX clients. The direct `/mcp` endpoint does not enable NoX discovery.
 
-A future CLI can compose `nox backend vault list`. This repository does not
-implement that CLI. A single explicit mapping supplies `_meta.cli` through the
-official runtime's `Meta` field. Runtime construction fails clearly if a
+The NoX CLI consumes these paths and rich descriptors through Gateway for human
+navigation. A single explicit mapping supplies `_meta.cli` through the official
+runtime's `Meta` field. Runtime construction fails clearly if a
 registered tool lacks a unique app-local mapping.
 
 ## Human menus through NoX discovery
@@ -138,9 +139,9 @@ choices after mutations; a stale selection is handled by the existing domain
 errors, including `NOT_FOUND`, rather than being rebound to another vault.
 
 Results retain the existing `structuredContent` and `outputSchema`. No custom
-result-rendering fields or new output schemas are introduced. The future CLI
-renders these results and the menus; this Backend change prepares and tests the
-published data, without implementing a terminal UI. The descriptor factory and
+result-rendering fields or new output schemas are introduced. The NoX CLI
+renders results and menus; Backend publishes the definitions and executes
+the domain operations without implementing a terminal UI. The descriptor factory and
 wire/lifecycle tests are in `backend/internal/app/mcp_cli.go` and
 `backend/internal/app/mcp_cli_test.go`.
 

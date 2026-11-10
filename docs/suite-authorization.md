@@ -1,12 +1,12 @@
 # Suite authorization issuance
 
-Backend point 6 implements the [approved Gateway/integration contract](suite-migration.md#approved-references-and-progression)
-using NoX MCP SDK 0.7.3 and wire version 1.0. It uses the persistent
+Backend issues user delegations and service probes using NoX MCP SDK 0.7.3,
+wire contract 1.0, over the [same-host channel](suite-local.md). It uses the persistent
 [issuer/signing keys and service trust](suite-trust.md) and
 [registry/event feed](suite-registry.md). It is generic to every conforming product.
-It does not implement Gateway, Portal or CLI. Backend's own protected
-[Suite MCP adapter](suite-product.md) is implemented in point 7. The existing native frontend, Google login, personal API keys,
-client APIs and independently authenticated direct `/mcp` remain operational.
+Gateway consumes these grants; Backend also exposes a protected
+[Suite MCP adapter](suite-product.md). The native frontend, NoX Login, personal
+keys, client APIs and direct `/mcp` remain separate.
 
 ## Protected exchange routes
 
@@ -43,10 +43,13 @@ User request (SDK `SuiteAuthorizationRequest`):
 ```
 
 The personal key is present only in the protected request body to Backend. Backend
-resolves the exact key verifier, active allowlisted account, current role, persistent
-personal `keyId` and `authRevision` locally. It does not contact Google, recreate a
-personal key, infer a domain account or accept caller-supplied identity/capabilities.
-Prepared accounts/keys therefore work without Internet access after restart.
+resolves the exact key verifier, active local account, role, personal `keyId`
+and `authRevision`. It also checks central admission through NoX Auth, reusing
+positive admission for at most five minutes. New delegations cannot outlive that
+admission result. Backend does not contact Google, recreate a key or accept
+caller-supplied identity/capabilities. Expired admission cannot be extended while
+Auth is unavailable; an existing key is not an offline admission bypass. See
+[NoX Login](nox-login.md#sessions-admission-and-logout).
 
 | Existing role | Granted scopes |
 | --- | --- |
@@ -106,7 +109,8 @@ agrees exactly with `exp`. Request-local values prevent concurrent users sharing
 an identity or receiving each other's capabilities.
 
 Tokens expire at most 300 seconds after issuance, bounded earlier by the authenticating
-service credential's validity (including a credential-rotation overlap). Existing
+service credential's validity (including a credential-rotation overlap). User
+delegations are additionally bounded by the current central admission result. Existing
 personal keys have no configured expiry; their revocation/status/rotation is checked
 on each exchange. The shared SDK refuses admission at `exp - 5 seconds`; there is
 no symmetric grace period accepting expired authority. Significant clock rollback
@@ -120,7 +124,7 @@ execution deadlines for each operation. A probe is limited to `initialize`,
 `notifications/initialized`, `ping` and supported `server/discover`; it cannot list
 or call tools or retrieve a user's catalog. Every message in a batch needs checking.
 The SDK supports those admission checks; [Backend's own Suite endpoint and tool
-classification](suite-product.md) implement them in point 7.
+classification](suite-product.md) implement them.
 
 ## Invalidation and long sessions
 
@@ -146,7 +150,7 @@ permissions require a new authenticated Backend response, not a label in an even
 Use the released SDK's partitioned cache and invalidation barrier; the cache and
 Gateway host itself are not implemented in this repository.
 
-A 1–3-hour work session does not force repeated Google login. Future consumers
+A 1–3-hour work session does not force repeated Google login. Gateway consumers
 reuse the grant for its original bounded lifetime and renew on subsequent use when
 needed. Waiting at a form is not an authorization poll. Backend does not start a
 per-user renewal timer. A valid admitted operation follows its execution deadline;

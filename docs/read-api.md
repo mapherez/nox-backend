@@ -1,32 +1,24 @@
-# API de leitura — integração com o Codex
+# File read and conditional download API
 
-Este contrato pertence ao NoX Backend (`mapherez/nox-backend`). A separação do repositório preserva as rotas, formatos, autenticação e comportamento existentes. O plugin Obsidian continua em [mapherez/nox-sync](https://github.com/mapherez/nox-sync).
+NoX Backend provides committed file metadata and binary downloads for application
+clients and external integrations. Clients use the same Backend origin and
+personal API key as the [Stable Client API](client-api.md). No importer, publishing
+workflow or consumer-specific UI is implemented by this API.
 
-Este contrato permite ao servidor Admin do Codex usar o **Server URL** e a
-**API key** já existentes no NoX Sync:
+## Authentication and vault selection
 
-**ligar → escolher vault → listar ficheiros → descarregar versões selecionadas → importar como drafts no Codex**.
-
-A atualização é apenas do backend NoX Sync. O importador, a seleção e a
-interpretação dos ficheiros, a criação de drafts e o Publish pertencem ao Codex
-e serão implementados no outro repositório. O NoX Sync não gere publicação.
-Não são necessários novos controlos no dashboard nem alterações no plugin Obsidian.
-
-## Autenticação e escolha do vault
-
-Todos os pedidos usam a autenticação existente:
+Send the account's current key in the request header:
 
 ```http
 Authorization: Bearer <API_KEY>
 ```
 
-O Server URL é a URL base do backend, sem acrescentar `/v1` na configuração.
-Os exemplos abaixo usam apenas um domínio, identificadores, hashes e credenciais
-fictícios. Substitua-os pelos valores da instalação.
+The Server URL is the Backend base origin without `/v1`. The values below are
+examples, not working credentials:
 
-```bash
-SERVER_URL='https://nox-sync.example.invalid'
-API_KEY='nox_fictitious_example_key'
+```sh
+SERVER_URL='http://backend.home.arpa:5710'
+API_KEY='<your-personal-api-key>'
 
 curl --fail --show-error \
   -H "Authorization: Bearer $API_KEY" \
@@ -37,32 +29,30 @@ curl --fail --show-error \
   "$SERVER_URL/v1/vaults"
 ```
 
-`GET /v1/auth/check` valida a chave e devolve o formato existente, incluindo
-`ok`, `user` e `role`. `GET /v1/vaults` mantém o contrato existente: a propriedade
-`vaults` contém os vaults ativos do utilizador, com `vaultId`, `name`, `revision`,
-`status`, `updatedAt` e `sizeBytes`. A resposta pode também conter
-`deletedVaults`; o consumidor deve escolher apenas entre os vaults ativos.
+`GET /v1/auth/check` returns the current identity, including `ok`, `user` and
+`role`. `GET /v1/vaults` returns active owned vaults in `vaults`, with `vaultId`,
+`name`, `revision`, `status`, `updatedAt` and `sizeBytes`. It may also return
+`deletedVaults`; select an active vault for reads.
 
-O acesso fica limitado aos vaults do utilizador associado à chave, mesmo que
-tenha papel `ADMIN`. O papel Admin no Codex também não concede acesso adicional
-no NoX Sync. Não há novas credenciais nem permissões globais de leitura.
-Uma chave inválida ou antiga após rotação, ou uma chave de um utilizador
-desativado, recebe `401`.
+Access is restricted to the key owner's vaults, including for ADMIN accounts.
+Another application's admin role does not grant additional Backend access.
+Missing/invalid credentials, a rotated key or a disabled account receive 401;
+central Auth admission also applies. See [NoX Login](nox-login.md).
 
-## Listar os ficheiros atuais
+## List committed files
 
 ```http
 GET /v1/files?vaultId=<ID>
 ```
 
-```bash
+```sh
 curl --fail --show-error --get \
   -H "Authorization: Bearer $API_KEY" \
   --data-urlencode 'vaultId=vault_example' \
   "$SERVER_URL/v1/files"
 ```
 
-Resposta `200`, com `Content-Type: application/json` e
+A successful 200 response uses `Content-Type: application/json` and
 `Cache-Control: no-store`:
 
 ```json
@@ -80,56 +70,49 @@ Resposta `200`, com `Content-Type: application/json` e
 }
 ```
 
-- `files` contém todos os ficheiros atuais não eliminados, de qualquer tipo,
-  incluindo Markdown, imagens, outros binários e ficheiros de tamanho zero.
-- Os caminhos são relativos ao vault e usam `/`, preservando os nomes e a
-  capitalização armazenados. Espaços, Unicode e nomes iguais em pastas diferentes
-  são permitidos. Codifique os parâmetros da URL, como nos exemplos.
-- A lista é plana, ordenada por caminho e sem paginação. O consumidor reconstrói
-  a árvore de pastas; pastas vazias não são representadas.
-- `hash` é o SHA-256 dos bytes originais, em 64 caracteres hexadecimais minúsculos.
-  `size` é o tamanho em bytes e `revision` identifica a revisão do ficheiro.
-- Não há conteúdo, histórico, tombstones, uploads em staging ou caminhos
-  internos do host na resposta.
+- `files` includes all current, non-deleted files: text, images, other binary
+  content and zero-byte files.
+- Paths are vault-relative, use `/` and preserve stored names and case. Spaces,
+  Unicode and equal filenames in different directories are supported. URL-encode
+  query parameters as shown above.
+- The list is flat, path-ordered and unpaginated. A consumer can reconstruct its
+  folder tree; empty directories are not represented.
+- `hash` is the lowercase 64-character SHA-256 hash of the original bytes. `size`
+  is the byte count; `revision` identifies the commit that last changed the file.
+- File contents, history, tombstones, staged uploads and internal host paths are
+  excluded. An empty vault returns `files: []`, even after all files are deleted.
+  A new vault starts at `serverRevision: 0`.
 
-Um vault vazio devolve `files: []`, incluindo quando todos os seus ficheiros
-foram eliminados. Um vault novo tem `serverRevision: 0`.
+### Vault revisions and file revisions
 
-### Revisão do vault e revisão do ficheiro
+`serverRevision` is the vault-wide revision advanced by commits. A file's
+`revision` is the vault revision at its last change, not an independent counter.
+In the example, the vault is at revision 12 while `World/Humans.md` remains at 10.
+Other file changes can advance the vault revision without changing this file's
+revision or hash. Conditional downloads compare the file revision.
 
-`serverRevision` é a revisão global **desse vault**, avançada pelos commits que
-alteram o estado remoto. A `revision` de um ficheiro é a revisão do commit que
-criou ou alterou esse ficheiro. Não é um contador independente por ficheiro.
+Authorization, the vault revision and file metadata are read in one SQLite
+transaction. The list represents coherent committed state during concurrent
+writes. Consumers must preserve the full integer precision of revisions/sizes.
 
-No exemplo, o vault está na revisão 12 e `World/Humans.md` permanece na revisão
-10. Alterações noutros ficheiros podem avançar `serverRevision` sem alterar a
-revisão ou o hash de `World/Humans.md`. O download condicionado compara a revisão
-individual do ficheiro, nunca a revisão global do vault.
-
-Autorização do vault, revisão global e metadados da lista são lidos na mesma
-transação SQLite. A resposta representa um estado confirmado coerente, mesmo
-quando ocorre um commit concorrente.
-
-## Descarregar a versão selecionada
+## Download the selected file
 
 ```http
 GET /v1/files/download?vaultId=<ID>&path=<PATH>&expectedHash=<HASH>&expectedRevision=<REVISION>
 ```
 
-Os parâmetros existentes `vaultId` e `path` continuam obrigatórios. Os novos
-parâmetros são opcionais e independentes:
+`vaultId` and `path` are required. The optional conditions are independent:
 
-| Parâmetro | Validação | Condição |
+| Parameter | Validation | Condition |
 | --- | --- | --- |
-| `expectedHash` | SHA-256 em 64 caracteres hexadecimais minúsculos | Tem de corresponder ao hash atual do ficheiro. |
-| `expectedRevision` | Inteiro decimal não negativo, até `9223372036854775807` | Tem de corresponder à revisão atual do ficheiro. |
+| `expectedHash` | Lowercase 64-character SHA-256 hexadecimal string | Must match the current file hash. |
+| `expectedRevision` | Non-negative decimal integer, at most `9223372036854775807` | Must match the current file revision. |
 
-Se presentes, os parâmetros não podem ser vazios ou repetidos. Revisões com
-sinal, espaços, frações ou valores fora do intervalo recebem `400`. Recomenda-se
-que o Codex envie **ambas** as condições copiadas da listagem, para identificar
-também alterações que tenham voltado aos mesmos bytes numa revisão posterior.
+Present conditions cannot be empty or repeated. Signed, whitespace-padded,
+fractional or out-of-range revisions return 400. Sending both values from the
+listing also detects a file that changed and later returned to the same bytes.
 
-```bash
+```sh
 curl --fail --show-error --get \
   -H "Authorization: Bearer $API_KEY" \
   --data-urlencode 'vaultId=vault_example' \
@@ -141,8 +124,7 @@ curl --fail --show-error --get \
   "$SERVER_URL/v1/files/download"
 ```
 
-Em caso de sucesso, a resposta `200` contém os bytes originais, sem transformação,
-com os headers existentes:
+A successful 200 response contains the original bytes with these headers:
 
 ```http
 Content-Type: application/octet-stream
@@ -153,20 +135,17 @@ X-NoX-Sync-Revision: 10
 Cache-Control: no-store
 ```
 
-O backend compara as condições com os mesmos metadados que selecionam o blob
-e serve esse blob pelo hash validado. Não volta a consultar a versão mais recente
-para substituir o conteúdo selecionado. O consumidor pode conferir os bytes
-recebidos com o hash, tamanho e headers da seleção.
+Backend checks the conditions against the same metadata used to select the blob,
+then serves that blob. It does not substitute a later version after selection.
+Clients can verify the bytes against the selected hash, size and response headers.
+The `X-NoX-Sync-*` header names are retained wire identifiers.
 
-Sem `expectedHash` e `expectedRevision`, mantém-se o download atual usado pelo
-plugin: devolve a versão atual encontrada durante o pedido. A exportação ZIP
-existente também permanece compatível.
+Without conditions, the endpoint returns the current file selected during the
+request. Existing clients and vault ZIP exports keep their existing behavior.
 
-### Alterações entre listagem e download
+### Changes between listing and download
 
-Se uma condição válida não corresponder à versão atual, a resposta é `409`,
-com `Content-Type: application/json`, `Cache-Control: no-store` e o formato de
-erro existente:
+A valid condition that no longer matches returns 409 with JSON/no-store:
 
 ```json
 {
@@ -175,37 +154,29 @@ erro existente:
 }
 ```
 
-Não são enviados bytes do ficheiro nesta resposta. O consumidor deve tratar
-o código `FILE_CHANGED`, voltar a listar o vault e atualizar a seleção antes de
-tentar novamente. Não deve retirar as condições para aceitar silenciosamente
-uma versão diferente. A mensagem é informativa; o código é o identificador do erro.
+No file bytes are sent on this failure. Handle `FILE_CHANGED` by refreshing the
+list and reviewing the selection. Do not drop conditions to silently accept a
+different version. Branch on the code, not the human-readable message.
 
-Se o ficheiro foi eliminado ou renomeado para outro caminho, o caminho antigo
-recebe `404` (`NOT_FOUND`), mesmo com condições. Atualize a listagem para localizar
-o novo caminho. Alterações noutros ficheiros não impedem descarregar a seleção
-quando o seu hash e a sua revisão permanecem iguais.
+A deleted or renamed file returns 404 at its old path, even with conditions.
+Refresh the list to find a new path. Changes to other files do not prevent a
+download whose own hash and revision still match.
 
-Não existem snapshots persistentes nem reserva de versões históricas. A lista
-é consistente por pedido; vários downloads não formam um snapshot atómico de
-todo o vault. Um commit posterior à validação do download não faz o backend
-trocar o blob que já selecionou para esse pedido.
+There is no persistent snapshot or reservation of historical versions. Several
+downloads do not form an atomic vault snapshot. A commit after validation does
+not change the blob already selected for that individual response.
 
-## Erros e efeitos sobre o sync
+## Errors and synchronization
 
-| HTTP | Código | Situação |
+| HTTP | Code | Meaning |
 | --- | --- | --- |
-| `400` | `BAD_REQUEST` | Parâmetros obrigatórios em falta, caminho inválido ou condições malformadas. |
-| `401` | `AUTH_REQUIRED` / `AUTH_FAILED` | Autenticação em falta ou inválida, chave rodada ou utilizador desativado. |
-| `404` | `NOT_FOUND` | Vault inexistente, eliminado ou de outro utilizador; ficheiro inexistente, eliminado ou renomeado. |
-| `409` | `FILE_CHANGED` | Hash ou revisão fornecidos não correspondem à versão atual. |
-| `405` | `BAD_REQUEST` | Método diferente de `GET` nas rotas de ficheiros. |
+| 400 | `BAD_REQUEST` | Missing parameters, invalid path or malformed conditions. |
+| 401 | `AUTH_REQUIRED` / `AUTH_FAILED` | Missing or invalid credentials, rotated key or disabled account. |
+| 404 | `NOT_FOUND` | Missing, deleted or foreign vault; missing, deleted or renamed file. |
+| 409 | `FILE_CHANGED` | The supplied hash or revision no longer matches. |
+| 405 | `BAD_REQUEST` | A method other than GET on the file routes. |
 
-As respostas de listagem e download, incluindo erros, usam
-`Cache-Control: no-store`. A autenticação e a validação de caminhos reutilizam
-o comportamento existente.
-
-A leitura é permitida durante uma sessão de sync e mostra apenas o último
-estado confirmado por commit. Não adquire locks de sync, não inicia sessões,
-não altera revisões, não limpa locks expirados e não emite eventos de sync.
-Este fluxo não exporta histórico, não inicia sincronização automática nem
-efetua escrita no NoX Sync.
+Listing and download responses, including errors, use `Cache-Control: no-store`.
+These reads are allowed during synchronization and expose only committed data.
+They do not acquire sync locks, start sessions, change revisions, reap stale
+locks, emit sync events, export historical versions or write to Backend.
