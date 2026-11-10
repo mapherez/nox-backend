@@ -1,65 +1,80 @@
 # NoX Backend
 
-The storage and integration authority behind your NoX applications.
+A shared home for your NoX application data.
 
-NoX Backend gives applications a shared place to store files, organize them into vaults and synchronize changes. Its dashboard lets you manage your account, API keys, vaults and Suite service connections without handling the underlying database directly.
+NoX Backend stores and synchronizes files for compatible applications. Organize data into vaults, manage your API key and connect your NoX Suite services from a browser dashboard.
 
-It also provides the central registry and authorization used by NoX Suite. Application data stays under its owner's account, while connected services receive the authority needed for their own responsibilities.
+- Create vaults and inspect their stored files.
+- Synchronize changes between compatible applications, with conflict detection.
+- Restore deleted vaults or permanently remove them.
+- Manage accounts, API keys and Suite service connections.
+- Use Backend operations from NoX CLI or an MCP-compatible AI client.
 
-## What you can do
+You keep the data on your own Docker host. Each account's vaults stay separate. Backend can serve compatible applications without Yard or Gateway; those services add Suite deployment and access to tools.
 
-| Capability | What it provides |
-| --- | --- |
-| Organize stored data | Create vaults and inspect the files committed to each vault. |
-| Synchronize applications | Let compatible clients exchange file changes, detect conflicts and commit updates. |
-| Control access | Manage personal API keys and account roles from the native dashboard. |
-| Recover deleted vaults | Restore soft-deleted vaults or explicitly remove their data permanently. |
-| Connect Suite services | Connect Yard and Gateway, inspect integration state and resume interrupted setup. |
-| Use application APIs | Access storage and synchronization through HTTP APIs and supported MCP tools. |
+## What you need
 
-Vaults and files are scoped to their owning account. Administrative access does not make another account's vaults your own. File contents use content-addressed storage, while SQLite holds metadata and operation state.
+- Docker with Docker Compose on the server where Backend will run.
+- [NoX Auth](https://github.com/mapherez/nox-auth) running on that same server, with your Google account allowed to sign in.
+- An address you can open in your browser. Private HTTP access is supported; Backend does not require you to create certificates for local use.
 
-## How it fits into NoX Suite
+## Help
 
-- **Auth** handles Google sign-in and central account admission.
-- **Backend** owns account/data relationships, personal API keys, service trust and the product registry.
-- **Yard** installs and manages participating deployments.
-- **Gateway** routes authorized MCP requests to the products that execute them.
+[Setup guide](docs/user-setup.md) · [Configuration](docs/backend-configuration.md) · [Backups and recovery](docs/suite-delivery.md) · [Troubleshooting](docs/troubleshooting.md)
 
-Backend's native APIs and dashboard do not require Gateway or Yard. Dashboard sign-in uses NoX Auth. The frontend and backend are separate containers in the same project, allowing compatible frontend updates without rebuilding the backend service.
-
-## Documentation
-
-- [Installation and account setup](docs/user-setup.md)
-- [Configuration](docs/backend-configuration.md)
-- [Client API](docs/client-api.md) and [file reads/downloads](docs/read-api.md)
-- [MCP tools](docs/mcp.md)
-- [NoX Login](docs/nox-login.md)
-- [Same-host Suite setup](docs/suite-local.md)
-- [Administration API](docs/administration-api.md)
-- [Frontend deployment](docs/frontend-deployment.md)
-- [Updates, backups and recovery](docs/suite-delivery.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Security reporting](SECURITY.md)
+For app developers: [client API](docs/client-api.md) · [MCP](docs/mcp.md) · [Suite integration](docs/suite-local.md)
 
 ## Usage
 
-Run NoX Auth on the same Docker host first. Save [docker-compose.yml](docker-compose.yml) and [.env.example](.env.example) in your deployment directory, naming the environment file `.env`.
+### Install
 
-Set `NOX_BACKEND_PUBLIC_URL` to the address you will open in your browser and `NOX_AUTH_PUBLIC_URL` to your Auth origin. Use your own addresses and deployment settings; private HTTP access is supported for Backend.
+On your Docker server, download the deployment files into a new folder:
 
-Start the project:
+```sh
+mkdir nox-backend
+cd nox-backend
+curl -fsSLo docker-compose.yml https://raw.githubusercontent.com/mapherez/nox-backend/master/docker-compose.yml
+curl -fsSLo .env https://raw.githubusercontent.com/mapherez/nox-backend/master/.env.example
+```
+
+Open `.env` in a text editor and set:
+
+| Setting | What to enter |
+| --- | --- |
+| `NOX_BACKEND_PUBLIC_URL` | The exact Backend address you will open in your browser, including its port when needed. |
+| `NOX_AUTH_PUBLIC_URL` | The HTTPS address of your running NoX Auth service. |
+
+The supplied configuration uses host port **5710**. To change it, set `NOX_FRONTEND_PORT` and include that port in your Backend address. The other settings can keep their defaults for a new installation using Auth's default volume names. Google credentials belong in Auth, not Backend.
+
+Start Backend:
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-Open your configured Backend address followed by `/vault-dashboard` and choose **NoX Login**. Create or select a vault and generate the personal API key needed by your client applications.
+### Sign in and connect an app
 
-To connect Suite services, use **Service connections** in the dashboard. Enable Backend's Suite MCP exposure through `NOX_BACKEND_SUITE_MCP_ENABLED` when you want its tools available through Gateway. Follow the [Suite setup guide](docs/suite-local.md) for the shared local channel.
+Open your configured Backend address followed by `/vault-dashboard`. Choose **NoX Login** and sign in with your allowed Google account.
 
-Keep the existing data volume when updating. Back up the complete Backend data directory, including its databases, stored files and private Suite state. See [delivery and recovery](docs/suite-delivery.md) before changing an existing installation.
+Create a vault and generate a personal API key from the dashboard. In a compatible app, enter your Backend base address and that key. Keep the key private; replacing it invalidates the previous key for clients using it.
+
+### Connect your Suite
+
+In **Service connections**, enter Yard's or Gateway's address, choose **Verify**, then **Connect** and confirm the verified identity. All Suite services must run on the same Docker host. The supplied Compose files share the local communication channel automatically; no certificate copying is needed.
+
+To make Backend's own tools available through Gateway and CLI, set `NOX_BACKEND_SUITE_MCP_ENABLED=true` in `.env`, run `docker compose up -d`, then open the Backend dashboard. Refresh the catalog in your client afterward.
+
+### Update and preserve data
+
+From your installation folder:
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+Keep the data volume and back it up before updating. The project runs a backend and a separate frontend together; an `auth-setup` container exiting successfully is normal. See [backups and recovery](docs/suite-delivery.md) for preserving the complete installation.
 
 ## License & Attribution
 
