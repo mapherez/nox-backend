@@ -10,10 +10,10 @@ keys, client APIs and direct `/mcp` remain separate.
 
 ## Protected exchange routes
 
-| Operation | Route | Required caller grant |
-| --- | --- | --- |
-| User delegation | `POST /api/nox/authorizations` | Current Gateway service with `authorization.delegate` |
-| Service readiness probe | `POST /api/nox/service-authorizations` | Current Gateway service with `mcp.probe` |
+| Operation               | Route                                  | Required caller grant                                 |
+| ----------------------- | -------------------------------------- | ----------------------------------------------------- |
+| User delegation         | `POST /api/nox/authorizations`         | Current Gateway service with `authorization.delegate` |
+| Service readiness probe | `POST /api/nox/service-authorizations` | Current Gateway service with `mcp.probe`              |
 
 Both require the [same-host local channel](suite-local.md) and
 `Authorization: Bearer <gateway-service-credential>`. A personal key, Google cookie,
@@ -51,10 +51,10 @@ caller-supplied identity/capabilities. Expired admission cannot be extended whil
 Auth is unavailable; an existing key is not an offline admission bypass. See
 [NoX Login](nox-login.md#sessions-admission-and-logout).
 
-| Existing role | Granted scopes |
-| --- | --- |
-| `USER` | `nox:inspect` |
-| `ADMIN` | `nox:inspect`, `nox:write`, `nox:sensitive-read` |
+| Existing role | Granted scopes                                   |
+| ------------- | ------------------------------------------------ |
+| `USER`        | `nox:inspect`                                    |
+| `ADMIN`       | `nox:inspect`, `nox:write`, `nox:sensitive-read` |
 
 Admin Managers have the existing `ADMIN` role for this mapping; their additional
 account-management protection remains server-derived. No role enum, per-user/tool

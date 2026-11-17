@@ -39,10 +39,10 @@ curl -fsSLo .env https://raw.githubusercontent.com/mapherez/nox-backend/master/.
 
 Open `.env` in a text editor and set:
 
-| Setting | What to enter |
-| --- | --- |
+| Setting                  | What to enter                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
 | `NOX_BACKEND_PUBLIC_URL` | The exact Backend address you will open in your browser, including its port when needed. |
-| `NOX_AUTH_PUBLIC_URL` | The HTTPS address of your running NoX Auth service. |
+| `NOX_AUTH_PUBLIC_URL`    | The HTTPS address of your running NoX Auth service.                                      |
 
 The supplied configuration uses host port **5710**. To change it, set `NOX_FRONTEND_PORT` and include that port in your Backend address. The other settings can keep their defaults for a new installation using Auth's default volume names. Google credentials belong in Auth, not Backend.
 
@@ -89,7 +89,7 @@ If you use, fork, or modify this code, you **must** provide attribution by linki
 
 ---
 
-*For more details on what you can and cannot do, please refer to the [LICENSE](LICENSE) file in this repository.*
+_For more details on what you can and cannot do, please refer to the [LICENSE](LICENSE) file in this repository._
 
 ## Disclaimer of Warranty
 

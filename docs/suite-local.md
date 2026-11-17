@@ -33,14 +33,14 @@ No protocol JSON, certificates, service credentials, CIDRs or proxy settings are
 
 Native APIs:
 
-| Route | Purpose |
-| --- | --- |
-| `PUT /api/admin/connections/{service}` | Save web URL with the existing configuration precondition |
-| `POST /api/admin/connections/{service}/verify` | `{ "revision": "<configuration revision>" }`; verify the local identity |
+| Route                                           | Purpose                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| `PUT /api/admin/connections/{service}`          | Save web URL with the existing configuration precondition                     |
+| `POST /api/admin/connections/{service}/verify`  | `{ "revision": "<configuration revision>" }`; verify the local identity       |
 | `POST /api/admin/connections/{service}/connect` | `{ "attemptId": "<verified attempt>" }`; confirm or resume the same operation |
-| `POST /api/admin/connections/{service}/cancel` | `{ "attemptId": "<attempt>" }`; cancel unacknowledged setup |
-| `GET /api/admin/connections` | Safe configuration, registration and setup progress |
-| `/api/admin/suite/operations/{operation...}` | Active-admin adapter for existing advanced Suite management operations |
+| `POST /api/admin/connections/{service}/cancel`  | `{ "attemptId": "<attempt>" }`; cancel unacknowledged setup                   |
+| `GET /api/admin/connections`                    | Safe configuration, registration and setup progress                           |
+| `/api/admin/suite/operations/{operation...}`    | Active-admin adapter for existing advanced Suite management operations        |
 
 The setup view contains identity/version, state, non-secret attempt ID, bounded diagnostics and available actions. It contains no intent, nonce, proof, credential or private-store handles. Setup metadata uses non-destructive database migration `008_suite_connections.sql`; pairing/provisioning secrets remain in the existing encrypted Suite vault. Pairing ID and setup association are committed atomically before delivery. Conditional configuration checks, leases, current authority and durable operation keys prevent stale/duplicate work. Other active admins can cancel pending setup or finish an already acknowledged association; an inactive creator does not require manual database editing.
 

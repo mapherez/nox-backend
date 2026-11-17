@@ -106,7 +106,6 @@ Local verification does not publish an image or update a deployment.
 
 When upgrading a deployment without the shared channel, also apply the [local-volume deployment update](suite-local.md#runtime-and-deployment). It preserves the existing data volume and native URL/ports. Updating images alone does not add mounts.
 
-
 The image split itself does not migrate the database. Current Backend upgrades can also include additive database migrations and NoX Login enrollment. First preserve
 the actual Compose project name, public URL, ports, environment, data mount and
 image references. Follow [updates and recovery](suite-delivery.md) for consistent backups and
@@ -156,7 +155,6 @@ disposable database. It never attaches existing application volumes. To include
 real Chromium flows, install it with `npm exec --prefix frontend -- playwright
 install chromium` and pass `--browser` to the integration script.
 
-
 Suite integration uses the shared local volume described in [local deployment](suite-local.md). The native HTTP flows remain available; no frontend trusted-ingress CIDR allowlist or certificate setup is required for local service traffic. Back up the complete secret store with SQLite before upgrading.
 
 ## Native Suite controls and final image checks
@@ -173,7 +171,6 @@ refusals/timeouts; persistent errors and invalid application responses still fai
 Unit tests cover the formerly failing startup case. The actual HTTP/local-channel administration
 flow is required through `check-suite-proxy.py --browser`; standalone frontend
 publication continues to use its `--frontend-only` mode without a Backend build.
-
 
 Backend local-channel delivery checks use the same candidate images:
 

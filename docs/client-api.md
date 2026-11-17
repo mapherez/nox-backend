@@ -110,13 +110,13 @@ All operations below require an API key. Query parameter `vaultId` is required
 for deletion, restoration and purge. Successful lifecycle mutations return
 `200` with `{"ok":true}`, except creation, which returns `201` with the vault.
 
-| Method | Path | Input / behavior |
-| --- | --- | --- |
-| `GET` | `/v1/vaults` | List owned active and soft-deleted vaults. |
-| `POST` | `/v1/vaults` | JSON body `{"name":"My Vault"}`; create an active vault. |
-| `DELETE` | `/v1/vaults?vaultId=<ID>` | Soft-delete an active vault. |
-| `POST` | `/v1/vaults/restore?vaultId=<ID>` | Restore a soft-deleted vault. |
-| `POST` | `/v1/vaults/purge?vaultId=<ID>` | Permanently remove a soft-deleted vault. |
+| Method   | Path                              | Input / behavior                                         |
+| -------- | --------------------------------- | -------------------------------------------------------- |
+| `GET`    | `/v1/vaults`                      | List owned active and soft-deleted vaults.               |
+| `POST`   | `/v1/vaults`                      | JSON body `{"name":"My Vault"}`; create an active vault. |
+| `DELETE` | `/v1/vaults?vaultId=<ID>`         | Soft-delete an active vault.                             |
+| `POST`   | `/v1/vaults/restore?vaultId=<ID>` | Restore a soft-deleted vault.                            |
+| `POST`   | `/v1/vaults/purge?vaultId=<ID>`   | Permanently remove a soft-deleted vault.                 |
 
 Example list response:
 
@@ -198,10 +198,10 @@ in the read API reference.
 
 Both endpoints require an API key and an owned active vault:
 
-| Method | Path | Success |
-| --- | --- | --- |
-| `GET` | `/v1/files?vaultId=<ID>` | `200` JSON list of current files and vault revision. |
-| `GET` | `/v1/files/download?vaultId=<ID>&path=<PATH>` | `200` original file bytes. |
+| Method | Path                                          | Success                                              |
+| ------ | --------------------------------------------- | ---------------------------------------------------- |
+| `GET`  | `/v1/files?vaultId=<ID>`                      | `200` JSON list of current files and vault revision. |
+| `GET`  | `/v1/files/download?vaultId=<ID>&path=<PATH>` | `200` original file bytes.                           |
 
 Download also accepts optional, independent `expectedHash` and
 `expectedRevision` conditions. A version mismatch returns `409` /
@@ -227,15 +227,15 @@ JSON responses use `Content-Type: application/json`. Downloads return
 Treat `code` as the machine-readable error identifier. `message` is informative
 and may change. Do not assume every endpoint has the file API's cache policy.
 
-| HTTP | Code | Meaning |
-| --- | --- | --- |
-| `400` | `BAD_REQUEST` | Invalid JSON, missing/invalid parameters or malformed download conditions. |
-| `401` | `AUTH_REQUIRED` | Missing API key. |
-| `401` | `AUTH_FAILED` | Invalid/rotated key or disabled user. |
-| `404` | `NOT_FOUND` | Missing/inaccessible vault or file, or incompatible vault lifecycle state. |
-| `405` | `BAD_REQUEST` | Unsupported method; the `Allow` header lists supported methods. |
-| `409` | `FILE_CHANGED` | A valid download condition does not match the current file. |
-| `500` | `SERVER_ERROR` | Internal backend failure. |
+| HTTP  | Code            | Meaning                                                                    |
+| ----- | --------------- | -------------------------------------------------------------------------- |
+| `400` | `BAD_REQUEST`   | Invalid JSON, missing/invalid parameters or malformed download conditions. |
+| `401` | `AUTH_REQUIRED` | Missing API key.                                                           |
+| `401` | `AUTH_FAILED`   | Invalid/rotated key or disabled user.                                      |
+| `404` | `NOT_FOUND`     | Missing/inaccessible vault or file, or incompatible vault lifecycle state. |
+| `405` | `BAD_REQUEST`   | Unsupported method; the `Allow` header lists supported methods.            |
+| `409` | `FILE_CHANGED`  | A valid download condition does not match the current file.                |
+| `500` | `SERVER_ERROR`  | Internal backend failure.                                                  |
 
 Existing validation order is preserved: `/v1/vaults` authenticates before
 checking the method; the other method-restricted endpoints above check the

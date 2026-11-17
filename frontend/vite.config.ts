@@ -1,3 +1,5 @@
+import type { FormatConfig } from "vite-plus/fmt";
+import formatOptions from "./format-options.json" with { type: "json" };
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 
@@ -53,25 +55,5 @@ export default defineConfig({
       "**/pnpm-lock.yaml",
     ],
   },
-  fmt: {
-    insertFinalNewline: true,
-    endOfLine: "lf",
-    useTabs: false,
-    tabWidth: 2,
-    sortPackageJson: false,
-    ignorePatterns: [
-      "dist/**",
-      "playwright-report/**",
-      "test-results/**",
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/target/**",
-      "**/vendor/**",
-      "**/*.md",
-      "**/*.mdx",
-      "**/package-lock.json",
-      "**/pnpm-lock.yaml",
-    ],
-  },
+  fmt: formatOptions as FormatConfig,
 });

@@ -39,11 +39,11 @@ operations, never a Google user, native administration or the legacy client API.
 Pending credentials can acknowledge their own provisioning and inspect their own
 metadata; they do not obtain ordinary service grants until acknowledged.
 
-| Purpose approved by administrator | Assigned grants |
-| --- | --- |
-| `gateway` | `registry.read`, `authorization.delegate`, `events.read`, `mcp.report`, `mcp.probe` |
-| `installer` | `registry.read`, `registry.manage-associated`, `events.read`, `lifecycle.report`, `pairing.manage-associated` |
-| `product` | `events.read` |
+| Purpose approved by administrator | Assigned grants                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `gateway`                         | `registry.read`, `authorization.delegate`, `events.read`, `mcp.report`, `mcp.probe`                           |
+| `installer`                       | `registry.read`, `registry.manage-associated`, `events.read`, `lifecycle.report`, `pairing.manage-associated` |
+| `product`                         | `events.read`                                                                                                 |
 
 A request's optional `grants` or identity claims cannot override these assignments.
 A Gateway cannot enroll services. Administrative pairing delegates management of the installer’s own local
@@ -77,24 +77,24 @@ bound to the newly provisioned credential rather than an administrator assertion
 
 ### Routes
 
-| Operation | Method and route | Access/precondition |
-| --- | --- | --- |
-| Read issuer/public keys | `GET /api/nox/keys` | Local Unix listener; public JSON and key-set ETag |
-| Prepare signing key | `POST /api/nox/keys` | Admin; If-Match key-set revision; returns prepared key ID and new revision |
-| Activate prepared key | `POST /api/nox/keys/{keyId}/activate` | Admin; If-Match current key-set revision |
-| Revoke signing key | `DELETE /api/nox/keys/{keyId}` | Admin; If-Match key-set revision |
-| Create intent | `POST /api/nox/pairings` | Admin or scoped installer; initial/replacement association condition |
-| Read safe pairing state | `GET /api/nox/pairings/{pairingId}` | Admin or its authorized creating installer; no secret |
-| Complete/recover proof | `POST /api/nox/pairings/{pairingId}/complete` | Bound HMAC proof over the local channel |
-| Acknowledge persisted provisioning | `POST /api/nox/pairings/{pairingId}/ack` | Newly issued service credential |
-| Cancel pending intent | `DELETE /api/nox/pairings/{pairingId}` | Authorized admin/installer; If-Match pairing revision |
-| Read services / one service | `GET /api/nox/services`, `GET /api/nox/services/{serviceId}` | Admin list; admin or service for one record |
-| Revoke full association/service | `DELETE /api/nox/services/{serviceId}` | Admin/current service; If-Match association revision; all generations revoked |
-| Rotate service credential | `POST /api/nox/services/{serviceId}/credentials` | Admin/current service; If-Match credential revision |
-| Acknowledge rotation | `POST /api/nox/services/{serviceId}/credentials/{credentialId}/ack` | Replacement credential only |
-| Revoke credential generation | `DELETE /api/nox/services/{serviceId}/credentials/{credentialId}` | Admin/current service; If-Match target credential revision |
-| Read installer deployment grants | `GET /api/nox/services/{serviceId}/deployments` | Admin or that scoped installer |
-| Authorize/change/remove deployment | `PUT` / `DELETE /api/nox/services/{serviceId}/deployments/{deploymentId}` | Admin or that current scoped installer; initial/current deployment revision |
+| Operation                          | Method and route                                                          | Access/precondition                                                           |
+| ---------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Read issuer/public keys            | `GET /api/nox/keys`                                                       | Local Unix listener; public JSON and key-set ETag                             |
+| Prepare signing key                | `POST /api/nox/keys`                                                      | Admin; If-Match key-set revision; returns prepared key ID and new revision    |
+| Activate prepared key              | `POST /api/nox/keys/{keyId}/activate`                                     | Admin; If-Match current key-set revision                                      |
+| Revoke signing key                 | `DELETE /api/nox/keys/{keyId}`                                            | Admin; If-Match key-set revision                                              |
+| Create intent                      | `POST /api/nox/pairings`                                                  | Admin or scoped installer; initial/replacement association condition          |
+| Read safe pairing state            | `GET /api/nox/pairings/{pairingId}`                                       | Admin or its authorized creating installer; no secret                         |
+| Complete/recover proof             | `POST /api/nox/pairings/{pairingId}/complete`                             | Bound HMAC proof over the local channel                                       |
+| Acknowledge persisted provisioning | `POST /api/nox/pairings/{pairingId}/ack`                                  | Newly issued service credential                                               |
+| Cancel pending intent              | `DELETE /api/nox/pairings/{pairingId}`                                    | Authorized admin/installer; If-Match pairing revision                         |
+| Read services / one service        | `GET /api/nox/services`, `GET /api/nox/services/{serviceId}`              | Admin list; admin or service for one record                                   |
+| Revoke full association/service    | `DELETE /api/nox/services/{serviceId}`                                    | Admin/current service; If-Match association revision; all generations revoked |
+| Rotate service credential          | `POST /api/nox/services/{serviceId}/credentials`                          | Admin/current service; If-Match credential revision                           |
+| Acknowledge rotation               | `POST /api/nox/services/{serviceId}/credentials/{credentialId}/ack`       | Replacement credential only                                                   |
+| Revoke credential generation       | `DELETE /api/nox/services/{serviceId}/credentials/{credentialId}`         | Admin/current service; If-Match target credential revision                    |
+| Read installer deployment grants   | `GET /api/nox/services/{serviceId}/deployments`                           | Admin or that scoped installer                                                |
+| Authorize/change/remove deployment | `PUT` / `DELETE /api/nox/services/{serviceId}/deployments/{deploymentId}` | Admin or that current scoped installer; initial/current deployment revision   |
 
 SDK-defined pairing/proof/provisioning/rotation payloads retain their published
 schemas. The key-management, service-state, deployment-authorization and rotation

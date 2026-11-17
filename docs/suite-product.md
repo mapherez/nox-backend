@@ -9,18 +9,18 @@ The native frontend remains part of this Backend project.
 
 ## Paths and independent configuration
 
-| Path | Policy |
-| --- | --- |
-| `GET /nox/integration` | Public, SDK-validated product declaration; no credentials, tool definitions or automatic membership |
-| `POST /mcp/suite` | Opt-in, same-host Unix socket, current Backend-issued product-bound user delegation or service probe |
-| `POST /mcp` | Existing direct personal-key/public-tool policy, enabled by default |
+| Path                   | Policy                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `GET /nox/integration` | Public, SDK-validated product declaration; no credentials, tool definitions or automatic membership  |
+| `POST /mcp/suite`      | Opt-in, same-host Unix socket, current Backend-issued product-bound user delegation or service probe |
+| `POST /mcp`            | Existing direct personal-key/public-tool policy, enabled by default                                  |
 
 The direct/native APIs keep their TCP listener and frontend routing. Protected Suite MCP is available only on the local Unix listener; the native listener/frontend refuse network access to it. These remain distinct authentication adapters over the same domain operations. See [same-host transport](suite-local.md).
 
-| Environment variable | Default | Effect |
-| --- | --- | --- |
-| `NOX_BACKEND_DIRECT_MCP_ENABLED` | `true` | Mount the existing direct `/mcp` endpoint |
-| `NOX_BACKEND_SUITE_MCP_ENABLED` | `false` | Mount `/mcp/suite` and advertise `capabilities.suiteMcp.path` |
+| Environment variable             | Default | Effect                                                        |
+| -------------------------------- | ------- | ------------------------------------------------------------- |
+| `NOX_BACKEND_DIRECT_MCP_ENABLED` | `true`  | Mount the existing direct `/mcp` endpoint                     |
+| `NOX_BACKEND_SUITE_MCP_ENABLED`  | `false` | Mount `/mcp/suite` and advertise `capabilities.suiteMcp.path` |
 
 Use literal `true` or `false`; invalid values stop startup. Both
 Compose files pass these options through. Existing installations need no env
@@ -35,7 +35,7 @@ Suite route is absent. When enabled it advertises:
   "productId": "nox-backend",
   "productVersion": "<resolved-backend-version>",
   "displayName": "NoX Backend",
-  "capabilities": {"suiteMcp": {"path": "/mcp/suite"}}
+  "capabilities": { "suiteMcp": { "path": "/mcp/suite" } }
 }
 ```
 
@@ -103,11 +103,11 @@ The same private discovery definitions include the [human menu descriptors](mcp.
 and local confirmations. They do not alter tool arguments, results or Suite scopes.
 The standard MCP catalog continues to omit CLI metadata and descriptors.
 
-| Tools | Required scopes |
-| --- | --- |
-| `backend_info`, `backend_whoami`, `backend_vault_list`, `backend_vault_status`, `backend_file_list` | `nox:inspect` |
-| `backend_health` | `nox:inspect`, `nox:sensitive-read` |
-| `backend_vault_create`, `backend_vault_delete`, `backend_vault_restore`, `backend_vault_purge` | `nox:inspect`, `nox:write` |
+| Tools                                                                                               | Required scopes                     |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `backend_info`, `backend_whoami`, `backend_vault_list`, `backend_vault_status`, `backend_file_list` | `nox:inspect`                       |
+| `backend_health`                                                                                    | `nox:inspect`, `nox:sensitive-read` |
+| `backend_vault_create`, `backend_vault_delete`, `backend_vault_restore`, `backend_vault_purge`      | `nox:inspect`, `nox:write`          |
 
 Health includes the existing internal database path, so Suite treats it as
 sensitive diagnostics. Direct health/info behavior remains unchanged. USER has

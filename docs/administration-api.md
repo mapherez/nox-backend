@@ -37,27 +37,27 @@ Authorization/cookies or API-key response bodies.
 
 ## Operations
 
-| Method | Route | Input/result | Access |
-| --- | --- | --- | --- |
-| GET | `/api/account` | Current user's presentation fields | Current account |
-| GET | `/api/account/api-key` | `{ "apiKey": "..." }` | Own key only |
-| POST | `/api/account/api-key/rotate` | New `{ "apiKey": "..." }`; previous key immediately fails authentication | Own key only |
-| POST | `/api/session/logout` | `{ "ok": true }`, expired session cookie | Browser session only |
-| POST | `/api/session/logout-all` | `{ "ok": true }` only after Auth confirms Suite-session revocation | Browser session only |
-| GET | `/api/admin/users` | Array of allowed users, without Google subjects or keys | Admin |
-| POST | `/api/admin/users` | `{ "email": "person@example.com", "role": "USER" }`; creates/re-enables a local record and returns its presentation fields; does not change Auth admission | Admin |
-| PUT | `/api/admin/users/{userId}/status` | `{ "status": "ACTIVE" }` or `DISABLED` | Admin |
-| PUT | `/api/admin/users/{userId}/role` | `{ "role": "USER" }` or `ADMIN` | Admin |
-| DELETE | `/api/admin/users/{userId}` | Deletes the account and its owned sync records | Admin |
-| GET | `/api/vaults` | `{ "vaults": [...], "deletedVaults": [...] }` | Own vaults only |
-| DELETE | `/api/vaults/{vaultId}` | Soft-delete | Owner |
-| POST | `/api/vaults/{vaultId}/restore` | Restore a soft-deleted vault | Owner |
-| DELETE | `/api/vaults/{vaultId}/purge` | Permanently purge a deleted vault | Owner |
-| GET | `/api/vaults/{vaultId}/download` | ZIP attachment; failures use JSON | Owner |
-| GET | `/api/admin/connections` | Foundation-service connection intent and configuration revisions | Admin |
-| PUT | `/api/admin/connections/{service}` | Save `{ "origin": "https://yard.example.com" }`, with a creation/update precondition | Admin |
-| DELETE | `/api/admin/connections/{service}` | Remove saved connection intent, with its revision precondition | Admin |
-| POST | `/api/admin/suite/backend/publish` | No body or query; publish/reconcile Backend's own Suite association when configured | Admin |
+| Method | Route                              | Input/result                                                                                                                                               | Access               |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| GET    | `/api/account`                     | Current user's presentation fields                                                                                                                         | Current account      |
+| GET    | `/api/account/api-key`             | `{ "apiKey": "..." }`                                                                                                                                      | Own key only         |
+| POST   | `/api/account/api-key/rotate`      | New `{ "apiKey": "..." }`; previous key immediately fails authentication                                                                                   | Own key only         |
+| POST   | `/api/session/logout`              | `{ "ok": true }`, expired session cookie                                                                                                                   | Browser session only |
+| POST   | `/api/session/logout-all`          | `{ "ok": true }` only after Auth confirms Suite-session revocation                                                                                         | Browser session only |
+| GET    | `/api/admin/users`                 | Array of allowed users, without Google subjects or keys                                                                                                    | Admin                |
+| POST   | `/api/admin/users`                 | `{ "email": "person@example.com", "role": "USER" }`; creates/re-enables a local record and returns its presentation fields; does not change Auth admission | Admin                |
+| PUT    | `/api/admin/users/{userId}/status` | `{ "status": "ACTIVE" }` or `DISABLED`                                                                                                                     | Admin                |
+| PUT    | `/api/admin/users/{userId}/role`   | `{ "role": "USER" }` or `ADMIN`                                                                                                                            | Admin                |
+| DELETE | `/api/admin/users/{userId}`        | Deletes the account and its owned sync records                                                                                                             | Admin                |
+| GET    | `/api/vaults`                      | `{ "vaults": [...], "deletedVaults": [...] }`                                                                                                              | Own vaults only      |
+| DELETE | `/api/vaults/{vaultId}`            | Soft-delete                                                                                                                                                | Owner                |
+| POST   | `/api/vaults/{vaultId}/restore`    | Restore a soft-deleted vault                                                                                                                               | Owner                |
+| DELETE | `/api/vaults/{vaultId}/purge`      | Permanently purge a deleted vault                                                                                                                          | Owner                |
+| GET    | `/api/vaults/{vaultId}/download`   | ZIP attachment; failures use JSON                                                                                                                          | Owner                |
+| GET    | `/api/admin/connections`           | Foundation-service connection intent and configuration revisions                                                                                           | Admin                |
+| PUT    | `/api/admin/connections/{service}` | Save `{ "origin": "https://yard.example.com" }`, with a creation/update precondition                                                                       | Admin                |
+| DELETE | `/api/admin/connections/{service}` | Remove saved connection intent, with its revision precondition                                                                                             | Admin                |
+| POST   | `/api/admin/suite/backend/publish` | No body or query; publish/reconcile Backend's own Suite association when configured                                                                        | Admin                |
 
 Successful mutations return HTTP 200 with `{ "ok": true }` except operations
 that explicitly return a user, key or connection. User roles and statuses are
@@ -133,15 +133,15 @@ registry membership is managed separately by the [registry APIs](suite-registry.
 Example creation from the same-origin browser session:
 
 ```js
-const response = await fetch('/api/admin/connections/yard', {
-  method: 'PUT',
-  credentials: 'same-origin',
+const response = await fetch("/api/admin/connections/yard", {
+  method: "PUT",
+  credentials: "same-origin",
   headers: {
-    'Content-Type': 'application/json',
-    'X-Nox-Request': '1',
-    'If-None-Match': '*',
+    "Content-Type": "application/json",
+    "X-Nox-Request": "1",
+    "If-None-Match": "*",
   },
-  body: JSON.stringify({ origin: 'http://yard.home.arpa:8095' }),
+  body: JSON.stringify({ origin: "http://yard.home.arpa:8095" }),
 });
 // Check response.ok; 412 requires a fresh read and administrator review.
 ```
@@ -150,18 +150,18 @@ const response = await fetch('/api/admin/connections/yard', {
 
 Errors are JSON `{ "code": "...", "message": "..." }`, never login redirects:
 
-| HTTP | Code | Meaning |
-| --- | --- | --- |
-| 400 | `BAD_REQUEST` | Invalid fields or protected admin operation |
-| 401 | `AUTH_REQUIRED` / `AUTH_FAILED` | Missing, expired, disabled or invalid authentication |
-| 403 | `FORBIDDEN` | Current role or browser-origin/request protection rejects access |
-| 404 | `NOT_FOUND` | Unknown resource/route, or vault not owned by this account |
-| 405 | `METHOD_NOT_ALLOWED` | Unsupported method; `Allow` lists accepted methods |
-| 412 | `PRECONDITION_FAILED` | Connection configuration revision changed |
-| 413 | `BODY_TOO_LARGE` | Administration body exceeds 64 KiB |
-| 415 | `UNSUPPORTED_MEDIA_TYPE` | JSON mutation sent with another Content-Type |
-| 428 | `PRECONDITION_REQUIRED` | Connection edit lacks the required condition |
-| 500 | `SERVER_ERROR` | Internal operation failure; no database internals returned |
+| HTTP | Code                            | Meaning                                                          |
+| ---- | ------------------------------- | ---------------------------------------------------------------- |
+| 400  | `BAD_REQUEST`                   | Invalid fields or protected admin operation                      |
+| 401  | `AUTH_REQUIRED` / `AUTH_FAILED` | Missing, expired, disabled or invalid authentication             |
+| 403  | `FORBIDDEN`                     | Current role or browser-origin/request protection rejects access |
+| 404  | `NOT_FOUND`                     | Unknown resource/route, or vault not owned by this account       |
+| 405  | `METHOD_NOT_ALLOWED`            | Unsupported method; `Allow` lists accepted methods               |
+| 412  | `PRECONDITION_FAILED`           | Connection configuration revision changed                        |
+| 413  | `BODY_TOO_LARGE`                | Administration body exceeds 64 KiB                               |
+| 415  | `UNSUPPORTED_MEDIA_TYPE`        | JSON mutation sent with another Content-Type                     |
+| 428  | `PRECONDITION_REQUIRED`         | Connection edit lacks the required condition                     |
+| 500  | `SERVER_ERROR`                  | Internal operation failure; no database internals returned       |
 
 The frontend submits JSON with the current session, disables forms during a
 mutation, shows API errors alongside the form, and refreshes the authenticated

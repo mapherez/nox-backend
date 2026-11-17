@@ -1,4 +1,5 @@
 """Validate packaged version/health contracts using disposable containers only."""
+
 import argparse
 import json
 import subprocess
@@ -7,7 +8,9 @@ import urllib.error
 import urllib.request
 
 
-def wait_for_health(url, *, attempts=60, delay=0.5, opener=urllib.request.urlopen, sleep=time.sleep):
+def wait_for_health(
+    url, *, attempts=60, delay=0.5, opener=urllib.request.urlopen, sleep=time.sleep
+):
     for _ in range(attempts):
         try:
             with opener(url, timeout=2) as response:
@@ -31,15 +34,31 @@ def main():
     parser.add_argument("--build-version", required=True)
     args = parser.parse_args()
     cases = [(args.default_image, None, None, "dev")] if args.default_image else []
-    cases += [(args.versioned_image, canonical, legacy, expected) for canonical, legacy, expected in [
-        (None, None, args.build_version), ("", "", args.build_version),
-        (None, "runtime-test", "runtime-test"), ("canonical", None, "canonical"),
-        ("canonical", "legacy", "canonical"), ("", "legacy", "legacy"),
-    ]]
+    cases += [
+        (args.versioned_image, canonical, legacy, expected)
+        for canonical, legacy, expected in [
+            (None, None, args.build_version),
+            ("", "", args.build_version),
+            (None, "runtime-test", "runtime-test"),
+            ("canonical", None, "canonical"),
+            ("canonical", "legacy", "canonical"),
+            ("", "legacy", "legacy"),
+        ]
+    ]
     for image, canonical, legacy, expected in cases:
-        options = ["run", "--detach", "--rm", "--publish", "127.0.0.1::8080",
-                   "--tmpfs", "/data:uid=10001,gid=10001,mode=0700"]
-        for name, value in [("NOX_BACKEND_VERSION", canonical), ("NOX_SYNC_VERSION", legacy)]:
+        options = [
+            "run",
+            "--detach",
+            "--rm",
+            "--publish",
+            "127.0.0.1::8080",
+            "--tmpfs",
+            "/data:uid=10001,gid=10001,mode=0700",
+        ]
+        for name, value in [
+            ("NOX_BACKEND_VERSION", canonical),
+            ("NOX_SYNC_VERSION", legacy),
+        ]:
             if value is not None:
                 options += ["--env", name + "=" + value]
         container = docker(*options, image)
@@ -47,9 +66,17 @@ def main():
             base = "http://" + docker("port", container, "8080/tcp")
             health = wait_for_health(base + "/v1/health")
             docker("exec", container, "/usr/local/bin/nox-backend", "healthcheck")
-            docker("exec", container, "/bin/sh", "-c", "test -x /usr/local/bin/nox-backend && test ! -e /usr/local/bin/nox-sync")
+            docker(
+                "exec",
+                container,
+                "/bin/sh",
+                "-c",
+                "test -x /usr/local/bin/nox-backend && test ! -e /usr/local/bin/nox-sync",
+            )
             for _ in range(60):
-                status = docker("inspect", "--format", "{{.State.Health.Status}}", container)
+                status = docker(
+                    "inspect", "--format", "{{.State.Health.Status}}", container
+                )
                 if status == "healthy":
                     break
                 assert status != "unhealthy", "Docker healthcheck failed"
@@ -60,18 +87,37 @@ def main():
                 assert response.status == 200
                 assert response.headers["Content-Type"] == "application/json"
                 info = json.load(response)
-            assert health == {"status": "ready", "version": expected,
-                              "dataDirInitialized": True, "databasePath": "/data/nox-backend.db"}, health
-            required = {"service": "nox-backend", "version": expected, "apiVersion": "v1",
-                        "capabilities": ["auth", "vaults", "files", "vault-status"]}
+            assert health == {
+                "status": "ready",
+                "version": expected,
+                "dataDirInitialized": True,
+                "databasePath": "/data/nox-backend.db",
+            }, health
+            required = {
+                "service": "nox-backend",
+                "version": expected,
+                "apiVersion": "v1",
+                "capabilities": ["auth", "vaults", "files", "vault-status"],
+            }
             for field, value in required.items():
-                assert field in info and type(info[field]) is type(value) and info[field] == value, (field, info)
-            print(f"PASS: {image}, canonical={canonical!r}, legacy={legacy!r}, version={expected}", flush=True)
+                assert (
+                    field in info
+                    and type(info[field]) is type(value)
+                    and info[field] == value
+                ), (field, info)
+            print(
+                f"PASS: {image}, canonical={canonical!r}, legacy={legacy!r}, version={expected}",
+                flush=True,
+            )
         except Exception:
             subprocess.run(["docker", "logs", container], check=False)
             raise
         finally:
-            subprocess.run(["docker", "rm", "--force", container], check=False, stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["docker", "rm", "--force", container],
+                check=False,
+                stdout=subprocess.DEVNULL,
+            )
 
 
 if __name__ == "__main__":

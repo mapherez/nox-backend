@@ -103,9 +103,9 @@ GET /v1/files/download?vaultId=<ID>&path=<PATH>&expectedHash=<HASH>&expectedRevi
 
 `vaultId` and `path` are required. The optional conditions are independent:
 
-| Parameter | Validation | Condition |
-| --- | --- | --- |
-| `expectedHash` | Lowercase 64-character SHA-256 hexadecimal string | Must match the current file hash. |
+| Parameter          | Validation                                                  | Condition                             |
+| ------------------ | ----------------------------------------------------------- | ------------------------------------- |
+| `expectedHash`     | Lowercase 64-character SHA-256 hexadecimal string           | Must match the current file hash.     |
 | `expectedRevision` | Non-negative decimal integer, at most `9223372036854775807` | Must match the current file revision. |
 
 Present conditions cannot be empty or repeated. Signed, whitespace-padded,
@@ -168,13 +168,13 @@ not change the blob already selected for that individual response.
 
 ## Errors and synchronization
 
-| HTTP | Code | Meaning |
-| --- | --- | --- |
-| 400 | `BAD_REQUEST` | Missing parameters, invalid path or malformed conditions. |
-| 401 | `AUTH_REQUIRED` / `AUTH_FAILED` | Missing or invalid credentials, rotated key or disabled account. |
-| 404 | `NOT_FOUND` | Missing, deleted or foreign vault; missing, deleted or renamed file. |
-| 409 | `FILE_CHANGED` | The supplied hash or revision no longer matches. |
-| 405 | `BAD_REQUEST` | A method other than GET on the file routes. |
+| HTTP | Code                            | Meaning                                                              |
+| ---- | ------------------------------- | -------------------------------------------------------------------- |
+| 400  | `BAD_REQUEST`                   | Missing parameters, invalid path or malformed conditions.            |
+| 401  | `AUTH_REQUIRED` / `AUTH_FAILED` | Missing or invalid credentials, rotated key or disabled account.     |
+| 404  | `NOT_FOUND`                     | Missing, deleted or foreign vault; missing, deleted or renamed file. |
+| 409  | `FILE_CHANGED`                  | The supplied hash or revision no longer matches.                     |
+| 405  | `BAD_REQUEST`                   | A method other than GET on the file routes.                          |
 
 Listing and download responses, including errors, use `Cache-Control: no-store`.
 These reads are allowed during synchronization and expose only committed data.

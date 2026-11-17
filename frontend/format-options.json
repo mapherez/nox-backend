@@ -1,0 +1,27 @@
+{
+  "insertFinalNewline": true,
+  "endOfLine": "lf",
+  "useTabs": false,
+  "tabWidth": 2,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/target/**",
+    "**/vendor/**",
+    "**/.venv/**",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/Cargo.lock",
+    "**/uv.lock",
+    "backend/internal/storage/migrations/001_initial.sql",
+    "backend/internal/storage/migrations/002_sync_plan_actions.sql",
+    "backend/internal/storage/migrations/003_multi_user_multi_vault_reset.sql",
+    "backend/internal/storage/migrations/004_foundation_connections.sql",
+    "backend/internal/storage/migrations/005_suite_trust.sql",
+    "backend/internal/storage/migrations/006_suite_registry.sql",
+    "backend/internal/storage/migrations/007_suite_authorization.sql",
+    "backend/internal/storage/migrations/008_suite_connections.sql"
+  ]
+}

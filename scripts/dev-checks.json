@@ -1,35 +1,16 @@
 {
   "policy": "scripts/ci-policy.mjs",
   "go": true,
-  "vite": [
-    "frontend"
-  ],
+  "vite": ["frontend"],
   "check": [
     {
       "command": "go",
-      "args": [
-        "vet",
-        "-mod=readonly",
-        "./..."
-      ],
+      "args": ["vet", "-mod=readonly", "./..."],
       "cwd": "backend"
     },
     {
       "command": "npm",
-      "args": [
-        "run",
-        "check"
-      ],
-      "cwd": "frontend"
-    }
-  ],
-  "format": [
-    {
-      "command": "npm",
-      "args": [
-        "run",
-        "fmt"
-      ],
+      "args": ["run", "check"],
       "cwd": "frontend"
     }
   ]

@@ -62,18 +62,18 @@ Exactly these 10 canonical tools are exposed. Every tool has an input schema,
 output schema, description and annotations. Canonical source definitions also retain
 `_meta.cli`; standard `tools/list` omits it through SDK 0.7.3.
 
-| Tool | `_meta.cli` | Input | Read-only | Destructive | Idempotent |
-| --- | --- | --- | --- | --- | --- |
-| `backend_health` | `health` | `{}` | Yes | No | Yes |
-| `backend_info` | `info` | `{}` | Yes | No | Yes |
-| `backend_whoami` | `whoami` | `{}` | Yes | No | Yes |
-| `backend_vault_list` | `vault list` | `{}` | Yes | No | Yes |
-| `backend_vault_create` | `vault create` | `{"name":"My Vault"}` | No | No | No |
-| `backend_vault_delete` | `vault delete` | `{"vaultId":"vault_example"}` | No | Yes | No |
-| `backend_vault_restore` | `vault restore` | `{"vaultId":"vault_example"}` | No | No | No |
-| `backend_vault_purge` | `vault purge` | `{"vaultId":"vault_example"}` | No | Yes | No |
-| `backend_vault_status` | `vault status` | `{"vaultId":"vault_example"}` | Yes | No | Yes |
-| `backend_file_list` | `file list` | `{"vaultId":"vault_example"}` | Yes | No | Yes |
+| Tool                    | `_meta.cli`     | Input                         | Read-only | Destructive | Idempotent |
+| ----------------------- | --------------- | ----------------------------- | --------- | ----------- | ---------- |
+| `backend_health`        | `health`        | `{}`                          | Yes       | No          | Yes        |
+| `backend_info`          | `info`          | `{}`                          | Yes       | No          | Yes        |
+| `backend_whoami`        | `whoami`        | `{}`                          | Yes       | No          | Yes        |
+| `backend_vault_list`    | `vault list`    | `{}`                          | Yes       | No          | Yes        |
+| `backend_vault_create`  | `vault create`  | `{"name":"My Vault"}`         | No        | No          | No         |
+| `backend_vault_delete`  | `vault delete`  | `{"vaultId":"vault_example"}` | No        | Yes         | No         |
+| `backend_vault_restore` | `vault restore` | `{"vaultId":"vault_example"}` | No        | No          | No         |
+| `backend_vault_purge`   | `vault purge`   | `{"vaultId":"vault_example"}` | No        | Yes         | No         |
+| `backend_vault_status`  | `vault status`  | `{"vaultId":"vault_example"}` | Yes       | No          | Yes        |
+| `backend_file_list`     | `file list`     | `{"vaultId":"vault_example"}` | Yes       | No          | Yes        |
 
 CLI paths are app-local: they contain no `backend ` prefix. For example,
 `backend_vault_list` retains `{"_meta":{"cli":"vault list"}}` in its source

@@ -60,7 +60,6 @@ services:
         condition: service_healthy
 
 volumes:
-
   nox-suite-local:
     name: "${NOX_SUITE_LOCAL_VOLUME_NAME:-nox-suite-local}"
     external: true

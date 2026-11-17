@@ -39,3 +39,6 @@ __pycache__/
 frontend/.vscode/*
 !frontend/.vscode/settings.json
 !frontend/.vscode/extensions.json
+
+# Local Node tooling dependencies
+node_modules/

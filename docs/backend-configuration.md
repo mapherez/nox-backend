@@ -77,13 +77,13 @@ If you change the left side of the port mapping, also use that host port in your
 
 ## Environment Variables
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `NOX_BACKEND_ADDR` | `:8080` | HTTP listen address inside the container or process. |
-| `NOX_BACKEND_DATA_DIR` | `/data` | Persistent backend data directory. |
-| `NOX_BACKEND_VERSION` | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`. |
-| `NOX_BACKEND_PUBLIC_URL` | unset outside Compose | Exact browser-facing HTTP(S) origin, including a non-default port. Required by Compose and NoX Login setup; registered automatically with Auth. |
-| `NOX_AUTH_PUBLIC_URL` | none | HTTPS issuer of the shared Auth service. Required by Compose. Google credentials and allowed emails are configured there only. |
+| Variable                 | Default                                                       | Purpose                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NOX_BACKEND_ADDR`       | `:8080`                                                       | HTTP listen address inside the container or process.                                                                                            |
+| `NOX_BACKEND_DATA_DIR`   | `/data`                                                       | Persistent backend data directory.                                                                                                              |
+| `NOX_BACKEND_VERSION`    | embedded build version, or `dev` for unversioned local builds | Non-empty override of the version returned by both `/v1/health` and `/v1/info`.                                                                 |
+| `NOX_BACKEND_PUBLIC_URL` | unset outside Compose                                         | Exact browser-facing HTTP(S) origin, including a non-default port. Required by Compose and NoX Login setup; registered automatically with Auth. |
+| `NOX_AUTH_PUBLIC_URL`    | none                                                          | HTTPS issuer of the shared Auth service. Required by Compose. Google credentials and allowed emails are configured there only.                  |
 
 ## NoX Login
 
@@ -151,14 +151,14 @@ frontend container, which retains the browser/API proxy routes.
 
 The backend creates and uses these paths under `NOX_BACKEND_DATA_DIR`:
 
-| Path | Purpose |
-| --- | --- |
+| Path                   | Purpose                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/data/nox-backend.db` | SQLite database with users, sessions, API keys, vaults, file metadata, revisions, tombstones, locks, staged upload records, and conflict records. |
-| `/data/nox-login.db` | Private NoX Login enrollment, identity bindings, pending transactions and sessions. Include it in backups. |
-| `/data/blobs` | Finalized file contents stored by SHA-256 hash. |
-| `/data/staging` | Temporary upload content for active sync sessions. |
-| `/data/logs` | Reserved log directory. Docker console logs are still the primary runtime log target. |
-| `/data/secrets/suite` | Encrypted Suite keys/recovery material and master key; back up with the database. |
+| `/data/nox-login.db`   | Private NoX Login enrollment, identity bindings, pending transactions and sessions. Include it in backups.                                        |
+| `/data/blobs`          | Finalized file contents stored by SHA-256 hash.                                                                                                   |
+| `/data/staging`        | Temporary upload content for active sync sessions.                                                                                                |
+| `/data/logs`           | Reserved log directory. Docker console logs are still the primary runtime log target.                                                             |
+| `/data/secrets/suite`  | Encrypted Suite keys/recovery material and master key; back up with the database.                                                                 |
 
 Back up the whole `/data` directory as one unit. Restoring only the database or only the blobs can leave metadata and file content out of sync.
 
@@ -252,11 +252,11 @@ Use the documented `NOX_BACKEND_*` variables and the current Compose configurati
 The `frontend` service is part of the same `nox-backend` Compose project.
 It owns the host port; the `backend` service owns data and credentials.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `NOX_FRONTEND_PORT` | `5710` | Host port forwarded to the frontend container's port 8080 |
-| `NOX_FRONTEND_BACKEND_URL` | `http://backend:8080` | Internal Backend origin used by the frontend proxy; set it when changing the Backend listener |
-| `NOX_FRONTEND_IMAGE_TAG` | Backend image tag, otherwise `latest` | Independently selected frontend image version or immutable `sha-<commit>` tag |
+| Variable                   | Default                               | Purpose                                                                                       |
+| -------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `NOX_FRONTEND_PORT`        | `5710`                                | Host port forwarded to the frontend container's port 8080                                     |
+| `NOX_FRONTEND_BACKEND_URL` | `http://backend:8080`                 | Internal Backend origin used by the frontend proxy; set it when changing the Backend listener |
+| `NOX_FRONTEND_IMAGE_TAG`   | Backend image tag, otherwise `latest` | Independently selected frontend image version or immutable `sha-<commit>` tag                 |
 
 Keep `NOX_BACKEND_PUBLIC_URL` equal to the external public
 origin, including a changed host port. Auth setup registers that origin's
@@ -264,7 +264,6 @@ origin, including a changed host port. Auth setup registers that origin's
 Server URLs or OAuth callback addresses. Public HTTPS may terminate at the
 installation's existing trusted reverse proxy; the frontend preserves its
 forwarded protocol. Read the [deployment guide](frontend-deployment.md).
-
 
 ## Initial foundation-service configuration
 
@@ -289,12 +288,12 @@ key and healthcheck CA options remain available for the web/client listener.
 
 ### Image and volume selection
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `NOX_BACKEND_IMAGE_TAG` | `latest` | Backend image tag; also the frontend default unless overridden. |
-| `NOX_BACKEND_DATA_VOLUME_NAME` | `nox-backend-data` | Actual data volume; preserve an existing installation's name. |
-| `NOX_SUITE_LOCAL_VOLUME_NAME` | `nox-suite-local` | External runtime volume created by Auth, shared by same-host participants. |
-| `NOX_AUTH_ADMIN_VOLUME_NAME` | `nox-auth-admin` | External Auth setup volume, mounted only by `auth-setup`. |
+| Variable                       | Default            | Purpose                                                                    |
+| ------------------------------ | ------------------ | -------------------------------------------------------------------------- |
+| `NOX_BACKEND_IMAGE_TAG`        | `latest`           | Backend image tag; also the frontend default unless overridden.            |
+| `NOX_BACKEND_DATA_VOLUME_NAME` | `nox-backend-data` | Actual data volume; preserve an existing installation's name.              |
+| `NOX_SUITE_LOCAL_VOLUME_NAME`  | `nox-suite-local`  | External runtime volume created by Auth, shared by same-host participants. |
+| `NOX_AUTH_ADMIN_VOLUME_NAME`   | `nox-auth-admin`   | External Auth setup volume, mounted only by `auth-setup`.                  |
 
 The production Compose uses external Auth/runtime volumes so a missing volume
 fails rather than creating a disconnected installation. Auth creates them first.

@@ -59,7 +59,6 @@ Permanent delete removes the deleted vault row and cascades its vault-scoped met
 
 Shared content-addressed blobs remain on disk if any remaining vault still references the same SHA-256 hash.
 
-
 ## Suite trust storage
 
 Migration 5 adds persistent issuer/public-key metadata, service credential
