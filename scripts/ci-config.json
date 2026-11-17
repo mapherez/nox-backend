@@ -1,0 +1,15 @@
+{
+  "workflow": "ci.yml",
+  "marker": "nox-backend-Release:",
+  "branch": "master",
+  "files": [
+    {
+      "path": "package.json",
+      "fields": [
+        [
+          "version"
+        ]
+      ]
+    }
+  ]
+}

@@ -7,26 +7,46 @@ concurrency:
   group: frontend-image-${{ github.sha }}
   cancel-in-progress: false
 jobs:
+  approval:
+    name: Reuse approved source CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source_sha: ${{ steps.ci.outputs.source_sha }}
+      ci_run_id: ${{ steps.ci.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Require successful CI for the exact source
+        id: ci
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { requireApprovedCI } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/ci-policy.mjs`).href);
+            const tag = context.ref.startsWith('refs/tags/') ? context.ref.slice('refs/tags/'.length) : '';
+
+            const approval = await requireApprovedCI({ github, ...context.repo, revision: context.sha, tag });
+            core.setOutput('source_sha', approval.sourceSha);
+            core.setOutput('ci_run_id', String(approval.runId));
+            core.notice(`Reusing source CI ${approval.runId} (${approval.sourceSha}); no source checks are repeated.`);
+
   frontend:
+    needs: approval
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-        working-directory: frontend
-      - run: npm run check && npm test
-        working-directory: frontend
-      - name: Build frontend validation image
-        run: docker build -t nox-backend-frontend:publish-check ./frontend
-      - name: Verify frontend runtime and Suite transport boundary
-        run: python3 scripts/check-suite-proxy.py --frontend-only --frontend-image nox-backend-frontend:publish-check
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4.6.0

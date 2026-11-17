@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 const backend = process.env.NOX_FRONTEND_BACKEND_URL || "http://localhost:8080";
 
 export default defineConfig({
+  staged: { "*": "vp check --fix" },
   plugins: [react()],
   base: "/vault-dashboard/",
   server: {
@@ -37,7 +38,40 @@ export default defineConfig({
   },
   lint: {
     options: { typeAware: true, typeCheck: true },
-    ignorePatterns: ["dist/**", "playwright-report/**", "test-results/**"],
+    ignorePatterns: [
+      "dist/**",
+      "playwright-report/**",
+      "test-results/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/target/**",
+      "**/vendor/**",
+      "**/*.md",
+      "**/*.mdx",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+    ],
   },
-  fmt: { ignorePatterns: ["dist/**", "playwright-report/**", "test-results/**"] },
+  fmt: {
+    insertFinalNewline: true,
+    endOfLine: "lf",
+    useTabs: false,
+    tabWidth: 2,
+    sortPackageJson: false,
+    ignorePatterns: [
+      "dist/**",
+      "playwright-report/**",
+      "test-results/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/target/**",
+      "**/vendor/**",
+      "**/*.md",
+      "**/*.mdx",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+    ],
+  },
 });

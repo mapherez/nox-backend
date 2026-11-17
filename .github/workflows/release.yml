@@ -14,7 +14,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  approval:
+    name: Reuse approved source CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source_sha: ${{ steps.ci.outputs.source_sha }}
+      ci_run_id: ${{ steps.ci.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Require successful CI for the exact source
+        id: ci
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { requireApprovedCI } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/ci-policy.mjs`).href);
+            const tag = context.ref.startsWith('refs/tags/') ? context.ref.slice('refs/tags/'.length) : '';
+            if (!tag) throw new Error("Release requires a version tag.");
+            const approval = await requireApprovedCI({ github, ...context.repo, revision: context.sha, tag });
+            core.setOutput('source_sha', approval.sourceSha);
+            core.setOutput('ci_run_id', String(approval.runId));
+            core.notice(`Reusing source CI ${approval.runId} (${approval.sourceSha}); no source checks are repeated.`);
+
   release:
+    needs: approval
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,43 +81,6 @@ jobs:
                 throw new Error(`Release ${process.env.RELEASE_TAG} already exists; refusing to replace it.`);
               }
             }
-
-      - name: Test release tooling
-        run: |
-          node --test scripts/release.test.mjs
-          python3 -m unittest discover -s scripts -p "test_*.py"
-
-      - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-
-      - name: Test backend
-        working-directory: backend
-        run: go test -race ./...
-
-      - name: Install and validate frontend
-        run: |
-          npm ci --prefix frontend
-          npm run check --prefix frontend
-          npm test --prefix frontend
-
-      - name: Validate native split images and browser workflows before publication
-        run: |
-          docker build --build-arg VERSION="$RELEASE_TAG" -t nox-backend:release-check ./backend
-          docker build -t nox-backend-frontend:release-check ./frontend
-          python3 scripts/check-image-contracts.py --versioned-image nox-backend:release-check --build-version "$RELEASE_TAG"
-          cd frontend
-          npx playwright install --with-deps chromium
-          cd ..
-          python3 scripts/check-split-deployment.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check --browser
-
-      - name: Verify local Suite channel and browser setup
-        run: python3 scripts/check-suite-proxy.py --browser --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
-
-      - name: Verify shipped Compose and real Auth enrollment before publication
-        run: python3 scripts/check-auth-compose.py --backend-image nox-backend:release-check --frontend-image nox-backend-frontend:release-check
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4

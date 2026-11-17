@@ -250,6 +250,7 @@ for (const input of ['0.1.0', 'v0.1.0-rc.1']) {
     const tag = `v${version}`;
     const branch = input.startsWith('v') ? 'release/prerelease' : 'main';
     if (branch !== 'main') git(fixture.root, 'checkout', '-b', branch);
+    if (branch !== 'main') git(fixture.root, 'push', 'origin', branch);
     git(fixture.root, 'tag', 'unrelated-tag');
     let checked = false;
     assert.equal(await release(fixture.root, input, { async check(root, checkedTag) {
@@ -283,8 +284,9 @@ test('push failure preserves local release and atomic push leaves remote refs un
   const tree = git(fixture.root, 'rev-parse', 'HEAD^{tree}');
   const remoteHead = git(fixture.root, '-c', 'user.name=Release test', '-c', 'user.email=release@example.invalid',
     'commit-tree', tree, '-p', fixture.head, '-m', 'Concurrent remote commit');
-  git(fixture.root, 'push', 'origin', `${remoteHead}:refs/heads/main`);
-  await assert.rejects(release(fixture.root, '0.1.0', noChecks), error => {
+  await assert.rejects(release(fixture.root, '0.1.0', {
+    check() { git(fixture.root, 'push', 'origin', `${remoteHead}:refs/heads/main`); },
+  }), error => {
     assert.match(error.message, /commit e a tag v0.1.0 ficaram locais/);
     assert.match(error.message, /git push --atomic origin/);
     assert.match(error.message, /HEAD:refs\/heads\/main/);
@@ -456,7 +458,7 @@ test('metadata CLI exports exact build tags, UTC creation time and GitHub classi
   const root = await mkdtemp(resolve(tmpdir(), 'nox-backend-metadata-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(resolve(root, 'scripts'));
-  for (const script of ['release.mjs', 'release-metadata.mjs']) {
+  for (const script of ['release.mjs', 'release-metadata.mjs', 'ci-policy.mjs', 'ci-config.json']) {
     await copyFile(new URL(`./${script}`, import.meta.url), resolve(root, 'scripts', script));
   }
   for (const version of ['1.0.2', '1.1.0-rc.1']) {
